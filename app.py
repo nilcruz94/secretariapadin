@@ -2565,38 +2565,44 @@ def quadros_inclusao():
     return render_template_string(upload_html)
 
 
-# Rota para Quadro de Atendimento Mensal – com upload opcional para duas listas
+# Função auxiliar para preencher blocos do modelo
+def fill_block(ws_model, ws_source, target_rows, source_rows):
+    for target, source in zip(target_rows, source_rows):
+        value_B = ws_source.cell(row=source, column=7).value
+        value_C = ws_source.cell(row=source, column=8).value
+        set_merged_cell_value(ws_model, f"B{target}", value_B)
+        set_merged_cell_value(ws_model, f"C{target}", value_C)
+        set_merged_cell_value(ws_model, f"D{target}", f"=B{target}+C{target}")
+
 @app.route('/quadros/atendimento_mensal', methods=['GET', 'POST'])
 @login_required
 def quadro_atendimento_mensal():
     if request.method == 'POST':
+        # Recupera os arquivos enviados diretamente da requisição
         fundamental_file = request.files.get('lista_fundamental')
         eja_file = request.files.get('lista_eja')
 
-        if fundamental_file and fundamental_file.filename != '':
-            filename = secure_filename(fundamental_file.filename)
-            unique_filename = f"atendimento_{uuid.uuid4().hex}_{filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            fundamental_file.save(file_path)
-            session['lista_fundamental'] = file_path
-
-        if eja_file and eja_file.filename != '':
-            filename = secure_filename(eja_file.filename)
-            unique_filename = f"atendimento_eja_{uuid.uuid4().hex}_{filename}"
-            file_path_eja = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            eja_file.save(file_path_eja)
-            session['lista_eja'] = file_path_eja
-
-        file_path = session.get('lista_fundamental')
-        if file_path and os.path.exists(file_path):
-            lista_file = open(file_path, 'rb')
-        else:
-            lista_file = None
-
-        if not lista_file:
-            flash("Nenhum arquivo enviado.", "error")
+        if not fundamental_file or fundamental_file.filename == '':
+            flash("Nenhum arquivo da Lista Piloto FUNDAMENTAL enviado.", "error")
+            return redirect(url_for('quadro_atendimento_mensal'))
+        if not eja_file or eja_file.filename == '':
+            flash("Nenhum arquivo da Lista Piloto EJA enviado.", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
+        # Carrega as planilhas diretamente da stream (sem salvar no disco)
+        try:
+            wb_lista = load_workbook(fundamental_file, data_only=True)
+        except Exception:
+            flash("Erro ao ler o arquivo da Lista Piloto FUNDAMENTAL.", "error")
+            return redirect(url_for('quadro_atendimento_mensal'))
+
+        try:
+            wb_eja = load_workbook(eja_file, data_only=True)
+        except Exception:
+            flash("Erro ao ler o arquivo da Lista Piloto EJA.", "error")
+            return redirect(url_for('quadro_atendimento_mensal'))
+
+        # Carrega o modelo a partir de um buffer em memória (pode ser cacheado se não mudar)
         model_path = os.path.join("modelos", "Quadro de Atendimento Mensal - Modelo.xlsx")
         if not os.path.exists(model_path):
             flash("Modelo Atendimento Mensal não encontrado.", "error")
@@ -2604,147 +2610,66 @@ def quadro_atendimento_mensal():
 
         try:
             with open(model_path, "rb") as f:
-                wb_modelo = load_workbook(f, data_only=False)
+                model_bytes = f.read()
+            wb_modelo = load_workbook(BytesIO(model_bytes), data_only=False)
         except Exception as e:
             flash(f"Erro ao ler o modelo de atendimento mensal: {str(e)}", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
-        # Se o modelo tiver mais de uma planilha, pega a segunda (ou a primeira, se só tiver uma)
-        if len(wb_modelo.worksheets) > 1:
-            ws_modelo = wb_modelo.worksheets[1]
-        else:
-            ws_modelo = wb_modelo.active
+        # Seleciona a planilha do modelo (segunda se houver mais de uma)
+        ws_modelo = wb_modelo.worksheets[1] if len(wb_modelo.worksheets) > 1 else wb_modelo.active
 
+        # Atualiza cabeçalhos e informações fixas
         set_merged_cell_value(ws_modelo, "B5", "E.M José Padin Mouta")
         set_merged_cell_value(ws_modelo, "C6", "Rafael Fernando da Silva")
         set_merged_cell_value(ws_modelo, "B7", "46034")
         current_month = datetime.now().strftime("%m")
         set_merged_cell_value(ws_modelo, "A13", f"{current_month}/2025")
 
-        try:
-            lista_file.seek(0)
-            wb_lista = load_workbook(lista_file, data_only=True)
-        except Exception:
-            flash("Erro ao ler o arquivo da lista piloto.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
-
-        sheet_name = None
-        for name in wb_lista.sheetnames:
-            if name.strip().lower() == "total de alunos":
-                sheet_name = name
-                break
-
+        # Seleciona a aba "Total de Alunos" na lista FUNDAMENTAL
+        sheet_name = next((s for s in wb_lista.sheetnames if s.strip().lower() == "total de alunos"), None)
         if not sheet_name:
-            flash("A aba 'Total de Alunos' não foi encontrada na lista piloto.", "error")
+            flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto FUNDAMENTAL.", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
-
         ws_total = wb_lista[sheet_name]
 
-        # Preenche blocos do modelo com dados da lista piloto FUNDAMENTAL
-        for r, source_row in zip(range(55, 57), range(13, 15)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
+        # Preenche os blocos do modelo com os dados FUNDAMENTAL
+        fill_block(ws_modelo, ws_total, range(55, 57), range(13, 15))
+        fill_block(ws_modelo, ws_total, range(57, 61), range(15, 19))
+        fill_block(ws_modelo, ws_total, range(73, 80), range(20, 27))
+        fill_block(ws_modelo, ws_total, range(91, 98), range(28, 35))
 
-        for r, source_row in zip(range(57, 61), range(15, 19)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
-
-        for r, source_row in zip(range(73, 80), range(20, 27)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
-
-        for r, source_row in zip(range(91, 98), range(28, 35)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
-
-        # Preenchimento dos campos específicos
-        value_R20 = ws_total.cell(row=37, column=9).value  # I37
-        set_merged_cell_value(ws_modelo, "R20", value_R20)
-
+        # Atualiza campos específicos da lista FUNDAMENTAL
+        set_merged_cell_value(ws_modelo, "R20", ws_total.cell(row=37, column=9).value)
         set_merged_cell_value(ws_modelo, "R24", "-")
+        set_merged_cell_value(ws_modelo, "R28", ws_total.cell(row=39, column=9).value)
+        for cell, (row_src, col) in {
+            "B37": (6, 7), "B38": (7, 7), "B39": (8, 7), "B40": (9, 7), "B41": (10, 7), "B42": (11, 7),
+            "C37": (6, 8), "C38": (7, 8), "C39": (8, 8), "C40": (9, 8), "C41": (10, 8), "C42": (11, 8)
+        }.items():
+            set_merged_cell_value(ws_modelo, cell, ws_total.cell(row=row_src, column=col).value)
 
-        value_R28 = ws_total.cell(row=39, column=9).value  # I39
-        set_merged_cell_value(ws_modelo, "R28", value_R28)
-
-        set_merged_cell_value(ws_modelo, "B37", ws_total.cell(row=6, column=7).value)   # G6
-        set_merged_cell_value(ws_modelo, "B38", ws_total.cell(row=7, column=7).value)   # G7
-        set_merged_cell_value(ws_modelo, "B39", ws_total.cell(row=8, column=7).value)   # G8
-        set_merged_cell_value(ws_modelo, "B40", ws_total.cell(row=9, column=7).value)   # G9
-        set_merged_cell_value(ws_modelo, "B41", ws_total.cell(row=10, column=7).value)  # G10
-        set_merged_cell_value(ws_modelo, "B42", ws_total.cell(row=11, column=7).value)  # G11
-
-        set_merged_cell_value(ws_modelo, "C37", ws_total.cell(row=6, column=8).value)   # H6
-        set_merged_cell_value(ws_modelo, "C38", ws_total.cell(row=7, column=8).value)   # H7
-        set_merged_cell_value(ws_modelo, "C39", ws_total.cell(row=8, column=8).value)   # H8
-        set_merged_cell_value(ws_modelo, "C40", ws_total.cell(row=9, column=8).value)   # H9
-        set_merged_cell_value(ws_modelo, "C41", ws_total.cell(row=10, column=8).value)  # H10
-        set_merged_cell_value(ws_modelo, "C42", ws_total.cell(row=11, column=8).value)  # H11
-
-        # ---- NOVA ALTERAÇÃO PARA EJA ----
-        eja_path = session.get('lista_eja')
-        if not eja_path or not os.path.exists(eja_path):
-            flash("Arquivo da Lista Piloto EJA não encontrado.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
-
-        with open(eja_path, 'rb') as f_eja:
-            wb_eja = load_workbook(f_eja, data_only=True)
-
-        sheet_name_eja = None
-        for name in wb_eja.sheetnames:
-            if name.strip().lower() == "total de alunos":
-                sheet_name_eja = name
-                break
-
+        # Seleciona a aba "Total de Alunos" na lista EJA
+        sheet_name_eja = next((s for s in wb_eja.sheetnames if s.strip().lower() == "total de alunos"), None)
         if not sheet_name_eja:
             flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA.", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
-
         ws_total_eja = wb_eja[sheet_name_eja]
 
-        set_merged_cell_value(ws_modelo, "L19", ws_total_eja.cell(row=6, column=5).value)   # E6
-        set_merged_cell_value(ws_modelo, "L20", ws_total_eja.cell(row=7, column=5).value)   # E7
-        set_merged_cell_value(ws_modelo, "L21", ws_total_eja.cell(row=8, column=5).value)   # E8
-        set_merged_cell_value(ws_modelo, "L22", ws_total_eja.cell(row=9, column=5).value)   # E9
-
-        set_merged_cell_value(ws_modelo, "M19", ws_total_eja.cell(row=6, column=6).value)   # F6
-        set_merged_cell_value(ws_modelo, "M20", ws_total_eja.cell(row=7, column=6).value)   # F7
-        set_merged_cell_value(ws_modelo, "M21", ws_total_eja.cell(row=8, column=6).value)   # F8
-        set_merged_cell_value(ws_modelo, "M22", ws_total_eja.cell(row=9, column=6).value)   # F9
-
-        set_merged_cell_value(ws_modelo, "L27", ws_total_eja.cell(row=11, column=5).value)  # E11
-        set_merged_cell_value(ws_modelo, "L28", ws_total_eja.cell(row=12, column=5).value)  # E12
-        set_merged_cell_value(ws_modelo, "L29", ws_total_eja.cell(row=13, column=5).value)  # E13
-        set_merged_cell_value(ws_modelo, "L30", ws_total_eja.cell(row=14, column=5).value)  # E14
-
-        set_merged_cell_value(ws_modelo, "M27", ws_total_eja.cell(row=11, column=6).value)  # F11
-        set_merged_cell_value(ws_modelo, "M28", ws_total_eja.cell(row=12, column=6).value)  # F12
-        set_merged_cell_value(ws_modelo, "M29", ws_total_eja.cell(row=13, column=6).value)  # F13
-        set_merged_cell_value(ws_modelo, "M30", ws_total_eja.cell(row=14, column=6).value)  # F14
-
-        set_merged_cell_value(ws_modelo, "L35", ws_total_eja.cell(row=16, column=5).value)  # E16
-        set_merged_cell_value(ws_modelo, "L36", ws_total_eja.cell(row=17, column=5).value)  # E17
-        set_merged_cell_value(ws_modelo, "L37", ws_total_eja.cell(row=18, column=5).value)  # E18
-
-        set_merged_cell_value(ws_modelo, "M35", ws_total_eja.cell(row=16, column=6).value)  # F16
-        set_merged_cell_value(ws_modelo, "M36", ws_total_eja.cell(row=17, column=6).value)  # F17
-        set_merged_cell_value(ws_modelo, "M37", ws_total_eja.cell(row=18, column=6).value)  # F18
-
-        set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)  # G20
+        # Atualiza os campos específicos da lista EJA
+        for cell, (row_src, col) in {
+            "L19": (6, 5), "L20": (7, 5), "L21": (8, 5), "L22": (9, 5),
+            "M19": (6, 6), "M20": (7, 6), "M21": (8, 6), "M22": (9, 6),
+            "L27": (11, 5), "L28": (12, 5), "L29": (13, 5), "L30": (14, 5),
+            "M27": (11, 6), "M28": (12, 6), "M29": (13, 6), "M30": (14, 6),
+            "L35": (16, 5), "L36": (17, 5), "L37": (18, 5),
+            "M35": (16, 6), "M36": (17, 6), "M37": (18, 6),
+            "R32": (20, 7)
+        }.items():
+            set_merged_cell_value(ws_modelo, cell, ws_total_eja.cell(row=row_src, column=col).value)
         set_merged_cell_value(ws_modelo, "R24", "-")
-        # ---- FIM NOVA ALTERAÇÃO ----
 
+        # Gera o arquivo Excel final e envia como anexo
         output = BytesIO()
         wb_modelo.save(output)
         output.seek(0)
@@ -2752,6 +2677,7 @@ def quadro_atendimento_mensal():
         return send_file(output, as_attachment=True, download_name=filename,
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+    # HTML do formulário de upload
     upload_html = '''
     <!doctype html>
     <html lang="pt-br">
