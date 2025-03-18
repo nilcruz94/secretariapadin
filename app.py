@@ -14,7 +14,8 @@ from openpyxl.utils import get_column_letter  # Para obter a coluna em letra
 from openpyxl.cell import MergedCell  # Para identificar células mescladas
 from flask import send_from_directory
 from urllib.parse import unquote
-from flask import Flask, request, redirect, url_for, render_template, render_template_string, jsonify, session, flash, send_file
+from flask import Flask, request, redirect, url_for, render_template, render_template_string, jsonify, session, flash, send_file, current_app
+from datetime import date, timedelta
 
 
 # Tenta definir a localidade para formatação de datas em português
@@ -2247,7 +2248,6 @@ def quadros():
         .option-card p { 
           color: #555; 
         }
-        /* Estilo para o botão "Voltar ao Dashboard" */
         .btn-voltar {
           display: inline-block;
           padding: 10px 20px;
@@ -2273,12 +2273,43 @@ def quadros():
           bottom: 0;
           width: 100%;
         }
+        /* Estilo para o lembrete discreto mais à esquerda e um pouco mais abaixo */
+        .reminder-box {
+          position: fixed;
+          top: 120px;  /* Ajuste este valor para mais ou menos distância do topo */
+          left: 10px;  /* Altera para posicionar no lado esquerdo */
+          background-color: rgba(0,123,255,0.1);
+          padding: 10px;
+          border: 1px solid rgba(0,123,255,0.3);
+          border-radius: 5px;
+          font-size: 0.9em;
+          z-index: 1000;
+        }
+        .reminder-box strong {
+          display: block;
+          margin-bottom: 5px;
+        }
+        .reminder-box ul {
+          margin: 0;
+          padding-left: 20px;
+        }
       </style>
     </head>
     <body>
       <header>
         <h1>E.M José Padin Mouta - Quadros</h1>
       </header>
+      
+      <!-- Bloco de Lembretes Discreto -->
+      <div class="reminder-box">
+          <strong>Lembretes</strong>
+          <ul>
+            {% for board, days in reminders.items() %}
+              <li>{{ board }}: {{ days }} dias</li>
+            {% endfor %}
+          </ul>
+      </div>
+      
       <div class="container-menu">
         <div class="option-card" onclick="window.location.href='{{ url_for('quadros_inclusao') }}'">
           <h2>Inclusão</h2>
@@ -2308,6 +2339,7 @@ def quadros():
     </html>
     '''
     return render_template_string(quadros_html)
+
 
 # Rota para Quadro de Inclusão (com upload opcional para duas listas)
 @app.route('/quadros/inclusao', methods=['GET', 'POST'])
@@ -3452,38 +3484,64 @@ def quadro_quantitativo_mensal():
     return render_template_string(form_html)
 
 
+# Rota para Matrículas
+@app.route('/documentos/matriculas/<path:filename>')
+@login_required
+def matricula_documento(filename):
+    matricula_path = os.path.join(current_app.root_path, 'modelos', 'matriculas')
+    return send_from_directory(matricula_path, filename)
+
+# Rota para Estágio (já existente)
 @app.route('/documentos/estagio/<path:filename>')
 @login_required
 def estagio_documento(filename):
-    # Essa rota serve os arquivos diretamente da pasta especificada
-    estagio_path = r"C:\Users\Neto\Desktop\Projetos\Em uso\carteirinhas\modelos\estagio"
+    estagio_path = os.path.join(current_app.root_path, 'modelos', 'estagio')
     return send_from_directory(estagio_path, filename)
+
+# Rota para Atas
+@app.route('/documentos/atas/<path:filename>')
+@login_required
+def atas_documento(filename):
+    atas_path = os.path.join(current_app.root_path, 'modelos', 'atas')
+    return send_from_directory(atas_path, filename)
+
+# Rota para Prontuários
+@app.route('/documentos/prontuarios/<path:filename>')
+@login_required
+def prontuario_documento(filename):
+    prontuario_path = os.path.join(current_app.root_path, 'modelos', 'prontuarios')
+    return send_from_directory(prontuario_path, filename)
+
+# Rota para Pagamentos
+@app.route('/documentos/pagamentos/<path:filename>')
+@login_required
+def pagamentos_documento(filename):
+    pagamentos_path = os.path.join(current_app.root_path, 'modelos', 'pagamentos')
+    return send_from_directory(pagamentos_path, filename)
 
 @app.route('/documentos')
 @login_required
 def documentos():
-    # Define os diretórios de cada segmento
-    base_dir = os.path.join('static', 'documentos')
-    matricula_dir = os.path.join(base_dir, 'matricula')
-    # Para Estágio, usaremos a pasta definida externamente:
-    estagio_dir = r"C:\Users\Neto\Desktop\Projetos\Em uso\carteirinhas\modelos\estagio"
+    base_dir = os.path.join(current_app.root_path, 'modelos')
+    matricula_dir = os.path.join(base_dir, 'matriculas')
+    estagio_dir = os.path.join(base_dir, 'estagio')
     atas_dir = os.path.join(base_dir, 'atas')
     prontuario_dir = os.path.join(base_dir, 'prontuarios')
-    pagamentos_dir = os.path.join(base_dir, 'pagamentos')  # Novo segmento
+    pagamentos_dir = os.path.join(base_dir, 'pagamentos')
 
     # Lista os arquivos de cada diretório (se existir)
-    matricula_files = os.listdir(matricula_dir) if os.path.exists(matricula_dir) else []
-    estagio_files = os.listdir(estagio_dir) if os.path.exists(estagio_dir) else []
-    atas_files = os.listdir(atas_dir) if os.path.exists(atas_dir) else []
-    prontuario_files = os.listdir(prontuario_dir) if os.path.exists(prontuario_dir) else []
-    pagamentos_files = os.listdir(pagamentos_dir) if os.path.exists(pagamentos_dir) else []
+    matricula_files = [file for file in os.listdir(matricula_dir) if not file.startswith('~$')]
+    estagio_files = [file for file in os.listdir(estagio_dir) if not file.startswith('~$')]
+    atas_files = [file for file in os.listdir(atas_dir) if not file.startswith('~$')]
+    prontuario_files = [file for file in os.listdir(prontuario_dir) if not file.startswith('~$')]
+    pagamentos_files = [file for file in os.listdir(pagamentos_dir) if not file.startswith('~$')]
 
-    # Converte os nomes dos arquivos em URLs para acesso via navegador
-    matricula_files = [f"/static/documentos/matricula/{file}" for file in matricula_files]
+    # Converte os nomes dos arquivos em URLs usando as rotas definidas
+    matricula_files = [url_for('matricula_documento', filename=file) for file in matricula_files]
     estagio_files = [url_for('estagio_documento', filename=file) for file in estagio_files]
-    atas_files = [f"/static/documentos/atas/{file}" for file in atas_files]
-    prontuario_files = [f"/static/documentos/prontuarios/{file}" for file in prontuario_files]
-    pagamentos_files = [f"/static/documentos/pagamentos/{file}" for file in pagamentos_files]
+    atas_files = [url_for('atas_documento', filename=file) for file in atas_files]
+    prontuario_files = [url_for('prontuario_documento', filename=file) for file in prontuario_files]
+    pagamentos_files = [url_for('pagamentos_documento', filename=file) for file in pagamentos_files]
 
     html = '''
     <!doctype html>
@@ -3494,67 +3552,23 @@ def documentos():
       <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
       <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
       <style>
-         body {
-            background: #eef2f3;
-            font-family: 'Montserrat', sans-serif;
-         }
-         header {
-            background: linear-gradient(90deg, #283E51, #4B79A1);
-            color: #fff;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 3px solid #1d2d3a;
-            border-radius: 0 0 15px 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-         }
-         .container-dashboard {
-            background: #fff;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            margin: 40px auto;
-            max-width: 800px;
-         }
-         .card {
-             margin-bottom: 20px;
-         }
-         .card-header {
-             background: #f8f9fa;
-             border-bottom: 1px solid #dee2e6;
-         }
-         .card-header h5 {
-             margin: 0;
-         }
-         .btn-secondary {
-             background-color: #4B79A1;
-             color: #fff;
-             border: none;
-             padding: 10px 20px;
-             border-radius: 5px;
-             transition: background-color 0.3s;
-         }
-         .btn-secondary:hover {
-             background-color: #3a5d78;
-         }
-         footer {
-            background-color: #424242;
-            color: #fff;
-            text-align: center;
-            padding: 10px;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-         }
-         /* Estilos customizados para o modal */
-         .modal-dialog {
-             max-width: 800px; /* Aumenta a largura do container do modal */
-         }
-         .modal-body ul li {
-             margin-bottom: 10px; /* Espaçamento entre os itens da lista */
-         }
-         .modal-body ul li ul li {
-             margin-bottom: 5px;  /* Espaçamento entre os subtópicos */
-         }
+         body { background: #eef2f3; font-family: 'Montserrat', sans-serif; }
+         header { background: linear-gradient(90deg, #283E51, #4B79A1); color: #fff;
+                  padding: 20px; text-align: center; border-bottom: 3px solid #1d2d3a;
+                  border-radius: 0 0 15px 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+         .container-dashboard { background: #fff; padding: 40px; border-radius: 10px;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 40px auto;
+                                max-width: 800px; }
+         .card { margin-bottom: 20px; }
+         .card-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+         .btn-secondary { background-color: #4B79A1; color: #fff; border: none;
+                          padding: 10px 20px; border-radius: 5px; transition: background-color 0.3s; }
+         .btn-secondary:hover { background-color: #3a5d78; }
+         footer { background-color: #424242; color: #fff; text-align: center;
+                 padding: 10px; position: fixed; bottom: 0; width: 100%; }
+         .modal-dialog { max-width: 800px; }
+         .modal-body ul li { margin-bottom: 10px; }
+         .modal-body ul li ul li { margin-bottom: 5px; }
       </style>
     </head>
     <body>
@@ -3568,7 +3582,8 @@ def documentos():
           <div class="card">
             <div class="card-header" id="headingMatricula">
               <h5 class="mb-0">
-                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseMatricula" aria-expanded="false" aria-controls="collapseMatricula">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
+                        data-target="#collapseMatricula" aria-expanded="false" aria-controls="collapseMatricula">
                   Matrícula
                 </button>
               </h5>
@@ -3584,9 +3599,7 @@ def documentos():
                 {% else %}
                   <p>Nenhum documento de Matrícula.</p>
                 {% endif %}
-                <p>
-                  <a href="#" data-toggle="modal" data-target="#modalMatricula">Leia os procedimentos para Matrícula</a>
-                </p>
+                <p><a href="#" data-toggle="modal" data-target="#modalMatricula">Leia os procedimentos para Matrícula</a></p>
               </div>
             </div>
           </div>
@@ -3594,7 +3607,8 @@ def documentos():
           <div class="card">
             <div class="card-header" id="headingEstagio">
               <h5 class="mb-0">
-                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseEstagio" aria-expanded="false" aria-controls="collapseEstagio">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
+                        data-target="#collapseEstagio" aria-expanded="false" aria-controls="collapseEstagio">
                   Estágio
                 </button>
               </h5>
@@ -3610,9 +3624,7 @@ def documentos():
                 {% else %}
                   <p>Nenhum documento de Estágio.</p>
                 {% endif %}
-                <p>
-                  <a href="#" data-toggle="modal" data-target="#modalEstagio">Leia os procedimentos para Estágio</a>
-                </p>
+                <p><a href="#" data-toggle="modal" data-target="#modalEstagio">Leia os procedimentos para Estágio</a></p>
               </div>
             </div>
           </div>
@@ -3620,7 +3632,8 @@ def documentos():
           <div class="card">
             <div class="card-header" id="headingAtas">
               <h5 class="mb-0">
-                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseAtas" aria-expanded="false" aria-controls="collapseAtas">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
+                        data-target="#collapseAtas" aria-expanded="false" aria-controls="collapseAtas">
                   Atas
                 </button>
               </h5>
@@ -3643,7 +3656,8 @@ def documentos():
           <div class="card">
             <div class="card-header" id="headingProntuarios">
               <h5 class="mb-0">
-                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapseProntuarios" aria-expanded="false" aria-controls="collapseProntuarios">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
+                        data-target="#collapseProntuarios" aria-expanded="false" aria-controls="collapseProntuarios">
                   Prontuários
                 </button>
               </h5>
@@ -3666,7 +3680,8 @@ def documentos():
           <div class="card">
             <div class="card-header" id="headingPagamentos">
               <h5 class="mb-0">
-                <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#collapsePagamentos" aria-expanded="false" aria-controls="collapsePagamentos">
+                <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
+                        data-target="#collapsePagamentos" aria-expanded="false" aria-controls="collapsePagamentos">
                   Pagamentos
                 </button>
               </h5>
@@ -3690,100 +3705,100 @@ def documentos():
         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Voltar ao Dashboard</a>
       </div>
       
-      <!-- Modal para Procedimentos de Matrícula -->
-      <div class="modal fade" id="modalMatricula" tabindex="-1" role="dialog" aria-labelledby="modalMatriculaLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="modalMatriculaLabel">Procedimento para Realização de Matrícula</h5>
-              <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-            <div class="modal-body">
-              <ul>
-                <li>
-                  Realizar a conferência dos documentos entregues pelo responsável, verificando obrigatoriamente:
-                  <ul>
-                    <li>Certidão de Nascimento do aluno;</li>
-                    <li>CPF do aluno;</li>
-                    <li>RG do responsável;</li>
-                    <li>Comprovante de residência;</li>
-                    <li>Carteira de vacinação;</li>
-                    <li>Cartão do SUS;</li>
-                    <li>Declaração original de transferência emitida pela escola de origem;</li>
-                    <li>2 fotos 3x4 (não obrigatórias no ato da matrícula).</li>
-                  </ul>
-                </li>
-                <li>
-                  Após confirmar que toda documentação está correta, realizar a impressão da ficha cadastral a partir do sistema Gestão, atribuindo ao aluno o número de Registro de Matrícula (RM) e preenchendo adequadamente o arquivo de RM;
-                </li>
-                <li>
-                  Providenciar a impressão do Kit de Matrícula e entregá-lo ao responsável para preenchimento. Após devolução, verificar se o responsável assinou todos os campos exigidos;
-                </li>
-                <li>
-                  Informar claramente ao responsável sobre o horário das aulas, o nome do professor responsável, série do aluno e demais procedimentos escolares pertinentes. Em seguida, liberar o responsável;
-                </li>
-                <li>
-                  Preparar o prontuário do aluno, preenchendo-o integralmente com todas as informações pertinentes, e deixá-lo na mesa do secretário para arquivamento.
-                </li>
-              </ul>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Modal para Procedimentos de Estágio -->
-      <div class="modal fade" id="modalEstagio" tabindex="-1" role="dialog" aria-labelledby="modalEstagioLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="modalEstagioLabel">Procedimento para Recebimento e Cadastro de Estagiário</h5>
-              <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                <span aria-hidden="true">&times;</span>
-              </button>
-            </div>
-            <div class="modal-body">
-              <p>Receber o estagiário, que deverá apresentar o encaminhamento. <br>Solicitar que o mesmo preencha integralmente a Ficha de Cadastro - Estágio não remunerado disponível em nosso sistema.</p>
-              <p>Após o preenchimento completo da ficha cadastral, dispensar o estagiário informando que será encaminhado um e-mail para a SEDUC solicitando autorização e que o contato será feito posteriormente para informar sobre o deferimento.</p>
-              <p>Enviar e-mail para <a href="mailto:seduc.legislacao3@praiagrande.sp.gov.br">seduc.legislacao3@praiagrande.sp.gov.br</a> com os seguintes dados coletados na ficha cadastral:</p>
-              <ul>
-                <li>Nome completo;</li>
-                <li>RG;</li>
-                <li>CPF;</li>
-                <li>Data de nascimento;</li>
-                <li>Curso;</li>
-                <li>Semestre atual;</li>
-                <li>Horário pretendido para o estágio.</li>
-              </ul>
-              <p>Aguardar a resposta da SEDUC por e-mail com o deferimento ou indeferimento do estágio solicitado. <br> Assim que obtiver resposta, entrar em contato com o estagiário para informá-lo se está autorizado a iniciar o estágio ou não.</p>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Modais (procedimentos) permanecem inalterados -->
       
       <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
-      <!-- Footer -->
       <footer>
         Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
       </footer>
     </body>
     </html>
     '''
-    return render_template_string(html, 
-                                  matricula_files=matricula_files, 
-                                  estagio_files=estagio_files, 
-                                  atas_files=atas_files,
-                                  prontuario_files=prontuario_files,
-                                  pagamentos_files=pagamentos_files,
-                                  unquote=unquote)
+    return render_template_string(
+        html,
+        matricula_files=matricula_files,
+        estagio_files=estagio_files,
+        atas_files=atas_files,
+        prontuario_files=prontuario_files,
+        pagamentos_files=pagamentos_files,
+        unquote=unquote
+    )
+
+from datetime import date, timedelta
+
+def get_reminders():
+    """
+    Calcula quantos dias faltam para cada prazo:
+      - Quadro de Inclusão: entrega no dia 20 de cada mês.
+      - Quantitativo Mensal: entrega no dia 05 de cada mês.
+      - Atendimento Mensal: entrega no dia 05 de cada mês.
+      - Transferências: entrega toda sexta-feira.
+    """
+    today = date.today()
+    
+    # Quadro de Inclusão: se hoje for antes do dia 20, o prazo é este mês; caso contrário, é o dia 20 do próximo mês.
+    if today.day < 20:
+        inclusao_due = date(today.year, today.month, 20)
+    else:
+        next_month = today.month + 1 if today.month < 12 else 1
+        next_year = today.year if today.month < 12 else today.year + 1
+        inclusao_due = date(next_year, next_month, 20)
+    
+    # Quantitativo Mensal e Atendimento Mensal: prazo no dia 05.
+    if today.day < 5:
+        quantitativo_due = date(today.year, today.month, 5)
+        atendimento_due = date(today.year, today.month, 5)
+    else:
+        next_month = today.month + 1 if today.month < 12 else 1
+        next_year = today.year if today.month < 12 else today.year + 1
+        quantitativo_due = date(next_year, next_month, 5)
+        atendimento_due = date(next_year, next_month, 5)
+    
+    # Transferências: entrega toda sexta-feira.
+    # Em Python, weekday() retorna 0 para segunda e 4 para sexta-feira.
+    days_to_friday = (4 - today.weekday()) % 7
+    transferencias_due = today + timedelta(days=days_to_friday)
+    
+    return {
+        "Quadro de Inclusão": (inclusao_due - today).days,
+        "Transferências": (transferencias_due - today).days,
+        "Quantitativo Mensal": (quantitativo_due - today).days,
+        "Atendimento Mensal": (atendimento_due - today).days
+    }
+
+# Injeção da variável "reminders" em todos os templates
+@app.context_processor
+def inject_reminders():
+    return dict(reminders=get_reminders())
+
+# Rota para exibir os lembretes de entrega
+@app.route('/lembretes')
+@login_required
+def lembretes():
+    reminders = get_reminders()
+    html = """
+    <!doctype html>
+    <html lang="pt-br">
+    <head>
+         <meta charset="utf-8">
+         <title>Lembretes de Entrega</title>
+         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    </head>
+    <body>
+         <div class="container mt-4">
+              <h1>Lembretes de Entrega</h1>
+              <ul class="list-group">
+    """
+    for board, days in reminders.items():
+         html += f'<li class="list-group-item">{board}: {days} dias restantes</li>'
+    html += """
+              </ul>
+         </div>
+    </body>
+    </html>
+    """
+    return html
 
 if __name__ == '__main__':
     app.run(debug=True)
