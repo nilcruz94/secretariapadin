@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter  # Para obter a coluna em letra
 from openpyxl.cell import MergedCell  # Para identificar células mescladas
 from flask import send_from_directory
 from urllib.parse import unquote
-from flask import Flask, request, redirect, url_for, render_template, render_template_string, jsonify, session, flash, send_file, current_app
+from flask import Flask, request, redirect, url_for, render_template, render_template_string, jsonify, session, flash, send_file, current_app, send_from_directory
 from datetime import date, timedelta
 
 
@@ -3484,6 +3484,7 @@ def quadro_quantitativo_mensal():
     return render_template_string(form_html)
 
 
+
 # Rota para Matrículas
 @app.route('/documentos/matriculas/<path:filename>')
 @login_required
@@ -3491,7 +3492,7 @@ def matricula_documento(filename):
     matricula_path = os.path.join(current_app.root_path, 'modelos', 'matriculas')
     return send_from_directory(matricula_path, filename)
 
-# Rota para Estágio (já existente)
+# Rota para Estágio
 @app.route('/documentos/estagio/<path:filename>')
 @login_required
 def estagio_documento(filename):
@@ -3523,20 +3524,25 @@ def pagamentos_documento(filename):
 @login_required
 def documentos():
     base_dir = os.path.join(current_app.root_path, 'modelos')
-    matricula_dir = os.path.join(base_dir, 'matriculas')
-    estagio_dir = os.path.join(base_dir, 'estagio')
-    atas_dir = os.path.join(base_dir, 'atas')
-    prontuario_dir = os.path.join(base_dir, 'prontuarios')
-    pagamentos_dir = os.path.join(base_dir, 'pagamentos')
+    directories = {
+        'matriculas': os.path.join(base_dir, 'matriculas'),
+        'estagio': os.path.join(base_dir, 'estagio'),
+        'atas': os.path.join(base_dir, 'atas'),
+        'prontuarios': os.path.join(base_dir, 'prontuarios'),
+        'pagamentos': os.path.join(base_dir, 'pagamentos')
+    }
 
-    # Lista os arquivos de cada diretório (se existir)
-    matricula_files = [file for file in os.listdir(matricula_dir) if not file.startswith('~$')]
-    estagio_files = [file for file in os.listdir(estagio_dir) if not file.startswith('~$')]
-    atas_files = [file for file in os.listdir(atas_dir) if not file.startswith('~$')]
-    prontuario_files = [file for file in os.listdir(prontuario_dir) if not file.startswith('~$')]
-    pagamentos_files = [file for file in os.listdir(pagamentos_dir) if not file.startswith('~$')]
+    def get_files(directory):
+        if os.path.exists(directory):
+            return [f for f in os.listdir(directory) if not f.startswith('~$')]
+        return []
 
-    # Converte os nomes dos arquivos em URLs usando as rotas definidas
+    matricula_files = get_files(directories['matriculas'])
+    estagio_files = get_files(directories['estagio'])
+    atas_files = get_files(directories['atas'])
+    prontuario_files = get_files(directories['prontuarios'])
+    pagamentos_files = get_files(directories['pagamentos'])
+
     matricula_files = [url_for('matricula_documento', filename=file) for file in matricula_files]
     estagio_files = [url_for('estagio_documento', filename=file) for file in estagio_files]
     atas_files = [url_for('atas_documento', filename=file) for file in atas_files]
@@ -3599,7 +3605,11 @@ def documentos():
                 {% else %}
                   <p>Nenhum documento de Matrícula.</p>
                 {% endif %}
-                <p><a href="#" data-toggle="modal" data-target="#modalMatricula">Leia os procedimentos para Matrícula</a></p>
+                <p>
+                  <a href="#" data-toggle="modal" data-target="#modalMatricula">
+                    Leia os procedimentos para Matrícula
+                  </a>
+                </p>
               </div>
             </div>
           </div>
@@ -3624,7 +3634,11 @@ def documentos():
                 {% else %}
                   <p>Nenhum documento de Estágio.</p>
                 {% endif %}
-                <p><a href="#" data-toggle="modal" data-target="#modalEstagio">Leia os procedimentos para Estágio</a></p>
+                <p>
+                  <a href="#" data-toggle="modal" data-target="#modalEstagio">
+                    Leia os procedimentos para Estágio
+                  </a>
+                </p>
               </div>
             </div>
           </div>
@@ -3649,6 +3663,11 @@ def documentos():
                 {% else %}
                   <p>Nenhum documento de Atas.</p>
                 {% endif %}
+                <p>
+                  <a href="#" data-toggle="modal" data-target="#modalAtasProcedimentos">
+                    Leia os procedimentos para a confecção de atas
+                  </a>
+                </p>
               </div>
             </div>
           </div>
@@ -3705,7 +3724,199 @@ def documentos():
         <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Voltar ao Dashboard</a>
       </div>
       
-      <!-- Modais (procedimentos) permanecem inalterados -->
+      <!-- Modal para Procedimentos de Matrícula -->
+      <div class="modal fade" id="modalMatricula" tabindex="-1" role="dialog" aria-labelledby="modalMatriculaLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalMatriculaLabel">Procedimentos para Matrícula</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <p><strong>Para realizar a matrícula, o funcionário deverá:</strong></p>
+              <h6>Conferência da Documentação:</h6>
+              <p>Verificar a documentação entregue pelo responsável, que inclui:</p>
+              <ul>
+                <li>Certidão de Nascimento do Aluno;</li>
+                <li>CPF do Aluno;</li>
+                <li>Declaração de Transferência ou Histórico Escolar;</li>
+                <li>Carteira de Vacinação;</li>
+                <li>RG do Responsável;</li>
+                <li>Comprovante de Residência Atual (dos últimos 3 meses) em nome do responsável. Caso não possua, apresentar a certidão em nome do dono da residência acompanhada de declaração preenchida pelo mesmo, certificando que o responsável reside no local;</li>
+                <li>2 (duas) fotos 3x4 (não obrigatórias no ato da matrícula).</li>
+              </ul>
+              <p><strong>Observação:</strong> Caso o responsável não esteja munido da Carteira de Vacinação e/ou das fotos 3x4, deverá preencher o Termo de Compromisso, comprometendo-se a entregar os documentos faltantes na data definida pelo funcionário.</p>
+              
+              <p><strong>Processamento da Matrícula:</strong></p>
+              <p>Após a conferência dos documentos:</p>
+              <ul>
+                <li>Preencher o arquivo RM, atribuindo o RM ao aluno;</li>
+                <li>Imprimir a ficha cadastral do sistema GEM, efetivando a matrícula do aluno. Após a impressão, o responsável deverá preenchê-la e assinar nos campos indicados.</li>
+              </ul>
+              
+              <p><strong>Enquanto o funcionário realiza essas atividades, poderá deixar o responsável:</strong></p>
+              <ul>
+                <li>Preencher as Fichas SED;</li>
+                <li>Preencher e assinar as Normas de Convivência.</li>
+              </ul>
+              
+              <p><strong>Verificação Final e Apresentação Institucional:</strong></p>
+              <p>Após o preenchimento de todos os documentos, o funcionário deverá:</p>
+              <ul>
+                <li>Verificar se os campos de assinatura estão devidamente assinados;</li>
+                <li>Se estiverem corretos, realizar uma breve apresentação da escola, abordando:
+                  <ul>
+                    <li>Horários de aula;</li>
+                    <li>Dias de aula;</li>
+                    <li>Sala de aula designada para o aluno;</li>
+                    <li>Série do aluno;</li>
+                    <li>Nome da professora responsável.</li>
+                  </ul>
+                </li>
+                <li>Imprimir o comprovante de matrícula e preenchê-lo com todas as informações apresentadas, para que seja entregue ao responsável.</li>
+              </ul>
+              
+              <p><strong>Encerramento do Procedimento e Encaminhamento do Prontuário:</strong></p>
+              <p>Após a conclusão de todos os procedimentos, o funcionário poderá dispensar o responsável e iniciar a confecção do prontuário do aluno. Em seguida, o prontuário deverá ser colocado na mesa do secretário para inclusão no Sistema de Gestão e na Lista Piloto.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Modal para Procedimentos de Estágio -->
+      <div class="modal fade" id="modalEstagio" tabindex="-1" role="dialog" aria-labelledby="modalEstagioLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalEstagioLabel">Procedimentos para Estágio</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <p><strong style="color:red;">Estágio Obrigatório Não Remunerado:</strong></p>
+              <p>Ao se apresentar algum aluno, alegando interesse em realizar estágio:</p>
+              <ul>
+                <li>Consultar o arquivo de instituições conveniadas para verificar se a faculdade do aluno é parceira da prefeitura.</li>
+              </ul>
+              <p><strong>Caso a instituição seja parceira:</strong></p>
+              <ul>
+                <li>Solicitar os documentos do aluno referentes à sua escolaridade;</li>
+                <li>Recolher a carta de apresentação;</li>
+                <li>Pedir que o aluno preencha a FICHA DE CADASTRO – ESTÁGIO NÃO REMUNERADO.</li>
+              </ul>
+              <p><strong>Após a obtenção dos documentos e do preenchimento da ficha:</strong></p>
+              <ul>
+                <li>Coletar todas as informações possíveis, incluindo o horário desejado, o tipo de estágio e os dias disponíveis para estagiar;</li>
+                <li>Dispensar o estágio, informando ao aluno que o contato será retomado após o retorno da SEDUC, o qual ocorrerá em média dentro de 2 semanas.</li>
+              </ul>
+              <p><strong>Após toda a coleta de informações:</strong></p>
+              <ul>
+                <li>Enviar um ofício, acompanhado de todos os referidos documentos e informações coletadas, para a SEDUC, direcionado à Seção de Bolsas de Estudo, aos cuidados de Stefany.</li>
+              </ul>
+              <p><strong style="color:red;">Estágio de Contrapartida:</strong></p>
+              <p>Ao receber o encaminhamento do estagiário:</p>
+              <ul>
+                <li>Solicitar que o mesmo preencha a Ficha de Cadastro Não Remunerado.</li>
+              </ul>
+              <p><strong>Após o preenchimento da ficha:</strong></p>
+              <ul>
+                <li>Dispensar o estagiário, informando que os dados solicitados serão encaminhados à SEDUC, conforme o encaminhamento recebido, e que o contato será retomado assim que houver devolutiva da SEDUC.</li>
+              </ul>
+              <p>Em seguida, enviar um e-mail para <a href="mailto:seduc.legislacao3@praiagrande.sp.gov.br">seduc.legislacao3@praiagrande.sp.gov.br</a>, aos cuidados de Stefany, contendo os seguintes dados solicitados:</p>
+              <ul>
+                <li>Nome;</li>
+                <li>RG;</li>
+                <li>CPF;</li>
+                <li>Data de Nascimento (DN);</li>
+                <li>Curso;</li>
+                <li>Semestre (2025);</li>
+                <li>Horário pretendido.</li>
+              </ul>
+              <p>Quando a SEDUC retornar o e-mail, aprovando ou não o estagiário, entrar em contato com o mesmo para informá-lo se poderá iniciar o estágio ou não.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Modal para Procedimentos de Atas -->
+      <div class="modal fade" id="modalAtasProcedimentos" tabindex="-1" role="dialog" aria-labelledby="modalAtasProcedimentosLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalAtasProcedimentosLabel">Procedimentos para a Confecção de Atas</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <div class="modal-body">
+              <p><strong style="color:red;">Confecção de Atas:</strong></p>
+              <p>A ata é um documento formal que registra, de forma fiel e detalhada, os acontecimentos, discussões, decisões e deliberações ocorridas durante uma reunião. Serve para documentar o que foi discutido, assegurando a transparência e a formalidade do processo, além de garantir a veracidade das informações registradas. Funciona como suporte documental para futuras consultas e eventuais comprovações legais.</p>
+              
+              <p><strong style="color:red;">Ata de Classificação no Sistema:</strong></p>
+              <p>No nosso sistema, a Ata de Classificação é um documento formal que registra, de forma oficial, a avaliação e o resultado final do desempenho acadêmico do estudante. Este documento consolida as notas, as observações dos professores e as deliberações referentes à progressão ou retenção do aluno, servindo como registro para a validação dos resultados obtidos. Na Ata de Classificação, encontram-se campos essenciais, tais como:</p>
+              <ul>
+                <li>Data da Ata;</li>
+                <li>Nome do Aluno;</li>
+                <li>Data de Nascimento;</li>
+                <li>Responsável pelo Aluno;</li>
+                <li>[Outros campos que se fizerem necessários conforme o processo institucional].</li>
+              </ul>
+              
+              <p><strong style="color:red;">Atas de HTPC:</strong></p>
+              <p>São documentos que registram, de forma resumida, as decisões e encaminhamentos das reuniões pedagógicas, garantindo transparência e continuidade nas ações. Deverão ser preenchidas com a data da ata, as pautas a serem discutidas e as assinaturas dos presentes na reunião.</p>
+              
+              <p><strong style="color:red;">Atas de Reclassificação:</strong></p>
+              <p>As Atas de Reclassificação seguem o mesmo formato da Ata de Classificação, porém, neste caso, o aluno já se encontra matriculado em nossa unidade. Este documento contém informações semelhantes à Ata de Classificação, tais como:</p>
+              <ul>
+                <li>Data da Ata;</li>
+                <li>Nome do Aluno;</li>
+                <li>Notas e demais dados avaliativos;</li>
+                <li>Observações e deliberações referentes à reavaliação do desempenho do aluno.</li>
+              </ul>
+              <p>Adicionalmente, pode incluir comentários sobre o progresso do aluno e eventuais ajustes necessários para a continuidade do processo pedagógico.</p>
+              
+              <p><strong style="color:red;">Ata de Reunião de Pais e Mestres:</strong></p>
+              <p>A Ata de Reunião de Pais e Mestres é um documento formal que registra os principais pontos discutidos durante as reuniões entre a equipe pedagógica e os responsáveis pelos alunos. Este documento tem como finalidade:</p>
+              <ul>
+                <li>Registrar os assuntos debatidos, as sugestões e as deliberações acerca do desenvolvimento acadêmico e comportamental dos alunos;</li>
+                <li>Assegurar a transparência do diálogo entre escola e família, promovendo a colaboração mútua para a melhoria do ambiente educacional;</li>
+                <li>Servir como referência para futuras reuniões e para o acompanhamento das ações implementadas.</li>
+              </ul>
+              <p>Na Ata de Reunião de Pais e Mestres, devem constar campos essenciais, tais como:</p>
+              <ul>
+                <li>Data da reunião;</li>
+                <li>Lista de participantes (pais, responsáveis e equipe escolar);</li>
+                <li>Pautas discutidas;</li>
+                <li>Decisões e encaminhamentos;</li>
+                <li>Assinaturas dos presentes.</li>
+              </ul>
+              
+              <p><strong style="color:red;">Ata de Reunião de Funcionários:</strong></p>
+              <p>A Ata de Reunião de Funcionários é um documento formal destinado a registrar as discussões, decisões e encaminhamentos das reuniões realizadas com os colaboradores da instituição. Este documento tem como objetivo promover a comunicação interna e a transparência, bem como documentar as ações e estratégias definidas para o aprimoramento dos processos administrativos e operacionais. Na Ata de Reunião de Funcionários, devem ser incluídos elementos essenciais, tais como:</p>
+              <ul>
+                <li>Data da reunião;</li>
+                <li>Lista de participantes (nomes e cargos dos funcionários presentes);</li>
+                <li>Pautas discutidas;</li>
+                <li>Decisões tomadas e encaminhamentos definidos;</li>
+                <li>Espaço para observações adicionais e comentários;</li>
+                <li>Assinaturas dos participantes, validando o conteúdo registrado.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
