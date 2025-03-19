@@ -2315,6 +2315,10 @@ def quadros():
           <h2>Inclusão</h2>
           <p>Gerar quadro de inclusão.</p>
         </div>
+        <div class="option-card" onclick="window.location.href='{{ url_for('quantinclusao') }}'">
+          <h2>Quantitativo - Inclusão</h2>
+          <p>Gerar quadro quantitativo de inclusão.</p>
+        </div>
         <div class="option-card" onclick="window.location.href='{{ url_for('quadro_atendimento_mensal') }}'">
           <h2>Atendimento Mensal</h2>
           <p>Gerar quadro de atendimento mensal.</p>
@@ -4010,6 +4014,362 @@ def lembretes():
     </html>
     """
     return html
+
+@app.route('/quantinclusao', methods=['GET', 'POST'])
+@login_required
+def quantinclusao():
+    if request.method == 'POST':
+        from io import BytesIO
+        import os
+        from datetime import datetime
+        from openpyxl import load_workbook
+        import pandas as pd
+
+        # Obtém o nome do responsável pelo preenchimento a partir do formulário
+        responsavel = request.form.get('responsavel', '')
+
+        # Obtém os arquivos enviados
+        fundamental_file = request.files.get('lista_fundamental')
+        eja_file = request.files.get('lista_eja')  # opcional
+
+        if not fundamental_file or fundamental_file.filename == '':
+            flash("Selecione a Lista Piloto FUNDAMENTAL.", "error")
+            return redirect(url_for('quantinclusao'))
+
+        # Função para processamento padrão (FUNDAMENTAL – e também parte do EJA que segue esta lógica)
+        # Usando coluna N para inclusão e coluna P para professores
+        def processa_lista_corrida_por_serie(file_obj, serie):
+            inclusao = 0
+            professores_contagem = 0
+            professores_set = set()
+            try:
+                df = pd.read_excel(file_obj, sheet_name="LISTA CORRIDA", header=0, engine="openpyxl")
+                df_filtrado = df[df.iloc[:, 0].astype(str).str.strip() == serie]
+                inclusao = df_filtrado[
+                    df_filtrado.iloc[:, 13].astype(str).str.strip().str.lower() == "sim"
+                ].shape[0]
+                df_prof = df_filtrado[
+                    df_filtrado.iloc[:, 13].astype(str).str.strip().str.lower() == "sim"
+                ]
+                nomes_prof = df_prof.iloc[:, 15].astype(str).str.strip()
+                nomes_prof = nomes_prof[~nomes_prof.isin(["-", "#REF"])]
+                professores_contagem = nomes_prof.shape[0]
+                professores_set = set(nomes_prof.unique())
+            except Exception as e:
+                print(f"Erro ao processar a aba LISTA CORRIDA para a série {serie}: {e}")
+            return inclusao, professores_contagem, professores_set
+
+        # Função para processar a inclusão na LISTA EJA, usando coluna R (índice 17)
+        def processa_inclusao_eja(file_obj, series_list):
+            inclusao = 0
+            try:
+                df = pd.read_excel(file_obj, sheet_name="LISTA CORRIDA", header=0, engine="openpyxl")
+                df_filtrado = df[df.iloc[:, 0].astype(str).str.strip().isin(series_list)]
+                inclusao = df_filtrado[
+                    df_filtrado.iloc[:, 17].astype(str).str.strip().str.lower() == "sim"
+                ].shape[0]
+            except Exception as e:
+                print(f"Erro ao processar a inclusão na LISTA EJA para as séries {series_list}: {e}")
+            return inclusao
+
+        # Função para processar os profissionais na LISTA EJA, usando a coluna T (índice 19)
+        # Aqui, os nomes duplicados serão somados (contando cada ocorrência)
+        def processa_profissionais_eja(file_obj, series_list):
+            total_professores = 0
+            try:
+                df = pd.read_excel(file_obj, sheet_name="LISTA CORRIDA", header=0, engine="openpyxl")
+                df_filtrado = df[df.iloc[:, 0].astype(str).str.strip().isin(series_list)]
+                df_prof = df_filtrado[
+                    df_filtrado.iloc[:, 17].astype(str).str.strip().str.lower() == "sim"
+                ]
+                nomes_prof = df_prof.iloc[:, 19].astype(str).str.strip()
+                nomes_prof = nomes_prof[~nomes_prof.isin(["0", "-", "#REF", ""])]
+                total_professores = nomes_prof.shape[0]
+            except Exception as e:
+                print(f"Erro ao processar profissionais na LISTA EJA para as séries {series_list}: {e}")
+            return total_professores
+
+        # Função para processar os profissionais de forma única na LISTA EJA,
+        # usando a coluna T (índice 19), contando cada nome apenas uma vez
+        def processa_profissionais_eja_unique(file_obj, series_list):
+            teachers_set = set()
+            try:
+                df = pd.read_excel(file_obj, sheet_name="LISTA CORRIDA", header=0, engine="openpyxl")
+                df_filtrado = df[df.iloc[:, 0].astype(str).str.strip().isin(series_list)]
+                df_prof = df_filtrado[
+                    df_filtrado.iloc[:, 17].astype(str).str.strip().str.lower() == "sim"
+                ]
+                nomes_prof = df_prof.iloc[:, 19].astype(str).str.strip()
+                nomes_prof = nomes_prof[~nomes_prof.isin(["0", "-", "#REF", ""])]
+                teachers_set = set(nomes_prof.unique())
+            except Exception as e:
+                print(f"Erro ao processar profissionais (distinct) na LISTA EJA para as séries {series_list}: {e}")
+            return len(teachers_set)
+
+        # Lê o conteúdo do arquivo FUNDAMENTAL
+        fundamental_content = fundamental_file.read()
+
+        # Se o arquivo EJA for enviado, guarda seu conteúdo
+        eja_content = None
+        if eja_file and eja_file.filename != '':
+            eja_content = eja_file.read()
+
+        ###############################################
+        # Processamento FUNDAMENTAL (e EJA com lógica padrão)
+        ###############################################
+        series_mapping = {
+            "2ºA": ("D13", "D14", "D15"),
+            "2ºB": ("D17", "D18", "D19"),
+            "2ºC": ("D21", "D22", "D23"),
+            "2ºD": ("D25", "D26", "D27"),
+            "2ºE": ("D29", "D30", "D31"),
+            "2ºF": ("D33", "D34", "D35"),
+            "3ºA": ("D41", "D42", "D43"),
+            "3ºB": ("D45", "D46", "D47"),
+            "3ºC": ("H13", "H14", "H15"),
+            "3ºD": ("H17", "H18", "H19"),
+            "3ºE": ("H21", "H22", "H23"),
+            "3ºF": ("H25", "H26", "H27"),
+            "4ºA": ("H29", "H30", "H31"),
+            "4ºB": ("H33", "H34", "H35"),
+            "4ºC": ("H37", "H38", "H39"),
+            "4ºD": ("H41", "H42", "H43"),
+            "4ºE": ("H45", "H46", "H47"),
+            "4ºF": ("L13", "L14", "L15"),
+            "4ºG": ("L17", "L18", "L19"),
+            "5ºA": ("L21", "L22", "L23"),
+            "5ºB": ("L25", "L26", "L27"),
+            "5ºC": ("L29", "L30", "L31"),
+            "5ºD": ("L33", "L34", "L35"),
+            "5ºE": ("L37", "L38", "L39"),
+            "5ºF": ("L41", "L42", "L43"),
+            "5ºG": ("L45", "L46", "L47")
+        }
+
+        fundamental_results = {}
+        for serie, cells in series_mapping.items():
+            stream_fund = BytesIO(fundamental_content)
+            inc_fund, occ_fund, set_fund = processa_lista_corrida_por_serie(stream_fund, serie)
+            inc_eja = occ_eja = 0
+            set_eja = set()
+            if eja_content is not None:
+                stream_eja = BytesIO(eja_content)
+                inc_eja, occ_eja, set_eja = processa_lista_corrida_por_serie(stream_eja, serie)
+            total_inclusao = inc_fund + inc_eja
+            total_occurrences = occ_fund + occ_eja
+            total_unique = len(set_fund.union(set_eja))
+            fundamental_results[serie] = (total_inclusao, total_occurrences, total_unique)
+
+        ###############################################
+        # Processamento da inclusão na LISTA EJA (usando coluna R)
+        ###############################################
+        eja_inclusion_mapping = {
+            "E1": {
+                "series": ["1ª SÉRIE E.F", "2ª SÉRIE E.F", "3ª SÉRIE E.F", "4ª SÉRIE E.F"],
+                "cell": "D53"
+            },
+            "E2": {
+                "series": ["5ª SÉRIE E.F", "6ª SÉRIE E.F"],
+                "cell": "D57"
+            },
+            "E3": {
+                "series": ["7ª SÉRIE E.F"],
+                "cell": "D61"
+            },
+            "E4": {
+                "series": ["8ª SÉRIE E.F"],
+                "cell": "H53"
+            },
+            "EM1": {
+                "series": ["1ª SÉRIE E.M"],
+                "cell": "H57"
+            },
+            "EM2": {
+                "series": ["2ª SÉRIE E.M"],
+                "cell": "H61"
+            },
+            "EM3": {
+                "series": ["3ª SÉRIE E.M"],
+                "cell": "L53"
+            }
+        }
+        eja_inclusion_results = {}
+        if eja_content is not None:
+            for group, info in eja_inclusion_mapping.items():
+                series_list = info["series"]
+                stream_eja_group = BytesIO(eja_content)
+                inc_group = processa_inclusao_eja(stream_eja_group, series_list)
+                eja_inclusion_results[group] = inc_group
+
+        ###############################################
+        # Processamento dos profissionais na LISTA EJA (usando coluna T)
+        # Aqui, os nomes duplicados serão somados (contando cada ocorrência)
+        ###############################################
+        eja_teacher_mapping = {
+            "E1": "D54",
+            "E2": "D58",
+            "E3": "D62",
+            "E4": "H54",
+            "EM1": "H58",
+            "EM2": "H62",
+            "EM3": "L54"
+        }
+        eja_teacher_results = {}
+        if eja_content is not None:
+            for group, cell in eja_teacher_mapping.items():
+                series_list = eja_inclusion_mapping[group]["series"]
+                stream_eja_group = BytesIO(eja_content)
+                teacher_count = processa_profissionais_eja(stream_eja_group, series_list)
+                eja_teacher_results[group] = teacher_count
+
+        ###############################################
+        # Processamento dos profissionais distintos na LISTA EJA (usando coluna T)
+        # Aqui, nomes iguais serão considerados apenas uma vez.
+        ###############################################
+        eja_teacher_distinct_mapping = {
+            "E1": "D55",
+            "E2": "D59",
+            "E3": "D63",
+            "E4": "H55",
+            "EM1": "H59",
+            "EM2": "H63",
+            "EM3": "L55"
+        }
+        eja_teacher_distinct_results = {}
+        if eja_content is not None:
+            for group, cell in eja_teacher_distinct_mapping.items():
+                series_list = eja_inclusion_mapping[group]["series"]
+                stream_eja_group = BytesIO(eja_content)
+                distinct_count = processa_profissionais_eja_unique(stream_eja_group, series_list)
+                eja_teacher_distinct_results[group] = distinct_count
+
+        ###############################################
+        # Carrega o modelo e preenche os resultados
+        ###############################################
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        model_path = os.path.join(base_dir, "modelos", "Quadro Quantitativo de Inclusão - Modelo.xlsx")
+        try:
+            wb_modelo = load_workbook(model_path)
+        except Exception as e:
+            flash(f"Erro ao carregar o modelo: {e}", "error")
+            return redirect(url_for('quantinclusao'))
+        
+        ws_modelo = wb_modelo.active
+
+        # Preenche os resultados do processamento padrão (FUNDAMENTAL + EJA com lógica de N/P)
+        for serie, cells in series_mapping.items():
+            cell_inclusao, cell_ocorrencias, cell_unicas = cells
+            inc, occ, unicas = fundamental_results.get(serie, (0, 0, 0))
+            ws_modelo[cell_inclusao] = inc
+            ws_modelo[cell_ocorrencias] = occ
+            ws_modelo[cell_unicas] = unicas
+
+        # Preenche os resultados de inclusão da LISTA EJA (usando coluna R)
+        for group, info in eja_inclusion_mapping.items():
+            cell = info["cell"]
+            inc = eja_inclusion_results.get(group, 0)
+            ws_modelo[cell] = inc
+
+        # Preenche os resultados dos profissionais (contagem total) na LISTA EJA (usando coluna T)
+        for group, cell in eja_teacher_mapping.items():
+            teacher_count = eja_teacher_results.get(group, 0)
+            ws_modelo[cell] = teacher_count
+
+        # Preenche os resultados dos profissionais distintos na LISTA EJA (usando coluna T)
+        for group, cell in eja_teacher_distinct_mapping.items():
+            distinct_count = eja_teacher_distinct_results.get(group, 0)
+            ws_modelo[cell] = distinct_count
+
+        ###############################################
+        # Novas informações no modelo:
+        # Célula C8: Responsável pelo preenchimento
+        # Célula K8: Data de geração (DD/MM/YYYY)
+        # Célula B4: "QUADRO QUANTITATIVO DE INCLUSÃO - MÊS/2025" (MÊS em letras maiúsculas)
+        ###############################################
+        ws_modelo["C8"] = responsavel
+        ws_modelo["K8"] = datetime.now().strftime("%d/%m/%Y")
+        # Mapeamento dos nomes dos meses em português (fixo para 2025)
+        month_names = {
+            1: "JANEIRO",
+            2: "FEVEREIRO",
+            3: "MARÇO",
+            4: "ABRIL",
+            5: "MAIO",
+            6: "JUNHO",
+            7: "JULHO",
+            8: "AGOSTO",
+            9: "SETEMBRO",
+            10: "OUTUBRO",
+            11: "NOVEMBRO",
+            12: "DEZEMBRO"
+        }
+        mes = month_names[datetime.now().month]
+        ws_modelo["B4"] = f"QUADRO QUANTITATIVO DE INCLUSÃO - {mes}/2025"
+
+        # Prepara o arquivo para download
+        output = BytesIO()
+        wb_modelo.save(output)
+        output.seek(0)
+        filename = f"Quadro_Quantitativo_Inclusao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return send_file(output, as_attachment=True, download_name=filename,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    
+    # GET: Exibe o formulário com a estilização solicitada
+    form_html = '''
+    <!doctype html>
+    <html lang="pt-br">
+    <head>
+      <meta charset="utf-8">
+      <title>E.M José Padin Mouta - Quadro Quantitativo de Inclusão</title>
+      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+      <style>
+        body { background: #eef2f3; font-family: 'Montserrat', sans-serif; }
+        header {
+          background: linear-gradient(90deg, #283E51, #4B79A1);
+          color: #fff;
+          padding: 20px;
+          text-align: center;
+          border-bottom: 3px solid #1d2d3a;
+          border-radius: 0 0 15px 15px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .container-form { background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 40px auto; max-width: 600px; }
+        .btn-primary { background-color: #283E51; border: none; }
+        .btn-primary:hover { background-color: #1d2d3a; }
+        footer { background-color: #424242; color: #fff; text-align: center; padding: 10px; position: fixed; bottom: 0; width: 100%; }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>E.M José Padin Mouta - Quadro Quantitativo de Inclusão</h1>
+      </header>
+      <div class="container-form">
+        <form method="POST" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="responsavel">Responsável pelo preenchimento:</label>
+            <input type="text" class="form-control" name="responsavel" id="responsavel" required>
+          </div>
+          <div class="form-group">
+            <label for="lista_fundamental">Selecione a Lista Piloto - FUNDAMENTAL (Excel):</label>
+            <input type="file" class="form-control-file" name="lista_fundamental" id="lista_fundamental" accept=".xlsx, .xls" required>
+          </div>
+          <div class="form-group">
+            <label for="lista_eja">Selecione a Lista Piloto - EJA (Excel):</label>
+            <input type="file" class="form-control-file" name="lista_eja" id="lista_eja" accept=".xlsx, .xls">
+          </div>
+          <button type="submit" class="btn btn-primary">Gerar Quadro Quantitativo de Inclusão</button>
+        </form>
+        <br>
+        <a href="{{ url_for('quadros') }}">Voltar para Quadros</a>
+      </div>
+      <footer>
+        Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+      </footer>
+    </body>
+    </html>
+    '''
+    return render_template_string(form_html)
 
 if __name__ == '__main__':
     app.run(debug=True)
