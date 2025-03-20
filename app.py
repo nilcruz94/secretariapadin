@@ -172,7 +172,7 @@ def gerar_html_carteirinhas(arquivo_excel):
       top: -0.35cm;
       right: -0.30cm;
       font-size: 0.3cm;
-      color: #2196F3;
+      color: #1976D2;
     }
     input {
       width: 100%;
@@ -189,7 +189,7 @@ def gerar_html_carteirinhas(arquivo_excel):
       outline: none;
     }
     .carteirinha {
-      background-color: #fff;
+      background: linear-gradient(135deg, #ffffff, #e3f2fd);
       border-radius: 0.3cm;
       box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.1);
       overflow: hidden;
@@ -199,12 +199,12 @@ def gerar_html_carteirinhas(arquivo_excel):
       height: 9.0cm;
       padding: 0.2cm;
       position: relative;
-      border: 0.05cm solid #2196F3;
+      border: 0.05cm solid #1976D2;
     }
     .escola {
       font-size: 0.35cm;
       font-weight: 600;
-      color: #2196F3;
+      color: #052df5;
       margin-bottom: 0.1cm;
       text-align: center;
       text-transform: uppercase;
@@ -213,14 +213,14 @@ def gerar_html_carteirinhas(arquivo_excel):
       white-space: nowrap;
     }
     .foto {
-      width: 1.8cm;
-      height: 1.8cm;
+      width: 2.0cm;
+      height: 2.0cm;
       margin-bottom: 0.1cm;
       border-radius: 50%;
       object-fit: cover;
       margin-left: auto;
       margin-right: auto;
-      border: 0.1cm solid #2196F3;
+      border: 0.1cm solid #1976D2;
       cursor: pointer;
     }
     .info {
@@ -231,16 +231,21 @@ def gerar_html_carteirinhas(arquivo_excel):
       margin-left: 0.1cm;
       margin-bottom: 0.1cm;
       font-size: 0.3cm;
-      color: #333;
+      color: #030303;
+      font-weight: bold;
     }
-    .info div, .info span { margin: 0.08cm 0; }
+    .info div, .info span { 
+      margin: 0.08cm 0; 
+      /* Deixa as respostas em negrito */
+      font-weight: bold;
+    }
     .info .titulo {
       font-weight: 600;
-      color: #2196F3;
+      color: #052df5;
       text-transform: uppercase;
       letter-spacing: 0.02cm;
     }
-    .info .descricao { color: #555; }
+    .info .descricao { color: #000; font-weight: bold; }
     .linha-nome { display: flex; align-items: center; gap: 0.1cm; }
     .linha, .linha-ra, .linha-horario, .linha-rm { display: flex; flex-direction: row; align-items: center; gap: 0.2cm; }
     .status {
@@ -257,8 +262,8 @@ def gerar_html_carteirinhas(arquivo_excel):
       min-width: 1.5cm;
       text-align: center;
     }
-    .verde { background-color: #81C784; }
-    .vermelho { background-color: #E57373; }
+    .verde { background-color: #06c90e; }
+    .vermelho { background-color: #fc0808; }
     .ano {
       position: absolute;
       bottom: 0.2cm;
@@ -267,7 +272,7 @@ def gerar_html_carteirinhas(arquivo_excel):
       text-align: center;
       font-size: 0.4cm;
       font-weight: 600;
-      color: #2196F3;
+      color: #052df5;
     }
     #loading-overlay {
       position: fixed;
@@ -307,7 +312,7 @@ def gerar_html_carteirinhas(arquivo_excel):
       position: fixed;
       bottom: 0.5cm;
       right: 0.5cm;
-      background-color: #2196F3;
+      background-color: #1976D2;
       color: #fff;
       padding: 0.2cm 0.4cm;
       font-size: 0.3cm;
@@ -455,7 +460,7 @@ def gerar_html_carteirinhas(arquivo_excel):
             foto_tag = f'<img src="{found_photo}" alt="Foto" class="foto uploadable" data-rm="{row["RM"]}">'
         else:
             foto_tag = f'''
-            <div class="foto uploadable" data-rm="{row["RM"]}" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div class="foto uploadable" data-rm="{row["RM"]}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #052df5;">
               <span style="font-size:0.8cm; opacity:0.5; color: grey; margin-bottom: 0.1cm;">&#128247;</span>
               <small style="font-size:0.2cm; opacity:0.5; color: grey;">Anexe uma foto</small>
             </div>
