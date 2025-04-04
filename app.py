@@ -2308,13 +2308,12 @@ def quadros():
     </html>
     '''
     return render_template_string(quadros_html)
-
 # Rota para Quadro de Inclusão (com upload opcional para duas listas)
 @app.route('/quadros/inclusao', methods=['GET', 'POST'])
 @login_required
 def quadros_inclusao():
     if request.method == 'POST':
-        # Atualiza as listas na sessão (Fundamental e EJA)
+        # Atualiza as listas na sessão (Regular e EJA)
         fundamental_file = request.files.get('lista_fundamental')
         eja_file = request.files.get('lista_eja')
 
@@ -2368,9 +2367,10 @@ def quadros_inclusao():
             return redirect(url_for('quadros_inclusao'))
 
         ws = wb.active
+        set_merged_cell_value(ws, "C2", "E.M. José Padin Mouta")
         set_merged_cell_value(ws, "C3", "Luciana Rocha Augustinho")
         set_merged_cell_value(ws, "H3", "Ana Carolina Valencio da Silva Rodrigues")
-        set_merged_cell_value(ws, "K3", "Rosemeire de Souza Pereira")
+        set_merged_cell_value(ws, "K3", "Ana Paula Rodrigues de Assis Santos")
         set_merged_cell_value(ws, "C4", "Rafael Marques Lima")
         set_merged_cell_value(ws, "H4", "Rita de Cassia de Andrade")
         set_merged_cell_value(ws, "K4", "Ana Paula Rodrigues de Assis Santos")
@@ -2379,9 +2379,10 @@ def quadros_inclusao():
         start_row = 7
         current_row = start_row
 
-        # Processa alunos da Lista Piloto Fundamental
+        # Processa alunos da Lista Piloto Regular (Fundamental)
+        # Verifica se há pelo menos 25 colunas (coluna Y é a 25ª)
         if df_fundamental is not None:
-            if len(df_fundamental.columns) < 21:
+            if len(df_fundamental.columns) < 25:
                 flash("O arquivo da Lista Piloto Fundamental não possui colunas suficientes.", "error")
                 return redirect(url_for('quadros_inclusao'))
 
@@ -2391,15 +2392,17 @@ def quadros_inclusao():
                     continue
 
                 if str(row[inclusion_col_fund]).strip().lower() == "sim":
+                    # Obtém o valor da coluna X (índice 23)
+                    valor_coluna_x = row[df_fundamental.columns[23]]
+                    
+                    # Processa os demais dados conforme o processamento original
                     col_a_val = str(row[df_fundamental.columns[0]]).strip()
                     match = re.match(r"(\d+º).*?([A-Za-z])$", col_a_val)
                     if match:
-                        nivel = match.group(1)
                         turma = match.group(2)
                     else:
-                        nivel = col_a_val
                         turma = ""
-
+                    
                     horario = str(row[df_fundamental.columns[10]]).strip()
                     if "08h" in horario and "12h" in horario:
                         periodo = "MANHÃ"
@@ -2409,7 +2412,7 @@ def quadros_inclusao():
                         periodo = "NOITE"
                     else:
                         periodo = ""
-
+                    
                     nome_aluno = str(row[df_fundamental.columns[3]]).strip()
                     data_nasc = row[df_fundamental.columns[5]]
                     if pd.notna(data_nasc):
@@ -2423,17 +2426,20 @@ def quadros_inclusao():
                             data_nasc = "Desconhecida"
                     else:
                         data_nasc = "Desconhecida"
-
+                    
                     professor = str(row[df_fundamental.columns[14]]).strip()
                     plano = str(row[df_fundamental.columns[15]]).strip()
                     aee = str(row[df_fundamental.columns[16]]).strip() if len(df_fundamental.columns) > 16 else ""
                     deficiencia = str(row[df_fundamental.columns[17]]).strip() if len(df_fundamental.columns) > 17 else ""
                     observacoes = str(row[df_fundamental.columns[18]]).strip() if len(df_fundamental.columns) > 18 else ""
                     cadeira = str(row[df_fundamental.columns[19]]).strip() if len(df_fundamental.columns) > 19 else ""
-                    adequacoes = "-"
-                    extra_field = row[df_fundamental.columns[20]] if len(df_fundamental.columns) > 20 else ""
+                    
+                    # Coluna N: recebe o valor da coluna U (índice 20)
+                    valor_coluna_n = row[df_fundamental.columns[20]]
+                    # Coluna O: recebe o valor da coluna Y (índice 24)
+                    valor_coluna_o = row[df_fundamental.columns[24]]
 
-                    ws.cell(row=current_row, column=2, value=nivel)
+                    ws.cell(row=current_row, column=2, value=valor_coluna_x)
                     ws.cell(row=current_row, column=3, value=turma)
                     ws.cell(row=current_row, column=4, value=periodo)
                     ws.cell(row=current_row, column=5, value=horario)
@@ -2445,13 +2451,14 @@ def quadros_inclusao():
                     ws.cell(row=current_row, column=11, value=deficiencia)
                     ws.cell(row=current_row, column=12, value=observacoes)
                     ws.cell(row=current_row, column=13, value=cadeira)
-                    ws.cell(row=current_row, column=14, value=adequacoes)
-                    ws.cell(row=current_row, column=15, value=extra_field)
+                    ws.cell(row=current_row, column=14, value=valor_coluna_n)
+                    ws.cell(row=current_row, column=15, value=valor_coluna_o)
                     current_row += 1
 
         # Processa alunos da Lista Piloto EJA com novo mapeamento
+        # Verifica se há pelo menos 29 colunas (coluna AC é a 29ª)
         if df_eja is not None:
-            if len(df_eja.columns) < 25:
+            if len(df_eja.columns) < 29:
                 flash("O arquivo da Lista Piloto EJA não possui colunas suficientes.", "error")
                 return redirect(url_for('quadros_inclusao'))
 
@@ -2461,7 +2468,10 @@ def quadros_inclusao():
                     continue
 
                 if str(row[inclusion_col_eja]).strip().lower() == "sim":
-                    nivel = str(row[df_eja.columns[0]]).strip()
+                    # Obtém o valor da coluna AB (índice 27) para "nível e ano"
+                    valor_coluna_ab = row[df_eja.columns[27]]
+                    
+                    # Processa os demais dados conforme o mapeamento atual
                     turma = "A"
                     periodo = "NOITE"
                     horario = str(row[df_eja.columns[15]]).strip()
@@ -2478,15 +2488,21 @@ def quadros_inclusao():
                             data_nasc = "Desconhecida"
                     else:
                         data_nasc = "Desconhecida"
+                    
                     professor = str(row[df_eja.columns[18]]).strip()
                     plano = str(row[df_eja.columns[19]]).strip()
                     aee = str(row[df_eja.columns[20]]).strip() if len(df_eja.columns) > 20 else ""
                     deficiencia = str(row[df_eja.columns[21]]).strip() if len(df_eja.columns) > 21 else ""
                     observacoes = str(row[df_eja.columns[22]]).strip() if len(df_eja.columns) > 22 else ""
-                    cadeira = str(row[df_eja.columns[23]]).strip() if len(df_eja.columns) > 23 else ""
-                    adequacoes = "-"
-                    atendimentos_saude = str(row[df_eja.columns[24]]).strip() if len(df_eja.columns) > 24 else ""
-                    ws.cell(row=current_row, column=2, value=nivel)
+                    # Aqui, se necessário, você pode tratar "cadeira" a partir de outra coluna, se aplicável
+                    cadeira = ""
+                    
+                    # Coluna N: recebe o valor da coluna Y (índice 24)
+                    valor_coluna_n = row[df_eja.columns[24]]
+                    # Coluna O: recebe o valor da coluna AC (índice 28)
+                    valor_coluna_o = row[df_eja.columns[28]]
+
+                    ws.cell(row=current_row, column=2, value=valor_coluna_ab)
                     ws.cell(row=current_row, column=3, value=turma)
                     ws.cell(row=current_row, column=4, value=periodo)
                     ws.cell(row=current_row, column=5, value=horario)
@@ -2498,8 +2514,8 @@ def quadros_inclusao():
                     ws.cell(row=current_row, column=11, value=deficiencia)
                     ws.cell(row=current_row, column=12, value=observacoes)
                     ws.cell(row=current_row, column=13, value=cadeira)
-                    ws.cell(row=current_row, column=14, value=adequacoes)
-                    ws.cell(row=current_row, column=15, value=atendimentos_saude)
+                    ws.cell(row=current_row, column=14, value=valor_coluna_n)
+                    ws.cell(row=current_row, column=15, value=valor_coluna_o)
                     current_row += 1
 
         output = BytesIO()
@@ -2511,6 +2527,7 @@ def quadros_inclusao():
         filename = f"Quadro de Inclusão - {mes} - E.M José Padin Mouta.xlsx"
         return send_file(output, as_attachment=True, download_name=filename,
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 
     upload_html = '''
     <!doctype html>
