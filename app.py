@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, url_for, render_template_string, jsonify, session, flash, send_file
+from flask import Flask, request, redirect, url_for, render_template_string, jsonify, session, flash, send_file, render_template, send_from_directory
 import pandas as pd
 import os
 import uuid
@@ -12,10 +12,7 @@ import xlrd  # Para ler arquivos .xls, se necessário
 from openpyxl import load_workbook, Workbook  # Usado para trabalhar com XLSX
 from openpyxl.utils import get_column_letter  # Para obter a coluna em letra
 from openpyxl.cell import MergedCell  # Para identificar células mescladas
-from flask import send_from_directory
 from urllib.parse import unquote
-from flask import Flask, request, redirect, url_for, render_template, render_template_string, jsonify, session, flash, send_file
-
 
 # Tenta definir a localidade para formatação de datas em português
 try:
@@ -35,6 +32,10 @@ if not os.path.exists('static/fotos'):
     os.makedirs('static/fotos')
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
+
+# Importa e registra o blueprint do confere.py
+from confere import confere_bp
+app.register_blueprint(confere_bp, url_prefix='/confere')
 
 
 def allowed_file(filename):
@@ -1368,6 +1369,10 @@ def dashboard():
           <div class="option-card" onclick="window.location.href='{{ url_for('quadros') }}'">
             <h2>Quadros</h2>
             <p>Gerar quadros para os alunos.</p>
+          </div>
+          <div class="option-card" onclick="window.location.href='{{ url_for('confere.index') }}'">
+            <h2>Conferir Listas</h2>
+            <p>Acessar a conferência de listas.</p>
           </div>
           <div class="option-card" onclick="window.location.href='{{ url_for('documentos') }}'">
             <h2>Documentos</h2>
