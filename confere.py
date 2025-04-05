@@ -17,7 +17,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 # Variável global para armazenar o caminho do arquivo Excel atual
 current_excel_file = None
 
-# Mapeamento de séries para os intervalos de linhas
+# Mapeamento de séries para os intervalos de linhas (usado quando não for "Todas as séries")
 mapeamento = {
     '2ºA': (0, 50),
     '2ºB': (50, 100),
@@ -176,7 +176,7 @@ def comparar_listas(df_excel, df_pdf):
             })
     
     excel_lookup = df_excel.set_index('nome_norm').to_dict(orient='index')
-    pdf_lookup = df_pdf.set_index('nome_norm').to_dict(orient='index')
+    pdf_lookup = df_pdf.drop_duplicates(subset=['nome_norm']).set_index('nome_norm').to_dict(orient='index')
     
     set_excel = set(df_excel['nome_norm'])
     set_pdf = set(df_pdf['nome_norm'])
@@ -207,6 +207,9 @@ def comparar_listas(df_excel, df_pdf):
 @confere_bp.route('/upload_excel', methods=['POST'])
 def upload_excel():
     global current_excel_file
+    if current_excel_file is not None:
+        return jsonify({"success": False, "message": "Arquivo Excel já foi carregado anteriormente."})
+    
     if 'listaExcel' not in request.files:
         return jsonify({"success": False, "message": "Nenhum arquivo Excel enviado."})
     file_excel = request.files['listaExcel']
@@ -231,18 +234,50 @@ def index():
         if current_excel_file is None:
             flash("Nenhum arquivo Excel foi carregado. Por favor, anexe um arquivo Excel.", "danger")
         else:
-            result = obter_dados_serie(selected_series, current_excel_file)
-            if isinstance(result, str):
-                error_excel = result
-            else:
-                dados_excel = result
+            if selected_series == "Todas as séries":
+                # Obtém os arquivos enviados para cada série pelo nome único
+                pdf_dict = {}
+                for key in request.files.keys():
+                    if key.startswith("listaPDF_"):
+                        file_pdf = request.files.get(key)
+                        if file_pdf and file_pdf.filename != '':
+                            # O sufixo indica a série
+                            serie_from_key = key.replace("listaPDF_", "")
+                            pdf_dict[serie_from_key] = file_pdf
 
-        if 'listaPDF' in request.files:
-            file_pdf = request.files['listaPDF']
-            if file_pdf.filename != '':
-                dados_pdf = obter_dados_pdf(file_pdf)
-        if dados_excel is not None and dados_pdf is not None:
-            divergencias = comparar_listas(dados_excel, dados_pdf)
+                divergencias_dict = {}
+                for serie in mapeamento.keys():
+                    df_excel_serie = obter_dados_serie(serie, current_excel_file)
+                    if isinstance(df_excel_serie, str):
+                        flash(f"Erro na série {serie}: {df_excel_serie}", "danger")
+                        continue
+                    if serie in pdf_dict:
+                        df_pdf = obter_dados_pdf(pdf_dict[serie])
+                        if df_pdf is not None:
+                            df_div = comparar_listas(df_excel_serie, df_pdf)
+                            if df_div is not None:
+                                # Se o resultado for um Series (apenas uma linha), converte para DataFrame
+                                if isinstance(df_div, pd.Series):
+                                    df_div = df_div.to_frame().T
+                                divergencias_dict[serie] = df_div
+                    else:
+                        flash(f"Nenhum PDF enviado para a série {serie}.", "warning")
+                if divergencias_dict:
+                    divergencias = divergencias_dict
+            else:
+                # Opção de série individual
+                result = obter_dados_serie(selected_series, current_excel_file)
+                if isinstance(result, str):
+                    error_excel = result
+                else:
+                    dados_excel = result
+
+                if 'listaPDF' in request.files:
+                    file_pdf = request.files['listaPDF']
+                    if file_pdf.filename != '':
+                        dados_pdf = obter_dados_pdf(file_pdf)
+                if dados_excel is not None and dados_pdf is not None:
+                    divergencias = comparar_listas(dados_excel, dados_pdf)
     
     return render_template('index.html', 
                            dados_excel=dados_excel, 
@@ -251,7 +286,6 @@ def index():
                            error_excel=error_excel,
                            selected_series=selected_series)
 
-# Permite rodar o subsistema de forma independente para testes
 if __name__ == '__main__':
     app = Flask(__name__)
     app.secret_key = 'sua_chave_secreta_aqui'
