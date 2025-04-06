@@ -1102,6 +1102,7 @@ def login_route():
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
           }
           .container-login {
             background: #fff;
@@ -1130,26 +1131,28 @@ def login_route():
             padding: 10px;
           }
           .error {
-            color: red;
+            color: #ff0000;
             margin-top: 15px;
           }
         </style>
       </head>
       <body>
         <header>
-          <h1 class="mb-0">E.M José Padin Mouta - Secretaria </h1>
+          <h1>E.M José Padin Mouta - Secretaria</h1>
         </header>
-        <main>
-          <div class="container container-login">
-            <h2>Acesso Restrito</h2>
+        <main class="container">
+          <div class="container-login">
+            <h2 class="text-center">Acesso Restrito</h2>
             <form method="POST">
               <div class="form-group">
                 <input type="password" name="token" class="form-control" placeholder="Digite o token de acesso" required>
               </div>
-              <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+              <button type="submit" class="btn btn-primary btn-block mt-3">Entrar</button>
             </form>
             {% if error %}
-              <p class="error">{{ error }}</p>
+              <div class="text-center">
+                <p class="error">{{ error }}</p>
+              </div>
             {% endif %}
           </div>
         </main>
@@ -1276,119 +1279,174 @@ def upload_listas():
 @login_required
 def dashboard():
     dashboard_html = '''
-    <!doctype html>
-    <html lang="pt-br">
-      <head>
-        <meta charset="utf-8">
-        <title>E.M José Padin Mouta - Secretaria </title>
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-        <style>
-          body {
-            background: #eef2f3;
-            font-family: 'Montserrat', sans-serif;
-          }
-          header {
-            background: linear-gradient(90deg, #283E51, #4B79A1);
-            color: #fff;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 3px solid #1d2d3a;
-            border-radius: 0 0 15px 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-          }
-          .container-dashboard {
-            background: #fff;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            margin: 40px auto;
-            max-width: 800px;
-          }
-          .option-card {
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            transition: transform 0.2s;
-            cursor: pointer;
-            margin-bottom: 20px;
-          }
-          .option-card:hover {
-            transform: scale(1.02);
-          }
-          .option-card h2 {
-            margin-bottom: 10px;
-            color: #283E51;
-          }
-          .option-card p {
-            color: #555;
-          }
-          .logout-container {
-            text-align: center;
-            margin-top: 20px;
-          }
-          .btn-logout {
-            background-color: #dc3545;
-            color: #fff;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            text-decoration: none;
-            transition: background-color 0.3s;
-          }
-          .btn-logout:hover {
-            background-color: #c82333;
-          }
-          footer {
-            background-color: #424242;
-            color: #fff;
-            text-align: center;
-            padding: 10px;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-          }
-        </style>
-      </head>
-      <body>
-        <header>
-          <h1>E.M José Padin Mouta - Secretaria</h1>
-        </header>
-        <div class="container container-dashboard">
-          <div class="option-card" onclick="window.location.href='{{ url_for('declaracao_tipo') }}'">
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <title>E.M José Padin Mouta - Secretaria</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap e Font Awesome -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background: #eef2f3;
+        font-family: 'Montserrat', sans-serif;
+        margin-bottom: 60px; /* Espaço para o rodapé fixo */
+      }
+      header {
+        background: linear-gradient(90deg, #283E51, #4B79A1);
+        color: #fff;
+        padding: 20px;
+        text-align: center;
+        border-bottom: 3px solid #1d2d3a;
+        border-radius: 0 0 15px 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      }
+      .container-dashboard {
+        background: #fff;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        margin: 40px auto;
+        max-width: 900px;
+      }
+      .option-row {
+        display: block;
+      }
+      .option-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        cursor: pointer;
+        background: #fff;
+        margin-bottom: 20px;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .option-card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+      }
+      .option-content {
+        flex: 1;
+      }
+      .option-icon {
+        width: 60px;
+        text-align: center;
+        margin-right: 20px;
+      }
+      .option-icon i {
+        font-size: 2rem;
+        color: #283E51;
+      }
+      .option-card h2 {
+        margin: 0 0 10px 0;
+        font-size: 1.25rem;
+        color: #283E51;
+      }
+      .option-card p {
+        margin: 0;
+        color: #555;
+        font-size: 1rem;
+      }
+      .logout-container {
+        text-align: center;
+        margin-top: 30px;
+      }
+      .btn-logout {
+        background-color: #dc3545;
+        color: #fff;
+        padding: 10px 25px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: background-color 0.3s;
+      }
+      .btn-logout:hover {
+        background-color: #c82333;
+      }
+      footer {
+        background-color: #424242;
+        color: #fff;
+        text-align: center;
+        padding: 10px;
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>E.M José Padin Mouta - Secretaria</h1>
+    </header>
+    <div class="container container-dashboard">
+      <div class="option-row">
+        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('declaracao_tipo') }}'">
+          <div class="option-icon">
+            <i class="fas fa-file-alt"></i>
+          </div>
+          <div class="option-content">
             <h2>Declaração Escolar</h2>
             <p>Gerar declaração escolar.</p>
           </div>
-          <div class="option-card" onclick="window.location.href='{{ url_for('carteirinhas') }}'">
+        </div>
+        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('carteirinhas') }}'">
+          <div class="option-icon">
+            <i class="fas fa-id-card"></i>
+          </div>
+          <div class="option-content">
             <h2>Carteirinhas</h2>
             <p>Gerar carteirinhas para os alunos.</p>
           </div>
-          <div class="option-card" onclick="window.location.href='{{ url_for('quadros') }}'">
+        </div>
+        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('quadros') }}'">
+          <div class="option-icon">
+            <i class="fas fa-chalkboard-teacher"></i>
+          </div>
+          <div class="option-content">
             <h2>Quadros</h2>
             <p>Gerar quadros para os alunos.</p>
           </div>
-          <div class="option-card" onclick="window.location.href='{{ url_for('confere.index') }}'">
+        </div>
+        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('confere.index') }}'">
+          <div class="option-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="option-content">
             <h2>Conferir Listas</h2>
             <p>Acessar a conferência de listas.</p>
           </div>
-          <div class="option-card" onclick="window.location.href='{{ url_for('documentos') }}'">
-            <h2>Documentos</h2>
-            <p>Documentos importantes por segmento</p>
+        </div>
+        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('documentos') }}'">
+          <div class="option-icon">
+            <i class="fas fa-folder-open"></i>
           </div>
-          <div class="logout-container">
-            <a href="{{ url_for('logout_route') }}" class="btn-logout">
-              <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+          <div class="option-content">
+            <h2>Documentos</h2>
+            <p>Documentos importantes por segmento.</p>
           </div>
         </div>
-        <footer>
-          Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
-        </footer>
-      </body>
-    </html>
+      </div>
+      <div class="logout-container">
+        <a href="{{ url_for('logout_route') }}" class="btn-logout">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+      </div>
+    </div>
+    <footer>
+      Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+    </footer>
+    <!-- Scripts do Bootstrap -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
+
+
     '''
     return render_template_string(dashboard_html)
 
@@ -2205,110 +2263,157 @@ def quadros():
     quadros_html = '''
     <!doctype html>
     <html lang="pt-br">
-    <head>
-      <meta charset="utf-8">
-      <title>E.M José Padin Mouta - Quadros</title>
-      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-      <style>
-        body { 
-          background: #eef2f3; 
-          font-family: 'Montserrat', sans-serif; 
-        }
-        header {
-          background: linear-gradient(90deg, #283E51, #4B79A1);
-          color: #fff;
-          padding: 20px;
-          text-align: center;
-          border-bottom: 3px solid #1d2d3a;
-          border-radius: 0 0 15px 15px;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .container-menu { 
-          margin: 40px auto; 
-          max-width: 800px; 
-          background: #fff; 
-          padding: 40px; 
-          border-radius: 10px; 
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
-        }
-        .option-card { 
-          border: 1px solid #ccc; 
-          border-radius: 10px; 
-          padding: 20px; 
-          text-align: center; 
-          transition: transform 0.2s; 
-          cursor: pointer; 
-          margin-bottom: 20px; 
-        }
-        .option-card:hover { 
-          transform: scale(1.02); 
-        }
-        .option-card h2 { 
-          margin-bottom: 10px; 
-          color: #283E51; 
-        }
-        .option-card p { 
-          color: #555; 
-        }
-        /* Estilo para o botão "Voltar ao Dashboard" */
-        .btn-voltar {
-          display: inline-block;
-          padding: 10px 20px;
-          font-size: 16px;
-          font-weight: 600;
-          font-family: 'Montserrat', sans-serif;
-          color: #fff;
-          background-color: #4B79A1;
-          border: none;
-          border-radius: 5px;
-          text-decoration: none;
-          transition: background-color 0.3s;
-        }
-        .btn-voltar:hover { 
-          background-color: #3a5d78; 
-        }
-        footer {
-          background-color: #424242;
-          color: #fff;
-          text-align: center;
-          padding: 10px;
-          position: fixed;
-          bottom: 0;
-          width: 100%;
-        }
-      </style>
-    </head>
-    <body>
-      <header>
-        <h1>E.M José Padin Mouta - Quadros</h1>
-      </header>
-      <div class="container-menu">
-        <div class="option-card" onclick="window.location.href='{{ url_for('quadros_inclusao') }}'">
-          <h2>Inclusão</h2>
-          <p>Gerar quadro de inclusão.</p>
+      <head>
+        <meta charset="utf-8">
+        <title>E.M José Padin Mouta - Quadros</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <!-- Bootstrap, Font Awesome e Google Fonts -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+        <style>
+          body {
+            background: #eef2f3;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 60px; /* Espaço para o rodapé fixo */
+          }
+          header {
+            background: linear-gradient(90deg, #283E51, #4B79A1);
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid #1d2d3a;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          }
+          .container-menu {
+            margin: 40px auto;
+            max-width: 900px;
+            background: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          }
+          .option-row {
+            display: block;
+          }
+          .option-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            background: #fff;
+            margin-bottom: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+          }
+          .option-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+          }
+          .option-icon {
+            width: 60px;
+            text-align: center;
+            margin-right: 20px;
+          }
+          .option-icon i {
+            font-size: 2rem;
+            color: #283E51;
+          }
+          .option-content {
+            flex: 1;
+          }
+          .option-content h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.25rem;
+            color: #283E51;
+          }
+          .option-content p {
+            margin: 0;
+            font-size: 1rem;
+            color: #555;
+          }
+          .btn-voltar {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            background-color: #4B79A1;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+          }
+          .btn-voltar:hover {
+            background-color: #3a5d78;
+          }
+          footer {
+            background-color: #424242;
+            color: #fff;
+            text-align: center;
+            padding: 10px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+          }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>E.M José Padin Mouta - Quadros</h1>
+        </header>
+        <div class="container-menu">
+          <div class="option-row">
+            <div class="option-card" onclick="window.location.href='{{ url_for('quadros_inclusao') }}'">
+              <div class="option-icon">
+                <i class="fas fa-user-plus"></i>
+              </div>
+              <div class="option-content">
+                <h2>Inclusão</h2>
+                <p>Gerar quadro de inclusão.</p>
+              </div>
+            </div>
+            <div class="option-card" onclick="window.location.href='{{ url_for('quadro_atendimento_mensal') }}'">
+              <div class="option-icon">
+                <i class="fas fa-calendar-alt"></i>
+              </div>
+              <div class="option-content">
+                <h2>Atendimento Mensal</h2>
+                <p>Gerar quadro de atendimento mensal.</p>
+              </div>
+            </div>
+            <div class="option-card" onclick="window.location.href='{{ url_for('quadro_transferencias') }}'">
+              <div class="option-icon">
+                <i class="fas fa-exchange-alt"></i>
+              </div>
+              <div class="option-content">
+                <h2>Transferências</h2>
+                <p>Gerar quadro de transferências.</p>
+              </div>
+            </div>
+            <div class="option-card" onclick="window.location.href='{{ url_for('quadro_quantitativo_mensal') }}'">
+              <div class="option-icon">
+                <i class="fas fa-chart-bar"></i>
+              </div>
+              <div class="option-content">
+                <h2>Quantitativo Mensal</h2>
+                <p>Gerar quadro quantitativo mensal.</p>
+              </div>
+            </div>
+          </div>
+          <div class="text-center mt-4">
+            <a href="{{ url_for('dashboard') }}" class="btn-voltar">Voltar ao Dashboard</a>
+          </div>
         </div>
-        <div class="option-card" onclick="window.location.href='{{ url_for('quadro_atendimento_mensal') }}'">
-          <h2>Atendimento Mensal</h2>
-          <p>Gerar quadro de atendimento mensal.</p>
-        </div>
-        <div class="option-card" onclick="window.location.href='{{ url_for('quadro_transferencias') }}'">
-          <h2>Transferências</h2>
-          <p>Gerar quadro de transferências.</p>
-        </div>
-        <div class="option-card" onclick="window.location.href='{{ url_for('quadro_quantitativo_mensal') }}'">
-          <h2>Quantitativo Mensal</h2>
-          <p>Gerar quadro quantitativo mensal.</p>
-        </div>
-        <!-- Botão Voltar ao Dashboard -->
-        <div class="text-center mt-4">
-          <a href="{{ url_for('dashboard') }}" class="btn-voltar">Voltar ao Dashboard</a>
-        </div>
-      </div>
-      <footer>
-        Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
-      </footer>
-    </body>
+        <footer>
+          Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+        </footer>
+        <!-- Scripts do Bootstrap -->
+        <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+      </body>
     </html>
     '''
     return render_template_string(quadros_html)
@@ -2498,8 +2603,8 @@ def quadros_inclusao():
                     aee = str(row[df_eja.columns[20]]).strip() if len(df_eja.columns) > 20 else ""
                     deficiencia = str(row[df_eja.columns[21]]).strip() if len(df_eja.columns) > 21 else ""
                     observacoes = str(row[df_eja.columns[22]]).strip() if len(df_eja.columns) > 22 else ""
-                    # Aqui, se necessário, você pode tratar "cadeira" a partir de outra coluna, se aplicável
-                    cadeira = ""
+                    # Aqui, a coluna M do modelo receberá o valor da coluna X (índice 23) da lista piloto EJA
+                    cadeira = row[df_eja.columns[23]]
                     
                     # Coluna N: recebe o valor da coluna Y (índice 24)
                     valor_coluna_n = row[df_eja.columns[24]]
@@ -2531,7 +2636,6 @@ def quadros_inclusao():
         filename = f"Quadro de Inclusão - {mes} - E.M José Padin Mouta.xlsx"
         return send_file(output, as_attachment=True, download_name=filename,
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
 
     upload_html = '''
     <!doctype html>

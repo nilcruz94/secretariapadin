@@ -1,322 +1,366 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Comparação de Listas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
-    <style>
-        /* Esconde o contêiner dinâmico inicialmente */
-        #dynamicPdfUploads {
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E.M José Padin Mouta - Secretaria</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: #eef2f3;
+      font-family: 'Montserrat', sans-serif;
+      margin-bottom: 60px; /* Espaço para o rodapé fixo */
+    }
+    header {
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+      border-bottom: 3px solid #1d2d3a;
+      border-radius: 0 0 15px 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    footer {
+      background-color: #424242;
+      color: #fff;
+      text-align: center;
+      padding: 10px;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+    }
+    /* Ajuste nas cards para aproximar do estilo do container-dashboard */
+    .card {
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    /* Overlay de carregamento */
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,255,0.8);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
 </head>
 <body class="bg-light">
-    <!-- Overlay de carregamento -->
-    <div id="loadingOverlay" style="display:none; position: fixed; top:0; left:0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center;">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Carregando...</span>
+  <header>
+    <h1>E.M José Padin Mouta - Secretaria</h1>
+  </header>
+  
+  <!-- Overlay de carregamento -->
+  <div id="loadingOverlay">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Carregando...</span>
+    </div>
+  </div>
+  
+  <div class="container py-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div>
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
         </div>
+      {% endif %}
+    {% endwith %}
+    {% if error_excel %}
+      <div class="alert alert-danger">{{ error_excel }}</div>
+    {% endif %}
+    
+    <!-- Formulário -->
+    <div class="card shadow rounded-3 border-0 mb-4">
+      <div class="card-header bg-primary text-white text-center">
+        <h3 class="mb-0">Sistema de Comparação de Listas</h3>
+      </div>
+      <div class="card-body">
+        <!-- Upload do Excel via AJAX -->
+        <div class="mb-3">
+          <label for="listaExcel" class="form-label"><strong>Upload do Excel:</strong></label>
+          <input type="file" class="form-control" id="listaExcel" name="listaExcel" accept=".xlsx, .xls">
+          <div id="excelMessage"></div>
+        </div>
+        <form method="POST" enctype="multipart/form-data" id="mainForm">
+          <div class="mb-3">
+            <label for="serie" class="form-label"><strong>Selecione a Série:</strong></label>
+            <select class="form-select" id="serie" name="serie" required>
+              <option value="" selected disabled>Selecione a série...</option>
+              <option value="Todas as séries">Todas as séries</option>
+              <optgroup label="2º Ano">
+                <option value="2ºA">2ºA</option>
+                <option value="2ºB">2ºB</option>
+                <option value="2ºC">2ºC</option>
+                <option value="2ºD">2ºD</option>
+                <option value="2ºE">2ºE</option>
+                <option value="2ºF">2ºF</option>
+              </optgroup>
+              <optgroup label="3º Ano">
+                <option value="3ºA">3ºA</option>
+                <option value="3ºB">3ºB</option>
+                <option value="3ºC">3ºC</option>
+                <option value="3ºD">3ºD</option>
+                <option value="3ºE">3ºE</option>
+                <option value="3ºF">3ºF</option>
+              </optgroup>
+              <optgroup label="4º Ano">
+                <option value="4ºA">4ºA</option>
+                <option value="4ºB">4ºB</option>
+                <option value="4ºC">4ºC</option>
+                <option value="4ºD">4ºD</option>
+                <option value="4ºE">4ºE</option>
+                <option value="4ºF">4ºF</option>
+                <option value="4ºG">4ºG</option>
+              </optgroup>
+              <optgroup label="5º Ano">
+                <option value="5ºA">5ºA</option>
+                <option value="5ºB">5ºB</option>
+                <option value="5ºC">5ºC</option>
+                <option value="5ºD">5ºD</option>
+                <option value="5ºE">5ºE</option>
+                <option value="5ºF">5ºF</option>
+                <option value="5ºG">5ºG</option>
+              </optgroup>
+            </select>
+          </div>
+          
+          <!-- Input único para PDF (série individual) -->
+          <div class="mb-3" id="singlePdfUpload">
+            <label for="listaPDF" class="form-label"><strong>Lista para Comparar (PDF):</strong></label>
+            <input type="file" class="form-control" id="listaPDF" name="listaPDF" accept=".pdf">
+          </div>
+          
+          <!-- Contêiner dinâmico para uploads quando "Todas as séries" for selecionado -->
+          <div class="mb-3" id="dynamicPdfUploads"></div>
+  
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-success btn-lg">
+              <i class="bi bi-file-earmark-check"></i> Conferir
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
     
-    <div class="container py-5">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div>
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-        {% if error_excel %}
-            <div class="alert alert-danger">{{ error_excel }}</div>
-        {% endif %}
-        
-        <!-- Formulário -->
-        <div class="card shadow rounded-3 border-0">
-            <div class="card-header bg-primary text-white text-center">
-                <h3 class="mb-0">Sistema de Comparação de Listas</h3>
+    <!-- Resultados do Excel -->
+    {% if dados_excel is not none %}
+    <div class="card shadow rounded-3 border-0 mb-4">
+      <div class="card-header bg-secondary text-white text-center">
+        <h4 class="mb-0">Resultados - Lista Piloto</h4>
+      </div>
+      <div class="card-body">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>OBS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for index, row in dados_excel.iterrows() %}
+            <tr>
+              <td>{{ row['Nome'] }}</td>
+              <td>{{ row['OBS'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Resultados do PDF (exibição individual) -->
+    {% if dados_pdf is not none %}
+    <div class="card shadow rounded-3 border-0 mb-4">
+      <div class="card-header bg-info text-white text-center">
+        <h4 class="mb-0">Resultados - SED</h4>
+      </div>
+      <div class="card-body">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Situação</th>
+              <th>Data Movimentação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for index, row in dados_pdf.iterrows() %}
+            <tr>
+              <td>{{ row['Nome'] }}</td>
+              <td>{{ row['Situacao'] }}</td>
+              <td>{{ row['DataMovimentacao'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Divergências -->
+    {% if divergencias is not none %}
+      {% if selected_series == "Todas as séries" %}
+        {% for serie, df_div in divergencias.items() %}
+          <div class="card shadow rounded-3 border-0 mb-4">
+            <div class="card-header bg-danger text-white text-center">
+              <h4 class="mb-0">Divergências - {{ serie }}</h4>
             </div>
             <div class="card-body">
-                <!-- Upload do Excel via AJAX -->
-                <div class="mb-3">
-                    <label for="listaExcel" class="form-label"><strong>Upload do Excel:</strong></label>
-                    <input type="file" class="form-control" id="listaExcel" name="listaExcel" accept=".xlsx, .xls">
-                    <div id="excelMessage"></div>
-                </div>
-                <form method="POST" enctype="multipart/form-data" id="mainForm">
-                    <div class="mb-3">
-                        <label for="serie" class="form-label"><strong>Selecione a Série:</strong></label>
-                        <select class="form-select" id="serie" name="serie" required>
-                            <option value="" selected disabled>Selecione a série...</option>
-                            <option value="Todas as séries">Todas as séries</option>
-                            <optgroup label="2º Ano">
-                                <option value="2ºA">2ºA</option>
-                                <option value="2ºB">2ºB</option>
-                                <option value="2ºC">2ºC</option>
-                                <option value="2ºD">2ºD</option>
-                                <option value="2ºE">2ºE</option>
-                                <option value="2ºF">2ºF</option>
-                            </optgroup>
-                            <optgroup label="3º Ano">
-                                <option value="3ºA">3ºA</option>
-                                <option value="3ºB">3ºB</option>
-                                <option value="3ºC">3ºC</option>
-                                <option value="3ºD">3ºD</option>
-                                <option value="3ºE">3ºE</option>
-                                <option value="3ºF">3ºF</option>
-                            </optgroup>
-                            <optgroup label="4º Ano">
-                                <option value="4ºA">4ºA</option>
-                                <option value="4ºB">4ºB</option>
-                                <option value="4ºC">4ºC</option>
-                                <option value="4ºD">4ºD</option>
-                                <option value="4ºE">4ºE</option>
-                                <option value="4ºF">4ºF</option>
-                                <option value="4ºG">4ºG</option>
-                            </optgroup>
-                            <optgroup label="5º Ano">
-                                <option value="5ºA">5ºA</option>
-                                <option value="5ºB">5ºB</option>
-                                <option value="5ºC">5ºC</option>
-                                <option value="5ºD">5ºD</option>
-                                <option value="5ºE">5ºE</option>
-                                <option value="5ºF">5ºF</option>
-                                <option value="5ºG">5ºG</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    
-                    <!-- Input único para PDF (série individual) -->
-                    <div class="mb-3" id="singlePdfUpload">
-                        <label for="listaPDF" class="form-label"><strong>Lista para Comparar (PDF):</strong></label>
-                        <input type="file" class="form-control" id="listaPDF" name="listaPDF" accept=".pdf">
-                    </div>
-                    
-                    <!-- Contêiner dinâmico para uploads quando "Todas as séries" for selecionado -->
-                    <div class="mb-3" id="dynamicPdfUploads"></div>
-        
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-file-earmark-check"></i> Conferir
-                        </button>
-                    </div>
-                </form>
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>OBS (Excel)</th>
+                    <th>Situação (PDF)</th>
+                    <th>Divergência</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for index, row in df_div.iterrows() %}
+                    <tr>
+                      <td>{{ row['Nome'] }}</td>
+                      <td>{{ row['OBS (Excel)'] }}</td>
+                      <td>{{ row['Situacao (PDF)'] }}</td>
+                      <td>{{ row['Divergência'] }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
             </div>
-        </div>
-        
-        <!-- Resultados do Excel -->
-        {% if dados_excel is not none %}
-        <div class="card mt-4 shadow rounded-3 border-0">
-            <div class="card-header bg-secondary text-white text-center">
-                <h4 class="mb-0">Resultados - Lista Piloto</h4>
-            </div>
-            <div class="card-body">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>OBS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for index, row in dados_excel.iterrows() %}
-                        <tr>
-                            <td>{{ row['Nome'] }}</td>
-                            <td>{{ row['OBS'] }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- Resultados do PDF (exibição individual) -->
-        {% if dados_pdf is not none %}
-        <div class="card mt-4 shadow rounded-3 border-0">
-            <div class="card-header bg-info text-white text-center">
-                <h4 class="mb-0">Resultados - SED</h4>
-            </div>
-            <div class="card-body">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Situação</th>
-                            <th>Data Movimentação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for index, row in dados_pdf.iterrows() %}
-                        <tr>
-                            <td>{{ row['Nome'] }}</td>
-                            <td>{{ row['Situacao'] }}</td>
-                            <td>{{ row['DataMovimentacao'] }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- Divergências -->
-        {% if divergencias is not none %}
-            {% if selected_series == "Todas as séries" %}
-                {% for serie, df_div in divergencias.items() %}
-                    <div class="card mt-4 shadow rounded-3 border-0">
-                        <div class="card-header bg-danger text-white text-center">
-                            <h4 class="mb-0">Divergências - {{ serie }}</h4>
-                        </div>
-                        <div class="card-body">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>OBS (Excel)</th>
-                                        <th>Situação (PDF)</th>
-                                        <th>Divergência</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for index, row in df_div.iterrows() %}
-                                        <tr>
-                                            <td>{{ row['Nome'] }}</td>
-                                            <td>{{ row['OBS (Excel)'] }}</td>
-                                            <td>{{ row['Situacao (PDF)'] }}</td>
-                                            <td>{{ row['Divergência'] }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="card shadow rounded-3 border-0 mb-4">
+          <div class="card-header bg-danger text-white text-center">
+            <h4 class="mb-0">Divergências - {{ selected_series }}</h4>
+          </div>
+          <div class="card-body">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>OBS (Excel)</th>
+                  <th>Situação (PDF)</th>
+                  <th>Divergência</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for index, row in divergencias.iterrows() %}
+                  <tr>
+                    <td>{{ row['Nome'] }}</td>
+                    <td>{{ row['OBS (Excel)'] }}</td>
+                    <td>{{ row['Situacao (PDF)'] }}</td>
+                    <td>{{ row['Divergência'] }}</td>
+                  </tr>
                 {% endfor %}
-            {% else %}
-                <div class="card mt-4 shadow rounded-3 border-0">
-                    <div class="card-header bg-danger text-white text-center">
-                        <h4 class="mb-0">Divergências - {{ selected_series }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Nome</th>
-                                    <th>OBS (Excel)</th>
-                                    <th>Situação (PDF)</th>
-                                    <th>Divergência</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for index, row in divergencias.iterrows() %}
-                                    <tr>
-                                        <td>{{ row['Nome'] }}</td>
-                                        <td>{{ row['OBS (Excel)'] }}</td>
-                                        <td>{{ row['Situacao (PDF)'] }}</td>
-                                        <td>{{ row['Divergência'] }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            {% endif %}
-        {% endif %}
-    </div>
-    
-    <footer class="text-center text-muted mt-4">
-        <small>© 2024 Sistema de Conferência Escolar</small>
-    </footer>
-    
-    <!-- Scripts -->
-    <script>
-        // Array com as séries na ordem definida
-        const seriesList = [
-            "2ºA", "2ºB", "2ºC", "2ºD", "2ºE", "2ºF",
-            "3ºA", "3ºB", "3ºC", "3ºD", "3ºE", "3ºF",
-            "4ºA", "4ºB", "4ºC", "4ºD", "4ºE", "4ºF", "4ºG",
-            "5ºA", "5ºB", "5ºC", "5ºD", "5ºE", "5ºF", "5ºG"
-        ];
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+  
+  <footer>
+    Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+  </footer>
+  
+  <!-- Scripts -->
+  <script>
+    // Array com as séries na ordem definida
+    const seriesList = [
+      "2ºA", "2ºB", "2ºC", "2ºD", "2ºE", "2ºF",
+      "3ºA", "3ºB", "3ºC", "3ºD", "3ºE", "3ºF",
+      "4ºA", "4ºB", "4ºC", "4ºD", "4ºE", "4ºF", "4ºG",
+      "5ºA", "5ºB", "5ºC", "5ºD", "5ºE", "5ºF", "5ºG"
+    ];
 
-        const serieSelect = document.getElementById("serie");
-        const singlePdfUpload = document.getElementById("singlePdfUpload");
-        const dynamicPdfContainer = document.getElementById("dynamicPdfUploads");
+    const serieSelect = document.getElementById("serie");
+    const singlePdfUpload = document.getElementById("singlePdfUpload");
+    const dynamicPdfContainer = document.getElementById("dynamicPdfUploads");
 
-        function createPdfInput(index) {
-            if (index >= seriesList.length) return;
-            const serieName = seriesList[index];
+    function createPdfInput(index) {
+      if (index >= seriesList.length) return;
+      const serieName = seriesList[index];
 
-            const div = document.createElement("div");
-            div.classList.add("mb-3");
-            div.id = "pdfContainer_" + index;
+      const div = document.createElement("div");
+      div.classList.add("mb-3");
+      div.id = "pdfContainer_" + index;
 
-            const label = document.createElement("label");
-            label.classList.add("form-label");
-            label.innerHTML = `<strong>Upload PDF para a série ${serieName}:</strong>`;
-            div.appendChild(label);
+      const label = document.createElement("label");
+      label.classList.add("form-label");
+      label.innerHTML = `<strong>Upload PDF para a série ${serieName}:</strong>`;
+      div.appendChild(label);
 
-            const input = document.createElement("input");
-            input.type = "file";
-            input.classList.add("form-control");
-            input.name = "listaPDF_" + serieName;
-            input.accept = ".pdf";
-            input.id = "pdfInput_" + index;
-            div.appendChild(input);
+      const input = document.createElement("input");
+      input.type = "file";
+      input.classList.add("form-control");
+      input.name = "listaPDF_" + serieName;
+      input.accept = ".pdf";
+      input.id = "pdfInput_" + index;
+      div.appendChild(input);
 
-            input.addEventListener("change", function() {
-                if (this.files.length > 0) {
-                    if (!document.getElementById("pdfContainer_" + (index + 1))) {
-                        createPdfInput(index + 1);
-                    }
-                }
-            });
-
-            dynamicPdfContainer.appendChild(div);
+      input.addEventListener("change", function() {
+        if (this.files.length > 0) {
+          if (!document.getElementById("pdfContainer_" + (index + 1))) {
+            createPdfInput(index + 1);
+          }
         }
+      });
 
-        serieSelect.addEventListener("change", function() {
-            if (this.value === "Todas as séries") {
-                singlePdfUpload.style.display = "none";
-                dynamicPdfContainer.style.display = "block";
-                dynamicPdfContainer.innerHTML = "";
-                createPdfInput(0);
-            } else {
-                singlePdfUpload.style.display = "block";
-                dynamicPdfContainer.style.display = "none";
-                dynamicPdfContainer.innerHTML = "";
-            }
-        });
+      dynamicPdfContainer.appendChild(div);
+    }
 
-        document.querySelector("#mainForm").addEventListener("submit", function() {
-            document.getElementById("loadingOverlay").style.display = "flex";
-        });
+    serieSelect.addEventListener("change", function() {
+      if (this.value === "Todas as séries") {
+        singlePdfUpload.style.display = "none";
+        dynamicPdfContainer.style.display = "block";
+        dynamicPdfContainer.innerHTML = "";
+        createPdfInput(0);
+      } else {
+        singlePdfUpload.style.display = "block";
+        dynamicPdfContainer.style.display = "none";
+        dynamicPdfContainer.innerHTML = "";
+        // Atualiza o label do input único para PDF com a série selecionada
+        document.querySelector("#singlePdfUpload label").innerHTML = `<strong>Selecione a lista SED do ${this.value}</strong>`;
+      }
+    });
 
-        document.getElementById("listaExcel").addEventListener("change", function() {
-            const fileInput = this;
-            if (fileInput.files.length > 0) {
-                const formData = new FormData();
-                formData.append("listaExcel", fileInput.files[0]);
-                fetch("/confere/upload_excel", {
-                    method: "POST",
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById("excelMessage").innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
-                })
-                .catch(error => {
-                    document.getElementById("excelMessage").innerHTML = '<div class="alert alert-danger">Erro ao carregar o arquivo Excel.</div>';
-                });
-            }
+    document.querySelector("#mainForm").addEventListener("submit", function() {
+      document.getElementById("loadingOverlay").style.display = "flex";
+    });
+
+    document.getElementById("listaExcel").addEventListener("change", function() {
+      const fileInput = this;
+      if (fileInput.files.length > 0) {
+        const formData = new FormData();
+        formData.append("listaExcel", fileInput.files[0]);
+        fetch("/confere/upload_excel", {
+          method: "POST",
+          body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("excelMessage").innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+        })
+        .catch(error => {
+          document.getElementById("excelMessage").innerHTML = '<div class="alert alert-danger">Erro ao carregar o arquivo Excel.</div>';
         });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
