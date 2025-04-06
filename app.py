@@ -13,6 +13,8 @@ from openpyxl import load_workbook, Workbook  # Usado para trabalhar com XLSX
 from openpyxl.utils import get_column_letter  # Para obter a coluna em letra
 from openpyxl.cell import MergedCell  # Para identificar células mescladas
 from urllib.parse import unquote
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
 # Tenta definir a localidade para formatação de datas em português
 try:
@@ -1428,6 +1430,15 @@ def dashboard():
           <div class="option-content">
             <h2>Documentos</h2>
             <p>Documentos importantes por segmento.</p>
+          </div>
+        </div>
+        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('oficio') }}'">
+          <div class="option-icon">
+            <i class="fas fa-envelope"></i>
+          </div>
+          <div class="option-content">
+            <h2>Ofício</h2>
+            <p>Gerar ofícios.</p>
           </div>
         </div>
       </div>
@@ -3909,6 +3920,518 @@ def documentos():
                                   prontuario_files=prontuario_files,
                                   pagamentos_files=pagamentos_files,
                                   unquote=unquote)
+
+
+# Lista de setores disponíveis para o dropdown
+SETORES = ["Financeiro", "Recursos Humanos", "Administrativo", "Marketing", "TI"]
+
+def data_extenso(dt):
+    """Retorna a data por extenso em português."""
+    meses = [
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+    ]
+    return f"{dt.day} de {meses[dt.month-1]} de {dt.year}"
+
+# Template para o formulário de criação do ofício
+oficio_form_template = """
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <title>E.M José Padin Mouta - Gerador de Ofício</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap, Font Awesome e Google Fonts -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background: #eef2f3;
+        font-family: 'Montserrat', sans-serif;
+        margin-bottom: 60px;
+      }
+      header {
+        background: linear-gradient(90deg, #283E51, #4B79A1);
+        color: #fff;
+        padding: 20px;
+        text-align: center;
+        border-bottom: 3px solid #1d2d3a;
+        border-radius: 0 0 15px 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      }
+      .container-menu {
+        margin: 40px auto;
+        max-width: 900px;
+        background: #fff;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      label {
+        font-weight: 600;
+      }
+      .btn-submit {
+        background-color: #4B79A1;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+      }
+      .btn-submit:hover {
+        background-color: #3a5d78;
+      }
+      .error {
+        color: red;
+      }
+      .btn-voltar {
+        display: inline-block;
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background-color: #4B79A1;
+        border: none;
+        border-radius: 5px;
+        text-decoration: none;
+        transition: background-color 0.3s;
+      }
+      .btn-voltar:hover {
+        background-color: #3a5d78;
+      }
+      footer {
+        background-color: #424242;
+        color: #fff;
+        text-align: center;
+        padding: 10px;
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>E.M José Padin Mouta - Gerador de Ofício</h1>
+    </header>
+    <div class="container-menu">
+      {% with messages = get_flashed_messages(category_filter=["error"]) %}
+        {% if messages %}
+          <div class="alert alert-danger" role="alert">
+            {% for msg in messages %}
+              <p>{{ msg }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      <form method="POST">
+        <div class="form-group">
+          <label for="destinatario">Destinatário:</label>
+          <input type="text" id="destinatario" name="destinatario" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="setor">Setor:</label>
+          <select id="setor" name="setor" class="form-control" required>
+            {% for setor in setores %}
+              <option value="{{ setor }}">{{ setor }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="corpo">Corpo do Ofício:</label>
+          <textarea id="corpo" name="corpo" rows="6" class="form-control" required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="oficio_num">Número do Ofício (3 dígitos):</label>
+          <input type="text" id="oficio_num" name="oficio_num" pattern="\\d{3}" placeholder="Ex: 001" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-submit">Gerar Ofício</button>
+      </form>
+      <div class="mt-4">
+      </div>
+    </div>
+    <footer>
+      Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+    </footer>
+    <!-- Scripts do Bootstrap -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
+"""
+
+# Template para exibição do ofício gerado (HTML para impressão)
+oficio_result_template = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>{{ titulo }} - E.M José Padin Mouta</title>
+  <style>
+    /* Estilos para visualização na tela como uma folha A4 */
+    @media screen {
+      body {
+        background: #eee;
+      }
+      .declaration-container {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 20px auto;
+        padding: 20mm;
+        background: white;
+      }
+      .no-print {
+        width: 210mm;
+        margin: 10px auto 0 auto;
+        text-align: right;
+      }
+      .no-print button, .no-print a {
+        background-color: #283E51;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12pt;
+        margin-right: 10px;
+        text-decoration: none;
+      }
+      .no-print button:hover, .no-print a:hover {
+        background-color: #1e2c3d;
+      }
+    }
+    
+    /* Margens para impressão: topo 1cm, demais 2.5cm */
+    @page { margin: 1cm 2.5cm 2.5cm 2.5cm; }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      font-size: 12pt;
+      line-height: 1.5;
+      color: #333;
+    }
+    
+    /* Cabeçalho com informações centralizadas e logo à direita */
+    .header {
+      position: relative;
+      text-align: center;
+      border-bottom: 2px solid #283E51;
+      padding-bottom: 5px;
+      margin-bottom: 40px;
+    }
+    
+    .header .header-text h1 {
+      margin: 0;
+      font-size: 16pt;
+      text-transform: uppercase;
+      color: #283E51;
+    }
+    
+    .header .header-text p {
+      margin: 3px 0;
+      font-size: 12pt;
+    }
+    
+    /* Logo posicionado à direita */
+    .header .logo {
+      position: absolute;
+      top: 0;
+      right: 0;
+    }
+    
+    /* Data posicionada no topo direito */
+    .date {
+      text-align: right;
+      font-size: 12pt;
+      margin-bottom: 10px;
+    }
+    
+    .content {
+      text-align: justify;
+      margin-bottom: 10px;
+    }
+
+    /* Número do ofício, alinhado à esquerda */
+    .oficio-number {
+      text-align: left;
+      font-size: 14pt;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .signature {
+      text-align: center;
+      margin-top: 0;
+    }
+    
+    .signature .line {
+      height: 1px;
+      background-color: #333;
+      width: 60%;
+      margin: 0 auto 5px auto;
+    }
+    
+    .footer {
+      text-align: center;
+      border-top: 2px solid #283E51;
+      padding-top: 5px;
+      margin: 0;
+      font-size: 10pt;
+      color: #555;
+    }
+    
+    /* Estilos aplicados apenas na impressão */
+    @media print {
+      .no-print { display: none !important; }
+      .header { margin-top: 0; margin-bottom: 60px; }
+      .signature { margin-top: 7cm; }
+      .footer { margin-top: 1cm; }
+    }
+    
+    {{ additional_css|default('') }}
+  </style>
+</head>
+<body>
+  <!-- Botões de Imprimir e Download PDF Editável posicionados acima da folha -->
+  <div class="no-print">
+    <button onclick="window.print()">Imprimir Ofício</button>
+    <a href="{{ url_for('oficio_pdf', destinatario=destinatario, setor=setor, corpo=corpo, oficio_num=oficio_num, data_extenso=data_extenso, titulo=titulo) }}">Download PDF Editável</a>
+  </div>
+  
+  <div class="declaration-container">
+    <!-- Cabeçalho com informações centralizadas e logo à direita -->
+    <div class="header">
+      <div class="header-text">
+        <h1>Secretaria de Educação</h1>
+        <p>E.M José Padin Mouta</p>
+        <p>Município da Estância Balneária de Praia Grande</p>
+        <p>Estado de São Paulo</p>
+      </div>
+      <div class="logo">
+        <img src="/static/logos/municipio.png" alt="Município Logo" style="height: 80px;">
+      </div>
+    </div>
+    
+    <!-- Data exibida no topo direito -->
+    <div class="date">
+      <p>{{ data_extenso }}</p>
+    </div>
+    
+    <div class="content">
+      <div class="oficio-number">
+        <p>OFÍCIO Nº {{ oficio_num }}/<span id="currentYear">{{ current_year|default("2025") }}</span></p>
+      </div>
+      <p><strong>Destinatário:</strong> {{ destinatario }}</p>
+      <p><strong>Setor:</strong> {{ setor }}</p>
+      <p>{{ corpo }}</p>
+    </div>
+    
+    <div class="signature">
+      <div class="line"></div>
+      <p>Luciana Rocha Augustinho</p>
+      <p>Diretora da Unidade Escolar</p>
+    </div>
+    
+    <div class="footer">
+      <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390</p>
+      <p>Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
+    </div>
+  </div>
+
+  <script>
+    // Atualiza o ano automaticamente, se necessário
+    document.addEventListener("DOMContentLoaded", function() {
+      var currentYearElement = document.getElementById("currentYear");
+      if (currentYearElement && (!currentYearElement.textContent || currentYearElement.textContent === "2025")) {
+        currentYearElement.textContent = new Date().getFullYear();
+      }
+    });
+  </script>
+</body>
+</html>
+"""
+
+def generate_editable_pdf(destinatario, setor, corpo, oficio_num, data_extenso_text, titulo):
+    """
+    Gera um PDF editável com AcroForm que tenta replicar a formatação do ofício impresso,
+    com os rótulos "Destinatário:" e "Setor:" em negrito, e permitindo maior quantidade de
+    caracteres no campo "Corpo do Ofício".
+    """
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from io import BytesIO
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    # Margens aproximadas
+    left_margin = 70      # ~2.5 cm
+    right_margin = 70     # ~2.5 cm
+    top_margin = 28       # ~1 cm
+    bottom_margin = 70    # ~2.5 cm
+
+    # --- Cabeçalho ---
+    header_top = height - top_margin
+    header_bottom = header_top - 80  # área do cabeçalho
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, header_top - 20, "Secretaria de Educação")
+    c.setFont("Helvetica", 12)
+    c.drawCentredString(width/2, header_top - 40, "E.M José Padin Mouta")
+    c.drawCentredString(width/2, header_top - 55, "Município da Estância Balneária de Praia Grande")
+    c.drawCentredString(width/2, header_top - 70, "Estado de São Paulo")
+    c.line(left_margin, header_bottom, width - right_margin, header_bottom)
+    
+    # --- Logo ---
+    try:
+        logo_width = 80
+        logo_height = 60
+        logo_x = width - right_margin - logo_width
+        logo_y = header_top - logo_height
+        c.drawImage("static/logos/municipio.png", logo_x, logo_y,
+                    width=logo_width, height=logo_height,
+                    mask='auto', preserveAspectRatio=True)
+    except Exception:
+        pass
+
+    # --- Data e Número do Ofício ---
+    c.setFont("Helvetica", 12)
+    c.drawRightString(width - right_margin, header_bottom - 20, data_extenso_text)
+    c.setFont("Helvetica-Bold", 14)
+    year = data_extenso_text.split()[-1]
+    of_text = f"OFÍCIO Nº {oficio_num}/{year}"
+    c.drawString(left_margin, header_bottom - 50, of_text)
+
+    # --- Campos Editáveis ---
+    current_y = header_bottom - 90  # espaçamento após o número do ofício
+    field_height = 20
+
+    # Destinatário: rótulo (negrito) e campo
+    label1 = "Destinatário:"
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(left_margin, current_y, label1)
+    label1_width = c.stringWidth(label1, "Helvetica-Bold", 12)
+    field_x = left_margin + label1_width + 10  # campo imediatamente após o rótulo
+    field_y = current_y - 8
+    c.acroForm.textfield(
+        name='destinatario', tooltip='Destinatário',
+        x=field_x, y=field_y,
+        width=300, height=field_height,
+        borderWidth=0, forceBorder=False,
+        fontName="Helvetica", fontSize=12,
+        value=destinatario
+    )
+    current_y -= 30
+
+    # Setor: rótulo (negrito) e campo
+    label2 = "Setor:"
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(left_margin, current_y, label2)
+    label2_width = c.stringWidth(label2, "Helvetica-Bold", 12)
+    field_x = left_margin + label2_width + 10
+    field_y = current_y - 8
+    c.acroForm.textfield(
+        name='setor', tooltip='Setor',
+        x=field_x, y=field_y,
+        width=300, height=field_height,
+        borderWidth=0, forceBorder=False,
+        fontName="Helvetica", fontSize=12,
+        value=setor
+    )
+    current_y -= 30
+
+    # Corpo do Ofício: somente o campo editável (sem rótulo)
+    corpo_field_height = 200
+    # Adicionado maxlen=0 para permitir quantidade ilimitada de caracteres
+    c.acroForm.textfield(
+        name='corpo', tooltip='Corpo do Ofício',
+        x=left_margin, y=current_y - corpo_field_height,
+        width=width - left_margin - right_margin, height=corpo_field_height,
+        borderWidth=0, forceBorder=False,
+        fontName="Helvetica", fontSize=12,
+        value=corpo, fieldFlags=4096, maxlen=0
+    )
+    current_y = current_y - corpo_field_height - 30
+
+    # --- Assinatura ---
+    # Área de assinatura
+    sig_top = bottom_margin + 170
+    short_line_width = 250  # largura do traço superior
+    c.line((width - short_line_width) / 2, sig_top, (width + short_line_width) / 2, sig_top)
+    c.setFont("Helvetica", 12)
+    c.drawCentredString(width/2, sig_top - 15, "Luciana Rocha Augustinho")
+    c.drawCentredString(width/2, sig_top - 30, "Diretora da Unidade Escolar")
+    # Linha divisória abaixo da assinatura (posição mantida conforme ajuste anterior)
+    divider_y = bottom_margin + 40
+    c.line(left_margin, divider_y, width - right_margin, divider_y)
+
+    # --- Rodapé ---
+    c.setFont("Helvetica", 10)
+    footer_y1 = bottom_margin - 20
+    footer_y2 = bottom_margin - 35
+    c.drawCentredString(width/2, footer_y1, "Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390")
+    c.drawCentredString(width/2, footer_y2, "Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br")
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+@app.route('/oficio', methods=["GET", "POST"])
+def oficio():
+    if request.method == "POST":
+        destinatario = request.form.get("destinatario")
+        setor = request.form.get("setor")
+        corpo = request.form.get("corpo")
+        oficio_num = request.form.get("oficio_num")
+
+        # Validação: o número do ofício deve ter exatamente 3 dígitos
+        if not re.fullmatch(r"\d{3}", oficio_num):
+            flash("Número do ofício deve ter exatamente 3 dígitos.", "error")
+            return redirect(url_for("oficio"))
+
+        hoje = datetime.today()
+        data_por_extenso = data_extenso(hoje)
+        titulo = f"Ofício nº {oficio_num}"
+
+        return render_template_string(
+            oficio_result_template,
+            destinatario=destinatario,
+            setor=setor,
+            corpo=corpo,
+            oficio_num=oficio_num,
+            data_extenso=data_por_extenso,
+            titulo=titulo,
+            current_year=hoje.year,
+            additional_css=""
+        )
+    # Método GET: renderiza o formulário com a lista de setores
+    return render_template_string(oficio_form_template, setores=SETORES)
+
+@app.route('/oficio/pdf')
+def oficio_pdf():
+    """
+    Rota que gera e retorna o PDF editável do ofício.
+    Os dados são passados via query string.
+    """
+    destinatario = request.args.get("destinatario")
+    setor = request.args.get("setor")
+    corpo = request.args.get("corpo")
+    oficio_num = request.args.get("oficio_num")
+    data_extenso_text = request.args.get("data_extenso")
+    titulo = request.args.get("titulo")
+    if not all([destinatario, setor, corpo, oficio_num, data_extenso_text, titulo]):
+        flash("Dados insuficientes para gerar PDF editável.", "error")
+        return redirect(url_for("oficio"))
+    pdf_buffer = generate_editable_pdf(destinatario, setor, corpo, oficio_num, data_extenso_text, titulo)
+    return send_file(pdf_buffer, as_attachment=True, download_name="oficio_editavel.pdf", mimetype="application/pdf")
+
 
 if __name__ == '__main__':
     app.run(debug=True)
