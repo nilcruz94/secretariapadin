@@ -1385,69 +1385,85 @@ def dashboard():
     <header>
       <h1>E.M José Padin Mouta - Secretaria</h1>
     </header>
-    <div class="container container-dashboard">
-      <div class="option-row">
-        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('declaracao_tipo') }}'">
-          <div class="option-icon">
-            <i class="fas fa-file-alt"></i>
-          </div>
-          <div class="option-content">
-            <h2>Declaração Escolar</h2>
-            <p>Gerar declaração escolar.</p>
-          </div>
-        </div>
-        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('carteirinhas') }}'">
-          <div class="option-icon">
-            <i class="fas fa-id-card"></i>
-          </div>
-          <div class="option-content">
-            <h2>Carteirinhas</h2>
-            <p>Gerar carteirinhas para os alunos.</p>
-          </div>
-        </div>
-        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('quadros') }}'">
-          <div class="option-icon">
-            <i class="fas fa-chalkboard-teacher"></i>
-          </div>
-          <div class="option-content">
-            <h2>Quadros</h2>
-            <p>Gerar quadros para os alunos.</p>
-          </div>
-        </div>
-        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('confere.index') }}'">
-          <div class="option-icon">
-            <i class="fas fa-check-circle"></i>
-          </div>
-          <div class="option-content">
-            <h2>Conferir Listas</h2>
-            <p>Acessar a conferência de listas.</p>
-          </div>
-        </div>
-        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('documentos') }}'">
-          <div class="option-icon">
-            <i class="fas fa-folder-open"></i>
-          </div>
-          <div class="option-content">
-            <h2>Documentos</h2>
-            <p>Documentos importantes por segmento.</p>
-          </div>
-        </div>
-        <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('oficio') }}'">
-          <div class="option-icon">
-            <i class="fas fa-envelope"></i>
-          </div>
-          <div class="option-content">
-            <h2>Ofício</h2>
-            <p>Gerar ofícios.</p>
-          </div>
-        </div>
+<div class="container container-dashboard"> 
+  <div class="option-row">
+    <!-- 1. Declaração Escolar -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('declaracao_tipo') }}'">
+      <div class="option-icon">
+        <i class="fas fa-file-alt"></i>
       </div>
-      <div class="logout-container">
-        <a href="{{ url_for('logout_route') }}" class="btn-logout">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+      <div class="option-content">
+        <h2>Declaração Escolar</h2>
+        <p>Gerar declaração escolar.</p>
       </div>
     </div>
+    <!-- 2. Carteirinhas -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('carteirinhas') }}'">
+      <div class="option-icon">
+        <i class="fas fa-id-card"></i>
+      </div>
+      <div class="option-content">
+        <h2>Carteirinhas</h2>
+        <p>Gerar carteirinhas para os alunos.</p>
+      </div>
+    </div>
+    <!-- 3. Quadros -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('quadros') }}'">
+      <div class="option-icon">
+        <i class="fas fa-chalkboard-teacher"></i>
+      </div>
+      <div class="option-content">
+        <h2>Quadros</h2>
+        <p>Gerar quadros para os alunos.</p>
+      </div>
+    </div>
+    <!-- 4. Conferir Listas -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('confere.index') }}'">
+      <div class="option-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div class="option-content">
+        <h2>Conferir Listas</h2>
+        <p>Acessar a conferência de listas.</p>
+      </div>
+    </div>
+    <!-- 5. Oficio -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('oficio') }}'">
+      <div class="option-icon">
+        <i class="fas fa-envelope"></i>
+      </div>
+      <div class="option-content">
+        <h2>Ofício</h2>
+        <p>Gerar ofícios.</p>
+      </div>
+    </div>
+    <!-- 6. Acúmulo de Cargo -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('acumulo') }}'">
+      <div class="option-icon">
+        <i class="fas fa-briefcase"></i>
+      </div>
+      <div class="option-content">
+        <h2>Acúmulo de Cargo</h2>
+        <p>Gerar formulário de acúmulo de cargo.</p>
+      </div>
+    </div>
+    <!-- 7. Documentos -->
+    <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('documentos') }}'">
+      <div class="option-icon">
+        <i class="fas fa-folder-open"></i>
+      </div>
+      <div class="option-content">
+        <h2>Documentos</h2>
+        <p>Documentos importantes por segmento.</p>
+      </div>
+    </div>
+  </div>
+  <div class="logout-container">
+    <a href="{{ url_for('logout_route') }}" class="btn-logout">
+      <i class="fas fa-sign-out-alt"></i> Logout
+    </a>
+  </div>
+</div>
     <footer>
       Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
     </footer>
@@ -2384,6 +2400,16 @@ def quadros():
               <div class="option-content">
                 <h2>Inclusão</h2>
                 <p>Gerar quadro de inclusão.</p>
+              </div>
+            </div>
+            <!-- Nova opção adicionada -->
+            <div class="option-card" onclick="window.location.href='{{ url_for('quantinclusao') }}'">
+              <div class="option-icon">
+                <i class="fas fa-chart-pie"></i>
+              </div>
+              <div class="option-content">
+                <h2>Quantitativo de Inclusão</h2>
+                <p>Gerar quadro quantitativo de inclusão.</p>
               </div>
             </div>
             <div class="option-card" onclick="window.location.href='{{ url_for('quadro_atendimento_mensal') }}'">
@@ -4432,6 +4458,1305 @@ def oficio_pdf():
     pdf_buffer = generate_editable_pdf(destinatario, setor, corpo, oficio_num, data_extenso_text, titulo)
     return send_file(pdf_buffer, as_attachment=True, download_name="oficio_editavel.pdf", mimetype="application/pdf")
 
+# Predefinições (cada cargo e suas horas) - mesmo dicionário fornecido 
+CARGOS = {
+    "PROFESSOR RECREACIONISTA": {
+        "total": 30,
+        "aluno": 20,
+        "htpi_pres": 2,
+        "htpi_online": 3,
+        "htpi_total": 5,
+        "htpc": 2,
+        "hal": 3
+    },
+    "PROFESSOR ADJUNTO I": {
+        "total": 30,
+        "aluno": 20,
+        "htpi_pres": 2,
+        "htpi_online": 3,
+        "htpi_total": 5,
+        "htpc": 2,
+        "hal": 3
+    },
+    "PROFESSOR I": {
+        "total": 27,
+        "aluno": 18,
+        "htpi_pres": 2,
+        "htpi_online": 2,
+        "htpi_total": 4,
+        "htpc": 2,
+        "hal": 3
+    },
+    "PROFESSOR II": {
+        "total": 27,
+        "aluno": 18,
+        "htpi_pres": 2,
+        "htpi_online": 2,
+        "htpi_total": 4,
+        "htpc": 2,
+        "hal": 3
+    },
+    "PROFESSOR III": {
+        "total": 30,
+        "aluno": 20,
+        "htpi_pres": 2,
+        "htpi_online": 3,
+        "htpi_total": 5,
+        "htpc": 2,
+        "hal": 3
+    },
+    "PROFESSOR IV": {
+        "total": 15,
+        "aluno": 10,
+        "htpi_pres": 1,
+        "htpi_online": 1,
+        "htpi_total": 2,
+        "htpc": 2,
+        "hal": 1
+    }
+}
 
-if __name__ == '__main__':
+FORM_HTML = """
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8">
+    <title>Acumulo de Cargo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+      body {
+        background: #eef2f3;
+        font-family: 'Montserrat', sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      header {
+        background: linear-gradient(90deg, #283E51, #4B79A1);
+        color: #fff;
+        padding: 20px;
+        text-align: center;
+        border-bottom: 3px solid #1d2d3a;
+        border-radius: 0 0 15px 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      }
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .container {
+        background: #fff;
+        padding: 20px;
+        margin-top: 30px;
+        border-radius: 8px;
+        max-width: 700px;
+        width: 100%;
+      }
+      h1 {
+        margin-bottom: 20px;
+      }
+      .form-day {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+      }
+      .form-day h5 {
+        margin-bottom: 8px;
+      }
+      .day-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-bottom: 5px;
+      }
+      .day-row label {
+        width: 120px;
+        margin-right: 10px;
+      }
+      .day-row input {
+        width: 150px;
+        margin-right: 10px;
+      }
+      .btn-primary {
+        background-color: #283E51;
+        border: none;
+      }
+      .btn-primary:hover {
+        background-color: #1d2d3a;
+      }
+      footer {
+        background-color: #424242;
+        color: #fff;
+        text-align: center;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>E.M José Padin Mouta - Secretaria</h1>
+    </header>
+    <main>
+      <div class="container">
+        <h1>Declaração de Acúmulo de Cargo</h1>
+        <form method="POST" id="acumuloForm">
+          <!-- Dados Pessoais -->
+          <div class="form-group">
+            <label for="nome">Nome do Professor(a):</label>
+            <input type="text" class="form-control" id="nome" name="nome" required>
+          </div>
+          <div class="form-group">
+            <label for="rg">RG:</label>
+            <input type="text" class="form-control" id="rg" name="rg" required>
+          </div>
+          <div class="form-group">
+            <label for="cargo">Selecione o Cargo:</label>
+            <select id="cargo" name="cargo" class="form-control" required>
+              <option value="">Selecione</option>
+              <option value="PROFESSOR RECREACIONISTA">PROFESSOR RECREACIONISTA</option>
+              <option value="PROFESSOR ADJUNTO I">PROFESSOR ADJUNTO I</option>
+              <option value="PROFESSOR I">PROFESSOR I</option>
+              <option value="PROFESSOR II">PROFESSOR II</option>
+              <option value="PROFESSOR III">PROFESSOR III</option>
+              <option value="PROFESSOR IV">PROFESSOR IV</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="disciplina">Disciplina (ex: Polivalente, Matemática...):</label>
+            <select class="form-control" id="disciplina" name="disciplina" required>
+              <option value="">Selecione</option>
+              <option value="Administração">Administração</option>
+              <option value="Artes">Artes</option>
+              <option value="Biologia">Biologia</option>
+              <option value="Ciências">Ciências</option>
+              <option value="Ciências Sociais">Ciências Sociais</option>
+              <option value="Educação Ambiental">Educação Ambiental</option>
+              <option value="Educação Especial">Educação Especial</option>
+              <option value="Educação Física">Educação Física</option>
+              <option value="Filosofia">Filosofia</option>
+              <option value="Física">Física</option>
+              <option value="Geografia">Geografia</option>
+              <option value="História">História</option>
+              <option value="Inglês">Inglês</option>
+              <option value="Informática">Informática</option>
+              <option value="Língua Portuguesa">Língua Portuguesa</option>
+              <option value="Literatura">Literatura</option>
+              <option value="Matemática">Matemática</option>
+              <option value="Música">Música</option>
+              <option value="Polivalente">Polivalente</option>
+              <option value="Química">Química</option>
+              <option value="Sociologia">Sociologia</option>
+              <option value="Tecnologia">Tecnologia</option>
+            </select>
+          </div>
+
+          <!-- Horários de Trabalho -->
+          <!-- Os rótulos aqui foram abreviados -->
+          <div class="form-day">
+            <h5>Segunda-Feira</h5>
+            <div class="day-row">
+              <label>Com Aluno:</label>
+              <input type="time" name="mon_aluno_ini">
+              <input type="time" name="mon_aluno_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPC:</label>
+              <input type="time" name="mon_htpc_ini">
+              <input type="time" name="mon_htpc_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPI:</label>
+              <input type="time" name="mon_hti_ini">
+              <input type="time" name="mon_hti_fim">
+            </div>
+          </div>
+
+          <div class="form-day">
+            <h5>Terça-Feira</h5>
+            <div class="day-row">
+              <label>Com Aluno:</label>
+              <input type="time" name="tue_aluno_ini">
+              <input type="time" name="tue_aluno_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPC:</label>
+              <input type="time" name="tue_htpc_ini">
+              <input type="time" name="tue_htpc_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPI:</label>
+              <input type="time" name="tue_hti_ini">
+              <input type="time" name="tue_hti_fim">
+            </div>
+          </div>
+
+          <div class="form-day">
+            <h5>Quarta-Feira</h5>
+            <div class="day-row">
+              <label>Com Aluno:</label>
+              <input type="time" name="wed_aluno_ini">
+              <input type="time" name="wed_aluno_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPC:</label>
+              <input type="time" name="wed_htpc_ini">
+              <input type="time" name="wed_htpc_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPI:</label>
+              <input type="time" name="wed_hti_ini">
+              <input type="time" name="wed_hti_fim">
+            </div>
+          </div>
+
+          <div class="form-day">
+            <h5>Quinta-Feira</h5>
+            <div class="day-row">
+              <label>Com Aluno:</label>
+              <input type="time" name="thu_aluno_ini">
+              <input type="time" name="thu_aluno_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPC:</label>
+              <input type="time" name="thu_htpc_ini">
+              <input type="time" name="thu_htpc_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPI:</label>
+              <input type="time" name="thu_hti_ini">
+              <input type="time" name="thu_hti_fim">
+            </div>
+          </div>
+
+          <div class="form-day">
+            <h5>Sexta-Feira</h5>
+            <div class="day-row">
+              <label>Com Aluno:</label>
+              <input type="time" name="fri_aluno_ini">
+              <input type="time" name="fri_aluno_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPC:</label>
+              <input type="time" name="fri_htpc_ini">
+              <input type="time" name="fri_htpc_fim">
+            </div>
+            <div class="day-row">
+              <label>HTPI:</label>
+              <input type="time" name="fri_hti_ini">
+              <input type="time" name="fri_hti_fim">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Gerar Declaração</button>
+        </form>
+      </div>
+    </main>
+    <footer>
+      Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+    </footer>
+    
+    <!-- Script para propagar automaticamente o horário "Com Aluno" da Segunda-Feira para os demais dias -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        var cargoSelect = document.querySelector("select[name='cargo']");
+        var monAlunoIni = document.querySelector("input[name='mon_aluno_ini']");
+        var monAlunoFim = document.querySelector("input[name='mon_aluno_fim']");
+        var otherAlunoIniFields = document.querySelectorAll("input[name$='_aluno_ini']:not([name='mon_aluno_ini'])");
+        var otherAlunoFimFields = document.querySelectorAll("input[name$='_aluno_fim']:not([name='mon_aluno_fim'])");
+        var allowedCargos = ["PROFESSOR RECREACIONISTA", "PROFESSOR ADJUNTO I", "PROFESSOR I", "PROFESSOR II"];
+  
+        function propagateAlunoSchedule() {
+          if (cargoSelect.value && allowedCargos.includes(cargoSelect.value.toUpperCase()) &&
+              monAlunoIni.value && monAlunoFim.value) {
+            otherAlunoIniFields.forEach(function(field) {
+              field.value = monAlunoIni.value;
+            });
+            otherAlunoFimFields.forEach(function(field) {
+              field.value = monAlunoFim.value;
+            });
+          }
+        }
+  
+        // Propaga quando os campos de segunda-feira forem alterados
+        monAlunoIni.addEventListener("change", propagateAlunoSchedule);
+        monAlunoFim.addEventListener("change", propagateAlunoSchedule);
+        // E também quando o cargo for alterado
+        cargoSelect.addEventListener("change", propagateAlunoSchedule);
+      });
+    </script>
+  </body>
+</html>
+"""
+
+# HTML do documento final (Declaração) - layout horizontal (landscape)
+# A primeira página permanece inalterada; a segunda página apresenta duas cópias da declaração,
+# cada uma com seu próprio cabeçalho (logo menor + "Declaração de Acúmulo")
+# e os campos organizados conforme o layout abaixo:
+#
+#   ( ) Acumulo cargo/função:
+#
+#   Federal:
+#       Local: __________________________
+#       Cargo/Função: __________________________
+#
+#   Estadual:
+#       Local: __________________________
+#       Cargo/Função: __________________________
+#
+#   Municipal:
+#       Local: __________________________
+#       Cargo/Função: __________________________
+#
+#   ( ) Não acumulo cargo/função.
+#
+DECLARACAO_HTML = """
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Declaração de Acúmulo de Cargo - Gerado</title>
+  <style>
+    @page { size: landscape; margin: 5mm; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 5mm;
+      font-size: 15px;
+    }
+    /* Primeira página */
+    .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 3px; }
+    .header .municipio-logo img { max-height: 70px; }
+    .header .title { text-transform: uppercase; font-weight: bold; font-size: 1.5em; margin-top: 5px; }
+    .subheader { text-align: center; font-size: 0.95em; margin-top: 3px; margin-bottom: 5px; }
+    .info-table, .horario-table, .cargo-table {
+      width: 100%; border-collapse: collapse; margin-bottom: 5px;
+    }
+    .info-table td, .cargo-table td { border: 1px solid #000; padding: 2px; text-align: left; }
+    /* Estrutura da tabela de horários com título "Atividade Extraclasse" */
+    .horario-table th, .horario-table td {
+      border: 1px solid #000; padding: 2px; text-align: center;
+    }
+    .signature { text-align: center; margin-top: 5px; }
+    .page-break { page-break-before: always; }
+  
+    /* Botão de imprimir estilizado no canto superior direito */
+    .print-button {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 9999;
+    }
+    .print-button button {
+      padding: 8px 12px;
+      font-size: 14px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .print-button button:hover {
+      background-color: #0056b3;
+    }
+    @media print {
+      .print-button { display: none; }
+    }
+  
+    /* Segunda página: Declaração de Acúmulo (2 cópias) */
+    .declaration-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    .declaration {
+      width: 48%;
+      border: 1px solid #000;
+      padding: 10px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    /* Cabeçalho individual com logo menor, centralizado e data reposicionada */
+    .decl-header { text-align: center; margin-bottom: 10px; }
+    .decl-header .logo { text-align: center; }
+    .decl-header .logo img { max-height: 20px; } /* Tamanho normal da logo na tela */
+    .decl-header h2 { margin-top: 5px; text-decoration: underline; font-size: 1.2em; }
+    .decl-header .declaration-date { text-align: left; margin-top: 5px; font-weight: bold; }
+    .declaration p { margin: 5px 0; line-height: 1.4; }
+    .section-label { font-weight: bold; margin-top: 10px; }
+    .field-row { margin-left: 20px; }
+    .field-row span { display: block; }
+    /* Mantendo apenas os underscores literais */
+    .line { display: inline-block; width: 30%; margin-left: 5px; }
+    .footer { margin-top: 40px; text-align: center; }
+    .signature-line { margin-top: 30px; border-top: 1px solid #000; width: 60%; margin: auto; }
+    .note { font-size: 0.9em; margin-top: 10px; text-align: justify; }
+  
+    /* CSS para impressão: ajusta somente o logo da segunda página */
+    @media print {
+      .decl-header .logo img {
+         max-height: 10px !important;
+         display: block;
+         margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Primeira página -->
+  <div class="header">
+    <div class="municipio-logo">
+      <img src="/static/logos/cabecalho_municipio.png" alt="Logo do Município">
+    </div>
+    <div class="title">Declaração de Acúmulo de Cargo</div>
+  </div>
+  <div class="subheader">
+    (Fundamentação Legal: Art. 37, XVI, “a” e “b” da Constituição Federal)
+  </div>
+  <table class="info-table">
+    <tr>
+      <td><strong>Unidade:</strong> E.M. JOSÉ PADIN MOUTA</td>
+      <td><strong>Fone:</strong> (13) 3496-5321</td>
+    </tr>
+    <tr>
+      <td><strong>Endereço:</strong> Rua Bororós, S/N - Vila Tupi</td>
+      <td><strong>Cidade:</strong> Praia Grande - SP</td>
+    </tr>
+    <tr>
+      <td><strong>Nome:</strong> {{ nome }}</td>
+      <td><strong>RG:</strong> {{ rg }}</td>
+    </tr>
+    <tr>
+      <td><strong>Cargo:</strong> {{ cargo }}</td>
+      <td><strong>Disciplina:</strong> {{ disciplina }}</td>
+    </tr>
+  </table>
+  
+  <h3>Horário de Trabalho</h3>
+  <table class="horario-table">
+    <tr>
+      <th rowspan="2">Dia da Semana</th>
+      <th rowspan="2">Carga Horária c/ Aluno</th>
+      <th colspan="2">Atividade Extraclasse</th>
+    </tr>
+    <tr>
+      <th>Hora de Trabalho Pedagógico Coletivo</th>
+      <th>Hora de Trabalho Pedagógico Individual</th>
+    </tr>
+    <tr>
+      <td>Segunda-Feira</td>
+      <td>{{ mon_aluno_ini }} - {{ mon_aluno_fim }}</td>
+      <td>{{ mon_htpc_ini }} - {{ mon_htpc_fim }}</td>
+      <td>{{ mon_hti_ini }} - {{ mon_hti_fim }}</td>
+    </tr>
+    <tr>
+      <td>Terça-Feira</td>
+      <td>{{ tue_aluno_ini }} - {{ tue_aluno_fim }}</td>
+      <td>{{ tue_htpc_ini }} - {{ tue_htpc_fim }}</td>
+      <td>{{ tue_hti_ini }} - {{ tue_hti_fim }}</td>
+    </tr>
+    <tr>
+      <td>Quarta-Feira</td>
+      <td>{{ wed_aluno_ini }} - {{ wed_aluno_fim }}</td>
+      <td>{{ wed_htpc_ini }} - {{ wed_htpc_fim }}</td>
+      <td>{{ wed_hti_ini }} - {{ wed_hti_fim }}</td>
+    </tr>
+    <tr>
+      <td>Quinta-Feira</td>
+      <td>{{ thu_aluno_ini }} - {{ thu_aluno_fim }}</td>
+      <td>{{ thu_htpc_ini }} - {{ thu_htpc_fim }}</td>
+      <td>{{ thu_hti_ini }} - {{ thu_hti_fim }}</td>
+    </tr>
+    <tr>
+      <td>Sexta-Feira</td>
+      <td>{{ fri_aluno_ini }} - {{ fri_aluno_fim }}</td>
+      <td>{{ fri_htpc_ini }} - {{ fri_htpc_fim }}</td>
+      <td>{{ fri_hti_ini }} - {{ fri_hti_fim }}</td>
+    </tr>
+  </table>
+  
+  <table class="cargo-table">
+    <tr>
+      <td><strong>Carga Horária c/ Aluno</strong></td>
+      <td>{{ aluno }} horas</td>
+    </tr>
+    <tr>
+      <td><strong>Hora de Trabalho Pedagógico Individual (Presencial e On-line)</strong></td>
+      <td>{{ htpi_total }} horas</td>
+    </tr>
+    <tr>
+      <td><strong>Hora de Trabalho Pedagógico Coletivo</strong></td>
+      <td>{{ htpc }} horas</td>
+    </tr>
+    <tr>
+      <td><strong>Hora de Atividade Livre (HAL)</strong></td>
+      <td>{{ hal }} horas</td>
+    </tr>
+    <tr>
+      <td><strong>Carga Horária Total</strong></td>
+      <td>{{ total }} horas</td>
+    </tr>
+  </table>
+  
+  <p>
+    * A Hora de Atividade Livre – HAL é o período remunerado no qual o docente deve cumpri-la em hora e local de livre.
+  </p>
+  <p>
+    * {{ htpi_online }} Horas de Trabalho Pedagógico Individual – HTPI serão realizados de forma on-line, portanto, não haverá determinação de horário para cumprimento.
+  </p>
+  <p>
+    Declaro, sob pena de responsabilidade, que as informações constantes desta declaração representam a verdade.
+  </p>
+  <p>
+    Praia Grande, {{ data_atual }}.
+  </p>
+  <div class="signature">
+    ______________________________________________<br>
+    Assinatura e Carimbo do Diretor(a) da Unidade Escolar
+  </div>
+  
+  <!-- Botão de imprimir estilizado no canto superior direito -->
+  <div class="print-button">
+    <button onclick="window.print()">Imprimir</button>
+  </div>
+  
+  <!-- Segunda página: Declaração de Acúmulo (2 cópias lado a lado) -->
+  <div class="page-break"></div>
+  <div class="declaration-container">
+    <!-- Cópia 1 -->
+    <div class="declaration">
+      <div class="decl-header logo">
+        <img src="/static/logos/cabecalho_municipio.png" alt="Logo do Município">
+        <h2>Declaração de Acúmulo</h2>
+        <p class="declaration-date"><strong>Praia Grande, {{ data_atual }}.</strong></p>
+      </div>
+      <p>Eu, <strong>{{ nome }}</strong>, R.G. <strong>{{ rg }}</strong>, (Cargo/Função que exerce: <strong>{{ cargo }}</strong>), lotado(a) na <strong>E.M. JOSÉ PADIN MOUTA</strong>, declaro para todos os fins que:</p>
+      
+      <p><strong>(       ) Acumulo cargo/função:</strong></p>
+      
+      <p class="section-label">Federal: <span style="margin-left:10px;">(       )</span></p>
+      <div class="field-row">
+        <span class="field-label">Local:</span> <span class="line">______________________________</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Cargo/Função:</span> <span class="line">______________________________</span>
+      </div>
+      
+      <p class="section-label">Estadual: <span style="margin-left:10px;">(       )</span></p>
+      <div class="field-row">
+        <span class="field-label">Local:</span> <span class="line">______________________________</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Cargo/Função:</span> <span class="line">______________________________</span>
+      </div>
+      
+      <p class="section-label">Municipal: <span style="margin-left:10px;">(       )</span></p>
+      <div class="field-row">
+        <span class="field-label">Local:</span> <span class="line">______________________________</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Cargo/Função:</span> <span class="line">______________________________</span>
+      </div>
+      
+      <p><strong>(       ) Não acumulo cargo/função.</strong></p>
+      <p>Por ser verdade, firmo o presente.</p>
+      <div class="footer">
+        <div class="signature-line"></div>
+        <p>Assinatura</p>
+      </div>
+      <p class="note">
+        Nota: Em caso de acúmulo de cargo/função, anexar declaração de horário do outro local de trabalho assinado pelo responsável e xérox do D.O., exceto o aposentado.
+      </p>
+    </div>
+    
+    <!-- Cópia 2 -->
+    <div class="declaration">
+      <div class="decl-header logo">
+        <img src="/static/logos/cabecalho_municipio.png" alt="Logo do Município">
+        <h2>Declaração de Acúmulo</h2>
+        <p class="declaration-date"><strong>Praia Grande, {{ data_atual }}.</strong></p>
+      </div>
+      <p>Eu, <strong>{{ nome }}</strong>, R.G. <strong>{{ rg }}</strong>, (Cargo/Função que exerce: <strong>{{ cargo }}</strong>), lotado(a) na <strong>E.M. JOSÉ PADIN MOUTA</strong>, declaro para todos os fins que:</p>
+      
+      <p><strong>(       ) Acumulo cargo/função:</strong></p>
+      
+      <p class="section-label">Federal: <span style="margin-left:10px;">(       )</span></p>
+      <div class="field-row">
+        <span class="field-label">Local:</span> <span class="line">______________________________</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Cargo/Função:</span> <span class="line">______________________________</span>
+      </div>
+      
+      <p class="section-label">Estadual: <span style="margin-left:10px;">(       )</span></p>
+      <div class="field-row">
+        <span class="field-label">Local:</span> <span class="line">______________________________</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Cargo/Função:</span> <span class="line">______________________________</span>
+      </div>
+      
+      <p class="section-label">Municipal: <span style="margin-left:10px;">(       )</span></p>
+      <div class="field-row">
+        <span class="field-label">Local:</span> <span class="line">______________________________</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Cargo/Função:</span> <span class="line">______________________________</span>
+      </div>
+      
+      <p><strong>(       ) Não acumulo cargo/função.</strong></p>
+      <p>Por ser verdade, firmo o presente.</p>
+      <div class="footer">
+        <div class="signature-line"></div>
+        <p>Assinatura</p>
+      </div>
+      <p class="note">
+        Nota: Em caso de acúmulo de cargo/função, anexar declaração de horário do outro local de trabalho assinado pelo responsável e xérox do D.O., exceto o aposentado.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+from flask import Flask, request
+from datetime import datetime
+
+
+@app.route("/acumulo", methods=["GET", "POST"])
+def acumulo():
+    if request.method == "POST":
+        # Dados básicos
+        nome = request.form.get("nome")
+        rg = request.form.get("rg")
+        cargo = request.form.get("cargo")
+        disciplina = request.form.get("disciplina", "")
+
+        # Horários (não obrigatórios)
+        mon_aluno_ini = request.form.get("mon_aluno_ini", "")
+        mon_aluno_fim = request.form.get("mon_aluno_fim", "")
+        mon_htpc_ini  = request.form.get("mon_htpc_ini", "")
+        mon_htpc_fim  = request.form.get("mon_htpc_fim", "")
+        mon_hti_ini   = request.form.get("mon_hti_ini", "")
+        mon_hti_fim   = request.form.get("mon_hti_fim", "")
+
+        tue_aluno_ini = request.form.get("tue_aluno_ini", "")
+        tue_aluno_fim = request.form.get("tue_aluno_fim", "")
+        tue_htpc_ini  = request.form.get("tue_htpc_ini", "")
+        tue_htpc_fim  = request.form.get("tue_htpc_fim", "")
+        tue_hti_ini   = request.form.get("tue_hti_ini", "")
+        tue_hti_fim   = request.form.get("tue_hti_fim", "")
+
+        wed_aluno_ini = request.form.get("wed_aluno_ini", "")
+        wed_aluno_fim = request.form.get("wed_aluno_fim", "")
+        wed_htpc_ini  = request.form.get("wed_htpc_ini", "")
+        wed_htpc_fim  = request.form.get("wed_htpc_fim", "")
+        wed_hti_ini   = request.form.get("wed_hti_ini", "")
+        wed_hti_fim   = request.form.get("wed_hti_fim", "")
+
+        thu_aluno_ini = request.form.get("thu_aluno_ini", "")
+        thu_aluno_fim = request.form.get("thu_aluno_fim", "")
+        thu_htpc_ini  = request.form.get("thu_htpc_ini", "")
+        thu_htpc_fim  = request.form.get("thu_htpc_fim", "")
+        thu_hti_ini   = request.form.get("thu_hti_ini", "")
+        thu_hti_fim   = request.form.get("thu_hti_fim", "")
+
+        fri_aluno_ini = request.form.get("fri_aluno_ini", "")
+        fri_aluno_fim = request.form.get("fri_aluno_fim", "")
+        fri_htpc_ini  = request.form.get("fri_htpc_ini", "")
+        fri_htpc_fim  = request.form.get("fri_htpc_fim", "")
+        fri_hti_ini   = request.form.get("fri_hti_ini", "")
+        fri_hti_fim   = request.form.get("fri_hti_fim", "")
+
+        # Propaga os horários "Com Aluno" de Segunda-Feira para os demais dias se o cargo for aplicável.
+        if cargo.upper() in ["PROFESSOR RECREACIONISTA", "PROFESSOR ADJUNTO I", "PROFESSOR I", "PROFESSOR II"] and mon_aluno_ini and mon_aluno_fim:
+            tue_aluno_ini = wed_aluno_ini = thu_aluno_ini = fri_aluno_ini = mon_aluno_ini
+            tue_aluno_fim = wed_aluno_fim = thu_aluno_fim = fri_aluno_fim = mon_aluno_fim
+
+        # Função para formatar o horário (ex: "13:30" -> "13h30")
+        def format_time(t):
+            return t.replace(":", "h") if t else t
+
+        # Formatar todos os horários
+        mon_aluno_ini = format_time(mon_aluno_ini)
+        mon_aluno_fim = format_time(mon_aluno_fim)
+        mon_htpc_ini  = format_time(mon_htpc_ini)
+        mon_htpc_fim  = format_time(mon_htpc_fim)
+        mon_hti_ini   = format_time(mon_hti_ini)
+        mon_hti_fim   = format_time(mon_hti_fim)
+
+        tue_aluno_ini = format_time(tue_aluno_ini)
+        tue_aluno_fim = format_time(tue_aluno_fim)
+        tue_htpc_ini  = format_time(tue_htpc_ini)
+        tue_htpc_fim  = format_time(tue_htpc_fim)
+        tue_hti_ini   = format_time(tue_hti_ini)
+        tue_hti_fim   = format_time(tue_hti_fim)
+
+        wed_aluno_ini = format_time(wed_aluno_ini)
+        wed_aluno_fim = format_time(wed_aluno_fim)
+        wed_htpc_ini  = format_time(wed_htpc_ini)
+        wed_htpc_fim  = format_time(wed_htpc_fim)
+        wed_hti_ini   = format_time(wed_hti_ini)
+        wed_hti_fim   = format_time(wed_hti_fim)
+
+        thu_aluno_ini = format_time(thu_aluno_ini)
+        thu_aluno_fim = format_time(thu_aluno_fim)
+        thu_htpc_ini  = format_time(thu_htpc_ini)
+        thu_htpc_fim  = format_time(thu_htpc_fim)
+        thu_hti_ini   = format_time(thu_hti_ini)
+        thu_hti_fim   = format_time(thu_hti_fim)
+
+        fri_aluno_ini = format_time(fri_aluno_ini)
+        fri_aluno_fim = format_time(fri_aluno_fim)
+        fri_htpc_ini  = format_time(fri_htpc_ini)
+        fri_htpc_fim  = format_time(fri_htpc_fim)
+        fri_hti_ini   = format_time(fri_hti_ini)
+        fri_hti_fim   = format_time(fri_hti_fim)
+
+        # Busca os dados do cargo
+        cargo_info = CARGOS.get(cargo.upper())
+        if not cargo_info:
+            return f"Cargo '{cargo}' não encontrado na tabela de horas."
+
+        total = cargo_info["total"]
+        aluno = cargo_info["aluno"]
+        htpi_pres = cargo_info["htpi_pres"]
+        htpi_online = cargo_info["htpi_online"]
+        htpi_total = cargo_info["htpi_total"]
+        htpc = cargo_info["htpc"]
+        hal = cargo_info["hal"]
+
+        # Data por extenso
+        hoje = datetime.now()
+        meses = [
+            "janeiro","fevereiro","março","abril","maio","junho",
+            "julho","agosto","setembro","outubro","novembro","dezembro"
+        ]
+        data_atual = f"{hoje.day} de {meses[hoje.month-1]} de {hoje.year}"
+
+        # Monta o HTML final substituindo variáveis
+        html_final = (DECLARACAO_HTML
+            .replace("{{ nome }}", nome)
+            .replace("{{ rg }}", rg)
+            .replace("{{ cargo }}", cargo)
+            .replace("{{ disciplina }}", disciplina)
+            .replace("{{ total }}", str(total))
+            .replace("{{ aluno }}", str(aluno))
+            .replace("{{ htpi_total }}", str(htpi_total))
+            .replace("{{ htpc }}", str(htpc))
+            .replace("{{ hal }}", str(hal))
+            .replace("{{ htpi_online }}", str(htpi_online))
+            .replace("{{ data_atual }}", data_atual)
+  
+            .replace("{{ mon_aluno_ini }}", mon_aluno_ini)
+            .replace("{{ mon_aluno_fim }}", mon_aluno_fim)
+            .replace("{{ mon_htpc_ini }}", mon_htpc_ini)
+            .replace("{{ mon_htpc_fim }}", mon_htpc_fim)
+            .replace("{{ mon_hti_ini }}", mon_hti_ini)
+            .replace("{{ mon_hti_fim }}", mon_hti_fim)
+  
+            .replace("{{ tue_aluno_ini }}", tue_aluno_ini)
+            .replace("{{ tue_aluno_fim }}", tue_aluno_fim)
+            .replace("{{ tue_htpc_ini }}", tue_htpc_ini)
+            .replace("{{ tue_htpc_fim }}", tue_htpc_fim)
+            .replace("{{ tue_hti_ini }}", tue_hti_ini)
+            .replace("{{ tue_hti_fim }}", tue_hti_fim)
+  
+            .replace("{{ wed_aluno_ini }}", wed_aluno_ini)
+            .replace("{{ wed_aluno_fim }}", wed_aluno_fim)
+            .replace("{{ wed_htpc_ini }}", wed_htpc_ini)
+            .replace("{{ wed_htpc_fim }}", wed_htpc_fim)
+            .replace("{{ wed_hti_ini }}", wed_hti_ini)
+            .replace("{{ wed_hti_fim }}", wed_hti_fim)
+  
+            .replace("{{ thu_aluno_ini }}", thu_aluno_ini)
+            .replace("{{ thu_aluno_fim }}", thu_aluno_fim)
+            .replace("{{ thu_htpc_ini }}", thu_htpc_ini)
+            .replace("{{ thu_htpc_fim }}", thu_htpc_fim)
+            .replace("{{ thu_hti_ini }}", thu_hti_ini)
+            .replace("{{ thu_hti_fim }}", thu_hti_fim)
+  
+            .replace("{{ fri_aluno_ini }}", fri_aluno_ini)
+            .replace("{{ fri_aluno_fim }}", fri_aluno_fim)
+            .replace("{{ fri_htpc_ini }}", fri_htpc_ini)
+            .replace("{{ fri_htpc_fim }}", fri_htpc_fim)
+            .replace("{{ fri_hti_ini }}", fri_hti_ini)
+            .replace("{{ fri_hti_fim }}", fri_hti_fim)
+        )
+  
+        return html_final
+    else:
+        return FORM_HTML
+    
+# Função auxiliar para avaliar se o valor do Plano de Ação é considerado válido
+def is_valid_plano(val):
+    if val is None:
+        return False
+    s = str(val).strip()
+    return s not in ["", "-", "0", "#REF"]
+
+@app.route('/quantinclusao', methods=["GET", "POST"])
+def quantinclusao():
+    if request.method == "POST":
+        # Obter os arquivos enviados
+        reg_file = request.files.get("lista_regular")
+        eja_file = request.files.get("lista_eja")
+        # Obter o responsável pelo preenchimento
+        responsavel = request.form.get("responsavel")
+        if not reg_file or reg_file.filename == "":
+            flash("Selecione o arquivo da Lista Piloto Regular.", "error")
+            return redirect(url_for('quantinclusao'))
+        if not eja_file or eja_file.filename == "":
+            flash("Selecione o arquivo da Lista Piloto EJA.", "error")
+            return redirect(url_for('quantinclusao'))
+        if not responsavel or responsavel.strip() == "":
+            flash("Informe o Responsável pelo preenchimento.", "error")
+            return redirect(url_for('quantinclusao'))
+        
+        # Salva os arquivos na pasta definida
+        reg_filename = secure_filename(f"regular_{uuid.uuid4().hex}_{reg_file.filename}")
+        eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_{eja_file.filename}")
+        reg_path = os.path.join(app.config['UPLOAD_FOLDER'], reg_filename)
+        eja_path = os.path.join(app.config['UPLOAD_FOLDER'], eja_filename)
+        reg_file.save(reg_path)
+        eja_file.save(eja_path)
+        
+        # Carrega o arquivo Regular – espera que contenha as abas "Total de Alunos" e "LISTA CORRIDA"
+        try:
+            wb_reg = load_workbook(reg_path, data_only=True)
+            ws_total_reg = wb_reg["Total de Alunos"]
+            ws_lista_reg = wb_reg["LISTA CORRIDA"]
+        except Exception as e:
+            flash(f"Erro ao ler o arquivo Regular: {str(e)}", "error")
+            return redirect(url_for('quantinclusao'))
+        
+        # Mapeamento do arquivo Regular (células da aba "Total de Alunos")
+        reg_map = {
+            "D13": ws_total_reg["O6"].value,
+            "D17": ws_total_reg["O7"].value,
+            "D21": ws_total_reg["O8"].value,
+            "D25": ws_total_reg["O9"].value,
+            "D29": ws_total_reg["O10"].value,
+            "D33": ws_total_reg["O11"].value,
+            "D41": ws_total_reg["O13"].value,
+            "D45": ws_total_reg["O14"].value,
+            "H13": ws_total_reg["O15"].value,
+            "H17": ws_total_reg["O16"].value,
+            "H21": ws_total_reg["O17"].value,
+            "H25": ws_total_reg["O18"].value,
+            "H29": ws_total_reg["O20"].value,
+            "H33": ws_total_reg["O21"].value,
+            "H37": ws_total_reg["O22"].value,
+            "H45": ws_total_reg["O24"].value,   # Corrigido: H45 recebe O24
+            "L13": ws_total_reg["O25"].value,
+            "L17": ws_total_reg["O26"].value,
+            "L21": ws_total_reg["O28"].value,
+            "L25": ws_total_reg["O29"].value,
+            "L29": ws_total_reg["O30"].value,
+            "L33": ws_total_reg["O31"].value,
+            "L37": ws_total_reg["O32"].value,
+            "L41": ws_total_reg["O33"].value,
+            "L45": ws_total_reg["O34"].value
+        }
+        
+        # Inicializa os contadores para as séries baseados na aba "LISTA CORRIDA" do Regular
+        count_2A = count_2B = count_2C = count_2D = count_2E = count_2F = 0
+        count_3A = count_3B = count_3C = count_3D = count_3E = count_3F = 0
+        count_4A = count_4B = count_4C = count_4D = count_4E = count_4F = count_4G = 0
+        count_5A = count_5B = count_5C = count_5D = count_5E = count_5F = count_5G = 0
+
+        # Dicionário para armazenar conjuntos de nomes únicos por série (LISTA CORRIDA do Regular)
+        series_list = ["2ºA", "2ºB", "2ºC", "2ºD", "2ºE", "2ºF", "2ºG",
+                       "3ºA", "3ºB", "3ºC", "3ºD", "3ºE", "3ºF",
+                       "4ºA", "4ºB", "4ºC", "4ºD", "4ºE", "4ºF", "4ºG",
+                       "5ºA", "5ºB", "5ºC", "5ºD", "5ºE", "5ºF", "5ºG"]
+        unique_names = {serie: set() for serie in series_list}
+
+        # Processa a aba "LISTA CORRIDA" do Regular
+        for row in ws_lista_reg.iter_rows(min_row=2, values_only=True):
+            serie = str(row[0]).strip() if row[0] is not None else ""
+            plano = row[15] if len(row) > 15 else None
+
+            # Armazena nomes únicos (coluna P) por série
+            if serie in unique_names and is_valid_plano(plano):
+                unique_names[serie].add(str(plano).strip())
+
+            # Contagem simples conforme série
+            if serie == "2ºA" and is_valid_plano(plano):
+                count_2A += 1
+            elif serie == "2ºB" and is_valid_plano(plano):
+                count_2B += 1
+            elif serie == "2ºC" and is_valid_plano(plano):
+                count_2C += 1
+            elif serie == "2ºD" and is_valid_plano(plano):
+                count_2D += 1
+            elif serie == "2ºE" and is_valid_plano(plano):
+                count_2E += 1
+            elif serie == "2ºF" and is_valid_plano(plano):
+                count_2F += 1
+            elif serie == "3ºA" and is_valid_plano(plano):
+                count_3A += 1
+            elif serie == "3ºB" and is_valid_plano(plano):
+                count_3B += 1
+            elif serie == "3ºC" and is_valid_plano(plano):
+                count_3C += 1
+            elif serie == "3ºD" and is_valid_plano(plano):
+                count_3D += 1
+            elif serie == "3ºE" and is_valid_plano(plano):
+                count_3E += 1
+            elif serie == "3ºF" and is_valid_plano(plano):
+                count_3F += 1
+            elif serie == "4ºA" and is_valid_plano(plano):
+                count_4A += 1
+            elif serie == "4ºB" and is_valid_plano(plano):
+                count_4B += 1
+            elif serie == "4ºC" and is_valid_plano(plano):
+                count_4C += 1
+            elif serie == "4ºD" and is_valid_plano(plano):
+                count_4D += 1
+            elif serie == "4ºE" and is_valid_plano(plano):
+                count_4E += 1
+            elif serie == "4ºF" and is_valid_plano(plano):
+                count_4F += 1
+            elif serie == "4ºG" and is_valid_plano(plano):
+                count_4G += 1
+            elif serie == "5ºA" and is_valid_plano(plano):
+                count_5A += 1
+            elif serie == "5ºB" and is_valid_plano(plano):
+                count_5B += 1
+            elif serie == "5ºC" and is_valid_plano(plano):
+                count_5C += 1
+            elif serie == "5ºD" and is_valid_plano(plano):
+                count_5D += 1
+            elif serie == "5ºE" and is_valid_plano(plano):
+                count_5E += 1
+            elif serie == "5ºF" and is_valid_plano(plano):
+                count_5F += 1
+            elif serie == "5ºG" and is_valid_plano(plano):
+                count_5G += 1
+        
+        # Carrega o arquivo EJA – espera que contenha a aba "Total de Alunos"
+        try:
+            wb_eja = load_workbook(eja_path, data_only=True)
+            ws_total_eja = wb_eja["Total de Alunos"]
+        except Exception as e:
+            flash(f"Erro ao ler o arquivo EJA: {str(e)}", "error")
+            return redirect(url_for('quantinclusao'))
+        
+        eja_map = {
+            "D53": ws_total_eja["M10"].value,
+            "D57": (ws_total_eja["M11"].value or 0) + (ws_total_eja["M12"].value or 0),
+            "D61": ws_total_eja["M13"].value,
+            "H53": ws_total_eja["M14"].value,
+            "H57": ws_total_eja["M16"].value,
+            "H61": ws_total_eja["M17"].value,
+            "L53": ws_total_eja["M18"].value
+        }
+        
+        # Tenta carregar a aba "LISTA CORRIDA" do EJA para as novas regras
+        try:
+            ws_lista_eja = wb_eja["LISTA CORRIDA"]
+        except Exception as e:
+            flash(f"Erro ao ler a aba LISTA CORRIDA no arquivo EJA: {str(e)}", "error")
+            return redirect(url_for('quantinclusao'))
+        
+        # --- NOVAS REGRAS DE PREENCHIMENTO (LISTA CORRIDA EJA) ---
+        # H41 do modelo receberá o valor da célula O23 da aba "Total de Alunos" do Regular
+        # Definição dos grupos de séries para os cálculos
+        series_ef_group1 = {"1ª SÉRIE E.F", "2ª SÉRIE E.F", "3ª SÉRIE E.F", "4ª SÉRIE E.F"}
+        series_ef_group2 = {"5ª SÉRIE E.F", "6ª SÉRIE E.F"}
+        series_ef_group3 = {"7ª SÉRIE E.F"}
+        series_ef_group4 = {"8ª SÉRIE E.F"}
+        series_em_group1 = {"1ª SÉRIE E.M"}
+        series_em_group2 = {"2ª SÉRIE E.M"}
+        series_em_group3 = {"3ª SÉRIE E.M"}
+        
+        # Inicializa contadores e conjuntos para os cálculos
+        d54_count = 0
+        unique_d55 = set()
+        d58_count = 0
+        unique_d59 = set()
+        d62_count = 0
+        unique_d63 = set()
+        h54_count = 0
+        unique_h55 = set()
+        h58_count = 0
+        unique_h59 = set()
+        h62_count = 0
+        unique_h63 = set()
+        l54_count = 0
+        unique_l55 = set()
+        
+        # Itera sobre as linhas da aba "LISTA CORRIDA" do EJA
+        for row in ws_lista_eja.iter_rows(min_row=2, values_only=True):
+            serie = str(row[0]).strip() if row[0] is not None else ""
+            # Coluna T é o índice 19 (A=0, ..., T=19)
+            nome = row[19] if len(row) > 19 else None
+
+            # Grupo 1 (D54 e D55): Séries E.F de 1ª a 4ª
+            if serie in series_ef_group1:
+                if is_valid_plano(nome):
+                    d54_count += 1
+                    unique_d55.add(str(nome).strip())
+            # Grupo 2 (D58 e D59): Séries E.F de 5ª e 6ª
+            if serie in series_ef_group2:
+                if is_valid_plano(nome):
+                    d58_count += 1
+                    unique_d59.add(str(nome).strip())
+            # Grupo 3 (D62 e D63): Série E.F de 7ª
+            if serie in series_ef_group3:
+                if is_valid_plano(nome):
+                    d62_count += 1
+                    unique_d63.add(str(nome).strip())
+            # Grupo 4 (H54 e H55): Série E.F de 8ª
+            if serie in series_ef_group4:
+                if is_valid_plano(nome):
+                    h54_count += 1
+                    unique_h55.add(str(nome).strip())
+            # Grupo 5 (H58 e H59): Série E.M de 1ª
+            if serie in series_em_group1:
+                if is_valid_plano(nome):
+                    h58_count += 1
+                    unique_h59.add(str(nome).strip())
+            # Grupo 6 (H62 e H63): Série E.M de 2ª
+            if serie in series_em_group2:
+                if is_valid_plano(nome):
+                    h62_count += 1
+                    unique_h63.add(str(nome).strip())
+            # Grupo 7 (L54 e L55): Série E.M de 3ª
+            if serie in series_em_group3:
+                if is_valid_plano(nome):
+                    l54_count += 1
+                    unique_l55.add(str(nome).strip())
+        # --- FIM DAS NOVAS REGRAS (LISTA CORRIDA EJA) ---
+        
+        # Carrega o modelo "Quadro Quantitativo de Inclusão - Modelo.xlsx" da pasta "modelos"
+        model_path = os.path.join("modelos", "Quadro Quantitativo de Inclusão - Modelo.xlsx")
+        try:
+            wb_model = load_workbook(model_path)
+        except Exception as e:
+            flash(f"Erro ao abrir o modelo de inclusão: {str(e)}", "error")
+            return redirect(url_for('quantinclusao'))
+        ws_model = wb_model.active
+        
+        # Preenche os valores fixos do Regular no modelo
+        for cell_addr, value in reg_map.items():
+            ws_model[cell_addr] = value
+        
+        # Preenche os valores do EJA no modelo
+        for cell_addr, value in eja_map.items():
+            ws_model[cell_addr] = value
+        
+        # Preenche as células de contagem simples (Regular)
+        ws_model["D14"] = count_2A
+        ws_model["D18"] = count_2B
+        ws_model["D22"] = count_2C
+        ws_model["D26"] = count_2D
+        ws_model["D30"] = count_2E
+        ws_model["D34"] = count_2F
+
+        ws_model["D42"] = count_3A
+        ws_model["D46"] = count_3B
+
+        ws_model["H14"] = count_3C
+        ws_model["H18"] = count_3D
+        ws_model["H22"] = count_3E
+        ws_model["H26"] = count_3F
+
+        ws_model["H30"] = count_4A
+        ws_model["H34"] = count_4B
+        ws_model["H38"] = count_4C
+        ws_model["H42"] = count_4D
+        ws_model["H46"] = count_4E
+
+        ws_model["L14"] = count_4F
+        ws_model["L18"] = count_4G
+
+        ws_model["L22"] = count_5A
+        ws_model["L26"] = count_5B
+        ws_model["L30"] = count_5C
+        ws_model["L34"] = count_5D
+        ws_model["L38"] = count_5E
+        ws_model["L42"] = count_5F
+        ws_model["L46"] = count_5G
+
+        # Preenche as células de nomes únicos (Regular)
+        ws_model["D15"] = len(unique_names["2ºA"])
+        ws_model["D19"] = len(unique_names["2ºB"])
+        ws_model["D23"] = len(unique_names["2ºC"])
+        ws_model["D27"] = len(unique_names["2ºD"])
+        ws_model["D31"] = len(unique_names["2ºE"])
+        ws_model["D35"] = len(unique_names["2ºF"])
+        ws_model["D39"] = len(unique_names["2ºG"])
+
+        ws_model["D43"] = len(unique_names["3ºA"])
+        ws_model["D47"] = len(unique_names["3ºB"])
+
+        ws_model["H15"] = len(unique_names["3ºC"])
+        ws_model["H19"] = len(unique_names["3ºD"])
+        ws_model["H23"] = len(unique_names["3ºE"])
+        ws_model["H27"] = len(unique_names["3ºF"])
+
+        ws_model["H31"] = len(unique_names["4ºA"])
+        ws_model["H35"] = len(unique_names["4ºB"])
+        ws_model["H39"] = len(unique_names["4ºC"])
+        ws_model["H43"] = len(unique_names["4ºD"])
+        ws_model["H47"] = len(unique_names["4ºE"])
+
+        ws_model["L15"] = len(unique_names["4ºF"])
+        ws_model["L19"] = len(unique_names["4ºG"])
+
+        ws_model["L23"] = len(unique_names["5ºA"])
+        ws_model["L27"] = len(unique_names["5ºB"])
+        ws_model["L31"] = len(unique_names["5ºC"])
+        ws_model["L35"] = len(unique_names["5ºD"])
+        ws_model["L39"] = len(unique_names["5ºE"])
+        ws_model["L43"] = len(unique_names["5ºF"])
+        ws_model["L47"] = len(unique_names["5ºG"])
+        
+        # --- NOVOS PREENCHIMENTOS USANDO DADOS DO EJA ---
+        # H41 do modelo recebe O23 da aba "Total de Alunos" do Regular
+        ws_model["H41"] = ws_total_reg["O23"].value
+        
+        # Preenchimentos para a aba LISTA CORRIDA do EJA:
+        ws_model["D54"] = d54_count
+        ws_model["D55"] = len(unique_d55)
+        ws_model["D58"] = d58_count
+        ws_model["D59"] = len(unique_d59)
+        ws_model["D62"] = d62_count
+        ws_model["D63"] = len(unique_d63)
+        ws_model["H54"] = h54_count
+        ws_model["H55"] = len(unique_h55)
+        ws_model["H58"] = h58_count
+        ws_model["H59"] = len(unique_h59)
+        ws_model["H62"] = h62_count
+        ws_model["H63"] = len(unique_h63)
+        ws_model["L54"] = l54_count
+        ws_model["L55"] = len(unique_l55)
+        # --- FIM DOS NOVOS PREENCHIMENTOS (LISTA CORRIDA EJA) ---
+        
+        # --- NOVAS INFORMAÇÕES ADICIONAIS ---
+        # Preencher B4 com o mês e ano atual (ex.: ABRIL/2025),
+        # C8 com o nome do responsável pelo preenchimento,
+        # e K8 com a data atual (ex.: 07/04/2025).
+        meses = {
+            1: "JANEIRO",
+            2: "FEVEREIRO",
+            3: "MARÇO",
+            4: "ABRIL",
+            5: "MAIO",
+            6: "JUNHO",
+            7: "JULHO",
+            8: "AGOSTO",
+            9: "SETEMBRO",
+            10: "OUTUBRO",
+            11: "NOVEMBRO",
+            12: "DEZEMBRO"
+        }
+        current_date = datetime.now()
+        ws_model["B4"] = f"{meses[current_date.month]}/{current_date.year}"
+        ws_model["C8"] = responsavel.strip()
+        ws_model["K8"] = current_date.strftime("%d/%m/%Y")
+        # --- FIM DAS INFORMAÇÕES ADICIONAIS ---
+        
+        # Salva o modelo preenchido em um buffer e envia para download
+        output = BytesIO()
+        wb_model.save(output)
+        output.seek(0)
+        filename = f"Quadro_Quantitativo_de_Inclusao_{datetime.now().strftime('%d%m%Y')}.xlsx"
+        return send_file(output, as_attachment=True, download_name=filename,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    else:
+        # Formulário HTML com campo adicional para o responsável pelo preenchimento
+        form_html = """
+        <!doctype html>
+        <html lang="pt-br">
+          <head>
+            <meta charset="UTF-8">
+            <title>Quadro Quantitativo de Inclusão</title>
+            <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+            <style>
+              body {
+                background: #eef2f3;
+                font-family: 'Montserrat', sans-serif;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
+              }
+              header {
+                background: linear-gradient(90deg, #283E51, #4B79A1);
+                color: #fff;
+                padding: 20px;
+                text-align: center;
+                border-bottom: 3px solid #1d2d3a;
+                border-radius: 0 0 15px 15px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              }
+              main {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+              }
+              .container {
+                background: #fff;
+                padding: 20px;
+                margin-top: 30px;
+                border-radius: 8px;
+                max-width: 700px;
+                width: 100%;
+              }
+              h1 {
+                margin-bottom: 20px;
+              }
+              footer {
+                background-color: #424242;
+                color: #fff;
+                text-align: center;
+                padding: 10px;
+              }
+            </style>
+          </head>
+          <body>
+            <header>
+              <h1>E.M José Padin Mouta - Quadro Quantitativo de Inclusão</h1>
+            </header>
+            <main>
+              <div class="container">
+                <h1>Upload das Listas Piloto</h1>
+                <form method="POST" enctype="multipart/form-data">
+                  <div class="form-group">
+                    <label for="responsavel">Responsável pelo preenchimento:</label>
+                    <input type="text" class="form-control" name="responsavel" id="responsavel" placeholder="Digite seu nome" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="lista_regular">Lista Piloto - REGULAR (Excel):</label>
+                    <input type="file" class="form-control-file" name="lista_regular" id="lista_regular" accept=".xlsx, .xls" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="lista_eja">Lista Piloto - EJA (Excel):</label>
+                    <input type="file" class="form-control-file" name="lista_eja" id="lista_eja" accept=".xlsx, .xls" required>
+                  </div>
+                  <button type="submit" class="btn btn-primary">Gerar Quadro de Inclusão</button>
+                </form>
+              </div>
+            </main>
+            <footer>
+              Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+            </footer>
+          </body>
+        </html>
+        """
+        return render_template_string(form_html)
+
+if __name__ == "__main__":
     app.run(debug=True)
