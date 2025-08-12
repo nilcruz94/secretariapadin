@@ -738,12 +738,12 @@ document.addEventListener('DOMContentLoaded', function() {{
     return render_template_string(html_content)
 
 
-import re
-import pandas as pd
 from datetime import datetime
+import pandas as pd
+import re
 from flask import session
 
-def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
+def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historico=False, unidade_anterior=None):
     # Verifica o tipo de declaração salvo na sessão para distinguir Regular e EJA
     if session.get('declaracao_tipo') != "EJA":
         # Parte Regular - leitura da planilha "LISTA CORRIDA"
@@ -768,7 +768,6 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
 
         row = aluno.iloc[0]
 
-        # No Regular, não existe coluna semestre (índice 29), então definimos vazio
         semestre_texto = ""
 
         nome = row['NOME']
@@ -829,7 +828,6 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
 
         row = aluno.iloc[0]
 
-        # Pega o semestre da coluna AD (índice 29) — somente existe no EJA
         if len(row) > 29:
             semestre = row.iloc[29]
             if pd.isna(semestre):
@@ -910,24 +908,54 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
                 f"Declaro, para os devidos fins, que o(a) aluno(a) <strong><u>{nome}</u></strong>, "
                 f"portador(a) do {ra_label} <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
                 f"solicitou transferência de nossa unidade escolar na data de hoje, estando apto(a) a cursar o "
-                f"<strong><u>{serie}</u></strong>.<br><br>"
-                f'<span style="display:flex; align-items:center;">'
-                f'<span style="width:18px; height:18px; border:1px solid #000; margin-right:8px;"></span>'
-                f'O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis.'
-                f'</span>'
+                f"<strong><u>{serie}</u></strong>."
             )
+            if deve_historico:
+                declaracao_text += (
+                    "<br><br>"
+                    '<label class="checkbox-label" style="display: block; text-align: justify;">'
+                    '<span class="warning-icon" aria-label="Aviso" role="img" style="margin-right: 8px;">&#9888;</span>'
+                )
+                if unidade_anterior:
+                    unidade_anterior = ' '.join(unidade_anterior.strip().split())
+                    declaracao_text += (
+                        f"O aluno deve o histórico escolar da unidade anterior: "
+                        f"<strong><span style=\"white-space: nowrap;\">{unidade_anterior}</span></strong>, "
+                        "após sua entrega, será confeccionado em até 30 dias úteis."
+                    )
+                else:
+                    declaracao_text += (
+                        "O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis."
+                    )
+                declaracao_text += "</label>"
+
         else:
             serie_mod = re.sub(r"^(\d+º).*", r"\1 ano", serie)
             declaracao_text = (
                 f"Declaro, para os devidos fins, que o(a) responsável do(a) aluno(a) <strong><u>{nome}</u></strong>, "
                 f"portador(a) do RA <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
                 f"compareceu a nossa unidade escolar e solicitou transferência na data de hoje, o aluno está apto(a) a cursar o "
-                f"<strong><u>{serie_mod}</u></strong>.<br><br>"
-                f'<span style="display:flex; align-items:center;">'
-                f'<span style="width:18px; height:18px; border:1px solid #000; margin-right:8px;"></span>'
-                f'O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis.'
-                f'</span>'
+                f"<strong><u>{serie_mod}</u></strong>."
             )
+            # Se quiser colocar o histórico para o não EJA, faça aqui:
+            if deve_historico:
+                declaracao_text += (
+                    "<br><br>"
+                    '<label class="checkbox-label" style="display: block; text-align: justify;">'
+                    '<span class="warning-icon" aria-label="Aviso" role="img" style="margin-right: 8px;">&#9888;</span>'
+                )
+                if unidade_anterior:
+                    unidade_anterior = ' '.join(unidade_anterior.strip().split())
+                    declaracao_text += (
+                        f"O aluno deve o histórico escolar da unidade anterior: "
+                        f"<strong><span style=\"white-space: nowrap;\">{unidade_anterior}</span></strong>, "
+                        "após sua entrega, será confeccionado em até 30 dias úteis."
+                    )
+                else:
+                    declaracao_text += (
+                        "O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis."
+                    )
+                declaracao_text += "</label>"
 
     elif tipo == "Conclusão":
         titulo = "Declaração de Conclusão"
@@ -958,7 +986,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
             declaracao_text = (
                 f"Declaro, para os devidos fins, que o(a) aluno(a) <strong><u>{nome}</u></strong>, "
                 f"portador(a) do {ra_label} <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
-                f"concluiu com êxito o <strong><u>{serie}</u></strong>{f', no {semestre_texto}' if semestre_texto else ''}, "
+                f"concluiu com êxito o <strong><u>{serie}</u></strong>{f', no <strong><u>{semestre_texto}</strong></u>' if semestre_texto else ''}, "
                 f"estando apto(a) a ingressar no <strong><u>{series_text}</u></strong>."
             )
         else:
@@ -1014,6 +1042,17 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
     .content {{
       text-align: justify;
       margin-bottom: 10px;
+      padding: 0 2cm;  /* aumentar margem lateral para evitar texto colado */
+      box-sizing: border-box;
+      hyphens: auto; /* ativa hifenização automática */
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }}
+    .content p {{
+      white-space: normal !important;
+      word-break: break-word !important; /* evita quebra no meio da palavra sem hífen */
+      overflow-wrap: break-word !important;
+      hyphens: auto !important;
     }}
     .signature {{
       text-align: center;
@@ -1034,32 +1073,99 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
       font-size: 14px;
       color: #555;
     }}
-    @media print {{
-      .no-print {{ display: none !important; }}
-      body {{
-        margin: 0;
-        padding: 0.5cm;
-        font-size: 16px;
-      }}
-      .declaration-bottom {{
-         margin-top: 10cm;
-      }}
-      .date {{
-         margin-top: 2cm;
-      }}
+    .warning-icon {{
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      color: red;
+      font-weight: bold;
+      font-size: 18px;
+      line-height: 18px;
+      vertical-align: middle;
+      user-select: none;
     }}
-    {additional_css}
-    header {{
-      background: linear-gradient(90deg, #283E51, #4B79A1);
-      color: #fff;
-      padding: 20px;
-      text-align: center;
-      border-bottom: 3px solid #1d2d3a;
-      border-radius: 0 0 15px 15px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }}
-  </style>
-</head>
+@media print {{
+  .no-print {{ display: none !important; }}
+
+  body {{
+    margin: 0;
+    padding: 1.5cm 1.5cm;  /* margens laterais reduzidas para 1.5cm */
+    font-size: 16px;
+    font-family: 'Montserrat', sans-serif;
+    color: #000;
+  }}
+
+  .declaration-bottom {{
+    margin-top: 8cm;
+  }}
+
+  .date {{
+    margin: 1cm 0 1cm 0;  /* margem topo reduzida para 1cm */
+    text-align: right;
+    hyphens: none !important; /* sem hifenização na data */
+  }}
+
+  .content {{
+    margin: 0;
+    padding: 0;
+    text-align: justify !important;
+    hyphens: none !important; /* desativa hifenização */
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }}
+
+  .content p {{
+    margin: 0 0 1em 0;
+    text-align: justify !important;
+    hyphens: none !important; /* desativa hifenização */
+  }}
+
+  body, .content, .content p {{
+    width: auto !important;
+    max-width: none !important;
+  }}
+}}
+
+.content, .content p, .date {{
+  hyphens: none !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}}
+
+{additional_css}
+
+/* CSS para checkbox alinhado */
+.checkbox-label {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left !important;
+  font-size: 16px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}}
+
+.checkbox-label input[type="checkbox"] {{
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  vertical-align: middle;
+}}
+
+header {{
+  background: linear-gradient(90deg, #283E51, #4B79A1);
+  color: #fff;
+  padding: 20px;
+  text-align: center;
+  border-bottom: 3px solid #1d2d3a;
+  border-radius: 0 0 15px 15px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}}
+
+    </style>
+    </head>
 <body>
   <div class="declaration-container">
     <div class="header">
@@ -1099,8 +1205,8 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
 </body>
 </html>
 '''
-    return base_template
 
+    return base_template
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_route():
@@ -2008,11 +2114,13 @@ def declaracao_select():
             return redirect(url_for('declaracao_upload_eja'))
         else:
             return redirect(url_for('declaracao_upload'))
+
     if session.get('declaracao_tipo') == "EJA":
         df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1)
         df['RM_str'] = df.iloc[:, 2].apply(lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else "")
         df['NOME'] = df.iloc[:, 3]
         df['NASC.'] = df.iloc[:, 6]
+
         def get_ra(row):
             try:
                 val = row.iloc[7]
@@ -2026,7 +2134,6 @@ def declaracao_select():
         df['RA'] = df.apply(get_ra, axis=1)
         df['SÉRIE'] = df.iloc[:, 0]
         alunos = df[df['RM_str'] != ""][['RM_str', 'NOME']].drop_duplicates()
-
     else:
         planilha = pd.read_excel(file_path, sheet_name='LISTA CORRIDA')
 
@@ -2038,24 +2145,47 @@ def declaracao_select():
 
         planilha['RM_str'] = planilha['RM'].apply(format_rm)
         alunos = planilha[planilha['RM_str'] != "0"][['RM_str', 'NOME']].drop_duplicates()
+
     options_html = ""
     for _, row in alunos.iterrows():
         rm_str = row['RM_str']
         nome = row['NOME']
         options_html += f'<option value="{rm_str}">{rm_str} - {nome}</option>'
+
     if request.method == 'POST':
         rm = request.form.get('rm')
         tipo = request.form.get('tipo')
+        deve_historico_str = request.form.get('deve_historico')
+        unidade_anterior = request.form.get('unidade_anterior', '').strip()
+
         if not rm or not tipo:
-            flash("Escolha o aluno para realizar a declaração.", "error")
+            flash("Escolha o aluno e o tipo de declaração.", "error")
             return redirect(url_for('declaracao_select'))
 
-        declaracao_html = gerar_declaracao_escolar(file_path, rm, tipo)
+        if tipo == "Transferencia":
+            if deve_historico_str not in ['sim', 'nao']:
+                flash("Por favor, responda se o aluno deve o histórico escolar.", "error")
+                return redirect(url_for('declaracao_select'))
+            if deve_historico_str == 'sim' and not unidade_anterior:
+                flash("Por favor, informe a unidade escolar anterior.", "error")
+                return redirect(url_for('declaracao_select'))
+            deve_historico = (deve_historico_str == 'sim')
+        else:
+            deve_historico = False
+            unidade_anterior = ""
+
+        declaracao_html = gerar_declaracao_escolar(
+            file_path, rm, tipo,
+            deve_historico=deve_historico,
+            unidade_anterior=unidade_anterior
+        )
+
         if declaracao_html is None:
             flash("Aluno não encontrado.", "error")
             return redirect(url_for('declaracao_select'))
 
         return declaracao_html
+
     select_form = f'''
     <!doctype html>
     <html lang="pt-br">
@@ -2103,6 +2233,21 @@ def declaracao_select():
           bottom: 0;
           width: 100%;
         }}
+        #historico-container {{
+          display: none;
+          margin-top: 15px;
+          border: 1px solid #ccc;
+          padding: 15px;
+          border-radius: 8px;
+          background: #f9f9f9;
+        }}
+        #unidade-anterior-container {{
+          display: none;
+          margin-top: 15px;
+        }}
+        #btn-container {{
+          margin-top: 20px;
+        }}
       </style>
     </head>
     <body>
@@ -2111,7 +2256,7 @@ def declaracao_select():
         <p>Escolha o aluno para realizar a declaração</p>
       </header>
       <div class="container container-form">
-        <form method="POST" onsubmit="return confirmDeclaration();">
+        <form method="POST" onsubmit="return validarFormulario();">
           <div class="form-group">
             <label for="rm">Aluno:</label>
             <select class="form-control" id="rm" name="rm" required>
@@ -2128,12 +2273,33 @@ def declaracao_select():
               <option value="Conclusão">Declaração de Conclusão</option>
             </select>
           </div>
-          <button type="submit" class="btn btn-primary">Gerar Declaração</button>
+
+          <div id="historico-container">
+            <label>Deve Histórico Escolar? <span style="color:red;">*</span></label><br>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="deve_historico" id="historico_sim" value="sim">
+              <label class="form-check-label" for="historico_sim">Sim</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="deve_historico" id="historico_nao" value="nao">
+              <label class="form-check-label" for="historico_nao">Não</label>
+            </div>
+          </div>
+
+          <div id="unidade-anterior-container" class="form-group">
+            <label for="unidade_anterior">Nome da unidade escolar anterior: <span style="color:red;">*</span></label>
+            <input type="text" class="form-control" id="unidade_anterior" name="unidade_anterior" placeholder="Digite o nome da unidade escolar">
+          </div>
+
+          <div id="btn-container">
+            <button type="submit" class="btn btn-primary">Gerar Declaração</button>
+          </div>
         </form>
       </div>
       <footer>
         Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
       </footer>
+
       <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
       <script>
@@ -2142,20 +2308,62 @@ def declaracao_select():
             placeholder: "Selecione o aluno",
             allowClear: true
           }});
-        }});
-        function confirmDeclaration() {{
-            var tipo = document.getElementById('tipo').value;
-            if(tipo === "Transferencia") {{
-                return confirm("Você está gerando uma declaração de transferência, essa é a declaração correta a ser gerada?");
+
+          $('#tipo').on('change', function() {{
+            if ($(this).val() === 'Transferencia') {{
+              $('#historico-container').show();
+            }} else {{
+              $('#historico-container').hide();
+              $('#unidade-anterior-container').hide();
+              $('input[name="deve_historico"]').prop('checked', false);
+              $('#info-historico').hide();
+              $('#unidade_anterior').val('');
             }}
-            return true;
+          }});
+
+          $('input[name="deve_historico"]').on('change', function() {{
+            if ($(this).val() === 'sim') {{
+              $('#info-historico').show();
+              $('#unidade-anterior-container').show();
+            }} else {{
+              $('#info-historico').hide();
+              $('#unidade-anterior-container').hide();
+              $('#unidade_anterior').val('');
+            }}
+          }});
+        }});
+
+        function validarFormulario() {{
+          var tipo = document.getElementById('tipo').value;
+          if (tipo === 'Transferencia') {{
+            var radios = document.getElementsByName('deve_historico');
+            var marcado = false;
+            for (var i = 0; i < radios.length; i++) {{
+              if (radios[i].checked) {{
+                marcado = true;
+                break;
+              }}
+            }}
+            if (!marcado) {{
+              alert('Por favor, responda se o aluno deve o histórico escolar.');
+              return false;
+            }}
+            if (document.getElementById('historico_sim').checked) {{
+              var unidade = document.getElementById('unidade_anterior').value.trim();
+              if (!unidade) {{
+                alert('Por favor, informe a unidade escolar anterior.');
+                return false;
+              }}
+            }}
+            return confirm("Você está gerando uma declaração de transferência, essa é a declaração correta a ser gerada?");
+          }}
+          return true;
         }}
       </script>
     </body>
     </html>
     '''
     return render_template_string(select_form)
-
 
 @app.route('/declaracao/tipo', methods=['GET', 'POST'])
 @login_required
