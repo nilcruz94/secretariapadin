@@ -757,6 +757,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
         if aluno.empty:
             return None
         row = aluno.iloc[0]
+        semestre = row.iloc[29]  # coluna AD (índice 29)
         nome = row['NOME']
         serie = row['SÉRIE']
         if isinstance(serie, str):
@@ -786,6 +787,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
         df['RM_str'] = df.iloc[:, 2].apply(lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else "")
         df['NOME'] = df.iloc[:, 3]
         df['NASC.'] = df.iloc[:, 6]
+
         def get_ra(row):
             try:
                 val = row.iloc[7]
@@ -806,6 +808,14 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
         if aluno.empty:
             return None
         row = aluno.iloc[0]
+
+        # Pega o semestre da coluna AD (índice 29)
+        semestre = row.iloc[29]
+        if pd.isna(semestre):
+            semestre_texto = ""
+        else:
+            semestre_texto = str(semestre).strip()
+
         nome = row['NOME']
         serie = row['SÉRIE']
         if isinstance(serie, str):
@@ -875,7 +885,11 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
                 f"Declaro, para os devidos fins, que o(a) aluno(a) <strong><u>{nome}</u></strong>, "
                 f"portador(a) do {ra_label} <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
                 f"solicitou transferência de nossa unidade escolar na data de hoje, estando apto(a) a cursar o "
-                f"<strong><u>{serie}</u></strong>."
+                f"<strong><u>{serie}</u></strong>.<br><br>"
+                f'<span style="display:flex; align-items:center;">'
+                f'<span style="width:18px; height:18px; border:1px solid #000; margin-right:8px;"></span>'
+                f'O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis.'
+                f'</span>'
             )
         else:
             serie_mod = re.sub(r"^(\d+º).*", r"\1 ano", serie)
@@ -883,7 +897,11 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
                 f"Declaro, para os devidos fins, que o(a) responsável do(a) aluno(a) <strong><u>{nome}</u></strong>, "
                 f"portador(a) do RA <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
                 f"compareceu a nossa unidade escolar e solicitou transferência na data de hoje, o aluno está apto(a) a cursar o "
-                f"<strong><u>{serie_mod}</u></strong>."
+                f"<strong><u>{serie_mod}</u></strong>.<br><br>"
+                f'<span style="display:flex; align-items:center;">'
+                f'<span style="width:18px; height:18px; border:1px solid #000; margin-right:8px;"></span>'
+                f'O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis.'
+                f'</span>'
             )
 
     elif tipo == "Conclusão":
@@ -915,8 +933,8 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
             declaracao_text = (
                 f"Declaro, para os devidos fins, que o(a) aluno(a) <strong><u>{nome}</u></strong>, "
                 f"portador(a) do {ra_label} <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
-                f"concluiu com êxito o <strong><u>{serie}</u></strong>, estando apto(a) a ingressar no "
-                f"<strong><u>{series_text}</u></strong>."
+                f"concluiu com êxito o <strong><u>{serie}</u></strong>{f', no {semestre_texto}' if semestre_texto else ''}, "
+                f"estando apto(a) a ingressar no <strong><u>{series_text}</u></strong>."
             )
         else:
             declaracao_text = (
@@ -1258,11 +1276,11 @@ def upload_listas():
       <div class="container-form">
         <form method="POST" enctype="multipart/form-data">
           <div class="form-group">
-            <label for="lista_fundamental">Selecione a Lista Piloto - REGULAR - 2025:</label>
+            <label for="lista_fundamental">Selecione a Lista Piloto - Regular:</label>
             <input type="file" class="form-control-file" name="lista_fundamental" id="lista_fundamental" accept=".xlsx, .xls" required>
           </div>
           <div class="form-group">
-            <label for="lista_eja">Selecione a Lista Piloto - EJA - 1º SEM - 2025:</label>
+            <label for="lista_eja">Selecione a Lista Piloto - EJA:</label>
             <input type="file" class="form-control-file" name="lista_eja" id="lista_eja" accept=".xlsx, .xls" required>
           </div>
           <button type="submit" class="btn btn-primary">Carregar Listas</button>
@@ -1427,7 +1445,7 @@ def dashboard():
         <p>Acessar a conferência de listas.</p>
       </div>
     </div>
-    <!-- 5. Oficio -->
+    <!--
     <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('oficio') }}'">
       <div class="option-icon">
         <i class="fas fa-envelope"></i>
@@ -1437,7 +1455,7 @@ def dashboard():
         <p>Gerar ofícios.</p>
       </div>
     </div>
-    <!-- 6. Acúmulo de Cargo -->
+
     <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('acumulo') }}'">
       <div class="option-icon">
         <i class="fas fa-briefcase"></i>
@@ -1447,7 +1465,7 @@ def dashboard():
         <p>Gerar formulário de acúmulo de cargo.</p>
       </div>
     </div>
-    <!-- 7. Documentos -->
+
     <div class="option-card d-flex align-items-center" onclick="window.location.href='{{ url_for('documentos') }}'">
       <div class="option-icon">
         <i class="fas fa-folder-open"></i>
@@ -1457,6 +1475,7 @@ def dashboard():
         <p>Documentos importantes por segmento.</p>
       </div>
     </div>
+    -->
   </div>
   <div class="logout-container">
     <a href="{{ url_for('logout_route') }}" class="btn-logout">
