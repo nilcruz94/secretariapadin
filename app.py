@@ -738,8 +738,15 @@ document.addEventListener('DOMContentLoaded', function() {{
     return render_template_string(html_content)
 
 
+import re
+import pandas as pd
+from datetime import datetime
+from flask import session
+
 def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
+    # Verifica o tipo de declaração salvo na sessão para distinguir Regular e EJA
     if session.get('declaracao_tipo') != "EJA":
+        # Parte Regular - leitura da planilha "LISTA CORRIDA"
         planilha = pd.read_excel(file_path, sheet_name='LISTA CORRIDA')
 
         def format_rm(x):
@@ -753,11 +760,17 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
             rm_num = str(int(float(rm)))
         except:
             rm_num = str(rm)
+
         aluno = planilha[planilha['RM_str'] == rm_num]
+
         if aluno.empty:
             return None
+
         row = aluno.iloc[0]
-        semestre = row.iloc[29]  # coluna AD (índice 29)
+
+        # No Regular, não existe coluna semestre (índice 29), então definimos vazio
+        semestre_texto = ""
+
         nome = row['NOME']
         serie = row['SÉRIE']
         if isinstance(serie, str):
@@ -769,6 +782,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
             horario = "Desconhecido"
         else:
             horario = str(horario).strip()
+
         ra_label = "RA"
         if pd.notna(data_nasc):
             try:
@@ -783,7 +797,9 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
             data_nasc = "Desconhecida"
 
     else:
+        # Parte EJA - leitura da planilha na primeira aba, sem cabeçalho e com skiprows=1
         df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1)
+
         df['RM_str'] = df.iloc[:, 2].apply(lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else "")
         df['NOME'] = df.iloc[:, 3]
         df['NASC.'] = df.iloc[:, 6]
@@ -800,21 +816,28 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
 
         df['RA'] = df.apply(get_ra, axis=1)
         df['SÉRIE'] = df.iloc[:, 0]
+
         try:
             rm_num = str(int(float(rm)))
         except:
             rm_num = str(rm)
+
         aluno = df[df['RM_str'] == rm_num]
+
         if aluno.empty:
             return None
+
         row = aluno.iloc[0]
 
-        # Pega o semestre da coluna AD (índice 29)
-        semestre = row.iloc[29]
-        if pd.isna(semestre):
-            semestre_texto = ""
+        # Pega o semestre da coluna AD (índice 29) — somente existe no EJA
+        if len(row) > 29:
+            semestre = row.iloc[29]
+            if pd.isna(semestre):
+                semestre_texto = ""
+            else:
+                semestre_texto = str(semestre).strip()
         else:
-            semestre_texto = str(semestre).strip()
+            semestre_texto = ""
 
         nome = row['NOME']
         serie = row['SÉRIE']
@@ -841,8 +864,10 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None):
             data_nasc = "Desconhecida"
 
     now = datetime.now()
-    meses = {1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
-             7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"}
+    meses = {
+        1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
+        7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+    }
     mes = meses[now.month].capitalize()
     data_extenso = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
 
