@@ -29,21 +29,79 @@ ACCESS_TOKEN = "minha_senha"  # Token de acesso
 app.config['UPLOAD_FOLDER'] = 'uploads'
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
 
+# Caminho fixo do arquivo CSV de escolas
+CSV_PATH = r"C:\Users\Neto\Desktop\Projetos\Em uso\secretariapadin\uploads\escolas.csv"
+
+# Variável global para armazenar os dados do CSV
+escolas_df = None
+
+# Função para carregar o arquivo de escolas
+def carregar_escolas():
+    global escolas_df
+    if os.path.exists(CSV_PATH):
+        try:
+            # Usando encoding 'latin1' (ou 'cp1252')
+            escolas_df = pd.read_csv(CSV_PATH, encoding="latin1", sep=";")
+            print(f"[INFO] Arquivo {CSV_PATH} carregado com sucesso.")
+        except Exception as e:
+            print(f"[ERRO] Falha ao carregar {CSV_PATH}: {e}")
+    else:
+        print(f"[ERRO] Arquivo {CSV_PATH} não encontrado.")
+
+# Função para garantir que os dados estão disponíveis
+def get_escolas_df():
+    global escolas_df
+    if escolas_df is None or escolas_df.empty:
+        print("[INFO] Recarregando arquivo escolas.csv...")
+        carregar_escolas()
+    return escolas_df
+
+@app.route('/escolas/search')
+def escolas_search():
+    df = get_escolas_df()
+    query = request.args.get('q', '').lower().strip()
+    results = []
+
+    if df is not None and not df.empty and query:
+        # Filtra usando pandas
+        df_filtered = df[df.iloc[:, 3].str.lower().str.contains(query, na=False)]
+
+        # Limita a 50 resultados para não sobrecarregar
+        df_filtered = df_filtered.head(50)
+
+        for idx, row in df_filtered.iterrows():
+            nome = str(row[3]).strip()
+            municipio = str(row[2]).strip()
+            uf = str(row[1]).strip()
+            text = f"{nome} - {municipio}/{uf}"
+            results.append({
+                "id": nome,   # ou algum identificador único
+                "text": text
+            })
+
+    return jsonify(results)
+
+@app.before_request
+def inicializar_escolas():
+    if escolas_df is None or escolas_df.empty:
+        carregar_escolas()
+
 # Cria os diretórios necessários, se não existirem
 if not os.path.exists('static/fotos'):
     os.makedirs('static/fotos')
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
+# Carrega o CSV na inicialização do sistema
+carregar_escolas()
+
 # Importa e registra o blueprint do confere.py
 from confere import confere_bp
 app.register_blueprint(confere_bp, url_prefix='/confere')
 
-
 def allowed_file(filename):
     _, ext = os.path.splitext(filename)
     return ext.lower() in ALLOWED_EXTENSIONS
-
 
 def login_required(f):
     @wraps(f)
@@ -737,8 +795,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 """
     return render_template_string(html_content)
 
-
-from datetime import datetime
+from datetime import datetime 
 import pandas as pd
 import re
 from flask import session
@@ -748,6 +805,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
     if session.get('declaracao_tipo') != "EJA":
         # Parte Regular - leitura da planilha "LISTA CORRIDA"
         planilha = pd.read_excel(file_path, sheet_name='LISTA CORRIDA')
+        planilha.columns = [c.strip().upper() for c in planilha.columns]  # normaliza colunas
 
         def format_rm(x):
             try:
@@ -762,21 +820,19 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
             rm_num = str(rm)
 
         aluno = planilha[planilha['RM_str'] == rm_num]
-
         if aluno.empty:
             return None
 
         row = aluno.iloc[0]
 
         semestre_texto = ""
-
         nome = row['NOME']
         serie = row['SÉRIE']
         if isinstance(serie, str):
             serie = re.sub(r"(\d+º)([A-Za-z])", r"\1 ano \2", serie)
         data_nasc = row['DATA NASC.']
         ra = row['RA']
-        horario = row['HORÁRIO']
+        horario = row.get('HORÁRIO', 'Desconhecido')
         if pd.isna(horario) or not str(horario).strip():
             horario = "Desconhecido"
         else:
@@ -798,6 +854,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
     else:
         # Parte EJA - leitura da planilha na primeira aba, sem cabeçalho e com skiprows=1
         df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1)
+        df.columns = [str(c).strip().upper() for c in df.columns]  # normaliza colunas
 
         df['RM_str'] = df.iloc[:, 2].apply(lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else "")
         df['NOME'] = df.iloc[:, 3]
@@ -822,7 +879,6 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
             rm_num = str(rm)
 
         aluno = df[df['RM_str'] == rm_num]
-
         if aluno.empty:
             return None
 
@@ -830,10 +886,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
 
         if len(row) > 29:
             semestre = row.iloc[29]
-            if pd.isna(semestre):
-                semestre_texto = ""
-            else:
-                semestre_texto = str(semestre).strip()
+            semestre_texto = str(semestre).strip() if pd.notna(semestre) else ""
         else:
             semestre_texto = ""
 
@@ -844,23 +897,18 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
         data_nasc = row['NASC.']
         ra = row['RA']
         original_ra = row.iloc[7]
-        if pd.isna(original_ra) or (isinstance(original_ra, (int, float)) and float(original_ra) == 0):
-            ra_label = "RG"
-        else:
-            ra_label = "RA"
+        ra_label = "RG" if pd.isna(original_ra) or (isinstance(original_ra, (int, float)) and float(original_ra) == 0) else "RA"
 
         if pd.notna(data_nasc):
             try:
                 data_nasc = pd.to_datetime(data_nasc, errors='coerce')
-                if pd.notna(data_nasc):
-                    data_nasc = data_nasc.strftime('%d/%m/%Y')
-                else:
-                    data_nasc = "Desconhecida"
+                data_nasc = data_nasc.strftime('%d/%m/%Y') if pd.notna(data_nasc) else "Desconhecida"
             except Exception:
                 data_nasc = "Desconhecida"
         else:
             data_nasc = "Desconhecida"
 
+    # Data por extenso
     now = datetime.now()
     meses = {
         1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
@@ -884,6 +932,9 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
 }
 '''
 
+# --- Montagem do texto da declaração --- 
+    # --- Montagem do texto da declaração --- 
+    declaracao_text = ""
     if tipo == "Escolaridade":
         titulo = "Declaração de Escolaridade"
         if session.get('declaracao_tipo') == "EJA":
@@ -910,25 +961,6 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
                 f"solicitou transferência de nossa unidade escolar na data de hoje, estando apto(a) a cursar o "
                 f"<strong><u>{serie}</u></strong>."
             )
-            if deve_historico:
-                declaracao_text += (
-                    "<br><br>"
-                    '<label class="checkbox-label" style="display: block; text-align: justify;">'
-                    '<span class="warning-icon" aria-label="Aviso" role="img" style="margin-right: 8px;">&#9888;</span>'
-                )
-                if unidade_anterior:
-                    unidade_anterior = ' '.join(unidade_anterior.strip().split())
-                    declaracao_text += (
-                        f"O aluno deve o histórico escolar da unidade anterior: "
-                        f"<strong><span style=\"white-space: nowrap;\">{unidade_anterior}</span></strong>, "
-                        "após sua entrega, será confeccionado em até 30 dias úteis."
-                    )
-                else:
-                    declaracao_text += (
-                        "O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis."
-                    )
-                declaracao_text += "</label>"
-
         else:
             serie_mod = re.sub(r"^(\d+º).*", r"\1 ano", serie)
             declaracao_text = (
@@ -937,25 +969,6 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
                 f"compareceu a nossa unidade escolar e solicitou transferência na data de hoje, o aluno está apto(a) a cursar o "
                 f"<strong><u>{serie_mod}</u></strong>."
             )
-            # Se quiser colocar o histórico para o não EJA, faça aqui:
-            if deve_historico:
-                declaracao_text += (
-                    "<br><br>"
-                    '<label class="checkbox-label" style="display: block; text-align: justify;">'
-                    '<span class="warning-icon" aria-label="Aviso" role="img" style="margin-right: 8px;">&#9888;</span>'
-                )
-                if unidade_anterior:
-                    unidade_anterior = ' '.join(unidade_anterior.strip().split())
-                    declaracao_text += (
-                        f"O aluno deve o histórico escolar da unidade anterior: "
-                        f"<strong><span style=\"white-space: nowrap;\">{unidade_anterior}</span></strong>, "
-                        "após sua entrega, será confeccionado em até 30 dias úteis."
-                    )
-                else:
-                    declaracao_text += (
-                        "O aluno deve o histórico escolar da unidade anterior; após sua entrega, será confeccionado em até 30 dias úteis."
-                    )
-                declaracao_text += "</label>"
 
     elif tipo == "Conclusão":
         titulo = "Declaração de Conclusão"
@@ -976,11 +989,8 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
             series_text = mapping.get(serie, "a série subsequente")
         else:
             match = re.search(r"(\d+)º\s*ano", serie)
-            if match:
-                next_year = int(match.group(1)) + 1
-                series_text = f"{next_year}º ano"
-            else:
-                series_text = "a série subsequente"
+            next_year = int(match.group(1)) + 1 if match else None
+            series_text = f"{next_year}º ano" if next_year else "a série subsequente"
 
         if session.get('declaracao_tipo') == "EJA":
             declaracao_text = (
@@ -997,10 +1007,41 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
                 f"<strong><u>{series_text}</u></strong>."
             )
 
-    else:
-        titulo = "Declaração"
-        declaracao_text = "Tipo de declaração inválido."
+    # --- Observações e Bolsa Família ---
+    valor_bolsa = str(row.get('BOLSA FAMILIA', '')).strip().upper()
+    if deve_historico or (valor_bolsa == "SIM" and tipo != "Escolaridade"):
+        declaracao_text += "<br><br><strong>Observações:</strong><br>"
+        declaracao_text += '<label class="checkbox-label" style="display: block; text-align: justify;">'
 
+        # Histórico, se houver
+        if deve_historico:
+            declaracao_text += '<span class="warning-icon">&#9888;</span> '
+            declaracao_text += "O aluno deve o histórico escolar da unidade anterior:<br><br>"
+            if unidade_anterior:
+                unidade_anterior = ' '.join(unidade_anterior.strip().split())
+                esc_df = escolas_df[escolas_df.iloc[:, 3].str.upper() == unidade_anterior.upper()] if escolas_df is not None else None
+                if esc_df is not None and not esc_df.empty:
+                    unidade_nome = esc_df.iloc[0, 3]
+                    inep = esc_df.iloc[0, 4]
+                    municipio = esc_df.iloc[0, 2]
+                    uf = esc_df.iloc[0, 1]
+                    declaracao_text += (
+                        f"<strong>Unidade:</strong> {unidade_nome}<br>"
+                        f"<strong>INEP:</strong> {inep}<br>"
+                        f"<strong>Cidade:</strong> {municipio}<br>"
+                        f"<strong>Estado:</strong> {uf}<br><br>"
+                    )
+                else:
+                    # Caso manual, mostra diretamente
+                    declaracao_text += f"<strong>Unidade:</strong> {unidade_anterior}<br><br>"
+            declaracao_text += "Após sua entrega, o documento será confeccionado em até 30 dias úteis.<br><br>"
+
+        # Bolsa Família, se houver
+        if valor_bolsa == "SIM" and tipo != "Escolaridade":
+            declaracao_text += '<img src="/static/logos/bolsa_familia.jpg" alt="Bolsa Família" style="width:28px; vertical-align:middle; margin-right:5px;">'
+            declaracao_text += "O aluno é beneficiário do Programa Bolsa Família."
+
+        declaracao_text += "</label>"
     base_template = f'''<!doctype html>
 <html lang="pt-br">
 <head>
@@ -1096,7 +1137,11 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
   }}
 
   .declaration-bottom {{
-    margin-top: 8cm;
+    position: fixed;   /* fica fixo na página impressa */
+    bottom: 0;         /* colado ao fundo da página */
+    left: 0;
+    width: 100%;
+    text-align: center; /* centraliza se quiser */
   }}
 
   .date {{
@@ -1165,7 +1210,8 @@ header {{
 }}
 
     </style>
-    </head>
+
+</head>
 <body>
   <div class="declaration-container">
     <div class="header">
@@ -1424,7 +1470,6 @@ def upload_listas():
     </html>
     '''
     return render_template_string(upload_listas_html)
-
 
 @app.route('/', methods=['GET'])
 @login_required
@@ -2115,6 +2160,7 @@ def declaracao_select():
         else:
             return redirect(url_for('declaracao_upload'))
 
+    # Carrega dados dos alunos
     if session.get('declaracao_tipo') == "EJA":
         df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1)
         df['RM_str'] = df.iloc[:, 2].apply(lambda x: str(int(x)) if pd.notna(x) and float(x) != 0 else "")
@@ -2146,6 +2192,7 @@ def declaracao_select():
         planilha['RM_str'] = planilha['RM'].apply(format_rm)
         alunos = planilha[planilha['RM_str'] != "0"][['RM_str', 'NOME']].drop_duplicates()
 
+    # Gera HTML das opções de alunos
     options_html = ""
     for _, row in alunos.iterrows():
         rm_str = row['RM_str']
@@ -2156,13 +2203,17 @@ def declaracao_select():
         rm = request.form.get('rm')
         tipo = request.form.get('tipo')
         deve_historico_str = request.form.get('deve_historico')
-        unidade_anterior = request.form.get('unidade_anterior', '').strip()
+        # Seleção ou input manual
+        unidade_select = request.form.get('unidade_anterior_select', '').strip()
+        unidade_manual = request.form.get('unidade_anterior_manual', '').strip()
+        unidade_anterior = unidade_select if unidade_select else unidade_manual
 
         if not rm or not tipo:
             flash("Escolha o aluno e o tipo de declaração.", "error")
             return redirect(url_for('declaracao_select'))
 
-        if tipo == "Transferencia":
+        # Validação para Transferência e Conclusão
+        if tipo in ["Transferencia", "Conclusão"]:
             if deve_historico_str not in ['sim', 'nao']:
                 flash("Por favor, responda se o aluno deve o histórico escolar.", "error")
                 return redirect(url_for('declaracao_select'))
@@ -2186,6 +2237,7 @@ def declaracao_select():
 
         return declaracao_html
 
+    # HTML do formulário com Select2 e input manual
     select_form = f'''
     <!doctype html>
     <html lang="pt-br">
@@ -2196,58 +2248,23 @@ def declaracao_select():
       <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
       <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
       <style>
-        body {{
-          background: #eef2f3;
-          font-family: 'Montserrat', sans-serif;
-        }}
+        body {{ background: #eef2f3; font-family: 'Montserrat', sans-serif; }}
         header {{
           background: linear-gradient(90deg, #283E51, #4B79A1);
-          color: #fff;
-          padding: 20px;
-          text-align: center;
-          border-bottom: 3px solid #1d2d3a;
-          border-radius: 0 0 15px 15px;
+          color: #fff; padding: 20px; text-align: center;
+          border-bottom: 3px solid #1d2d3a; border-radius: 0 0 15px 15px;
           box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }}
-        .container-form {{
-          background: #fff;
-          padding: 40px;
-          border-radius: 10px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          margin: 40px auto;
-          max-width: 600px;
-        }}
-        .btn-primary {{
-          background-color: #283E51;
-          border: none;
-        }}
-        .btn-primary:hover {{
-          background-color: #1d2d3a;
-        }}
-        footer {{
-          background-color: #424242;
-          color: #fff;
-          text-align: center;
-          padding: 10px;
-          position: fixed;
-          bottom: 0;
-          width: 100%;
-        }}
-        #historico-container {{
-          display: none;
-          margin-top: 15px;
-          border: 1px solid #ccc;
-          padding: 15px;
-          border-radius: 8px;
-          background: #f9f9f9;
-        }}
-        #unidade-anterior-container {{
-          display: none;
-          margin-top: 15px;
-        }}
-        #btn-container {{
-          margin-top: 20px;
-        }}
+        .container-form {{ background: #fff; padding: 40px; border-radius: 10px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 40px auto; max-width: 600px; }}
+        .btn-primary {{ background-color: #283E51; border: none; }}
+        .btn-primary:hover {{ background-color: #1d2d3a; }}
+        footer {{ background-color: #424242; color: #fff; text-align: center; padding: 10px;
+          position: fixed; bottom: 0; width: 100%; }}
+        #historico-container {{ display: none; margin-top: 15px; border: 1px solid #ccc;
+          padding: 15px; border-radius: 8px; background: #f9f9f9; }}
+        #unidade-anterior-container {{ display: none; margin-top: 15px; }}
+        #btn-container {{ margin-top: 20px; }}
       </style>
     </head>
     <body>
@@ -2264,6 +2281,7 @@ def declaracao_select():
               {options_html}
             </select>
           </div>
+
           <div class="form-group">
             <label for="tipo">Tipo de Declaração:</label>
             <select class="form-control" id="tipo" name="tipo" required>
@@ -2288,7 +2306,12 @@ def declaracao_select():
 
           <div id="unidade-anterior-container" class="form-group">
             <label for="unidade_anterior">Nome da unidade escolar anterior: <span style="color:red;">*</span></label>
-            <input type="text" class="form-control" id="unidade_anterior" name="unidade_anterior" placeholder="Digite o nome da unidade escolar">
+            
+            <!-- Select AJAX -->
+            <select class="form-control" id="unidade_anterior" name="unidade_anterior_select"></select>
+            <!-- Input manual -->
+            <input type="text" id="unidade_anterior_manual" name="unidade_anterior_manual" class="form-control mt-2"
+              placeholder="Ou digite o nome da unidade">
           </div>
 
           <div id="btn-container">
@@ -2303,67 +2326,91 @@ def declaracao_select():
       <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
       <script>
-        $(document).ready(function() {{
+      $(document).ready(function() {{
+          // Select2 para alunos
           $('#rm').select2({{
-            placeholder: "Selecione o aluno",
-            allowClear: true
+              placeholder: "Selecione o aluno",
+              allowClear: true,
+              width: '100%'
           }});
 
+          // Select2 AJAX para unidades
+          $('#unidade_anterior').select2({{
+              placeholder: "Selecione ou busque a escola",
+              allowClear: true,
+              width: '100%',
+              ajax: {{
+                  url: '/escolas/search',
+                  dataType: 'json',
+                  delay: 250,
+                  data: function(params) {{
+                      return {{ q: params.term }};
+                  }},
+                  processResults: function(data) {{
+                      var results = data.map(function(item) {{
+                          return {{ id: item.id, text: item.text }};
+                      }});
+                      return {{ results: results }};
+                  }},
+                  cache: true
+              }},
+              minimumInputLength: 1
+          }});
+
+          // Histórico e unidade anterior
           $('#tipo').on('change', function() {{
-            if ($(this).val() === 'Transferencia') {{
-              $('#historico-container').show();
-            }} else {{
-              $('#historico-container').hide();
-              $('#unidade-anterior-container').hide();
-              $('input[name="deve_historico"]').prop('checked', false);
-              $('#info-historico').hide();
-              $('#unidade_anterior').val('');
-            }}
+              if ($(this).val() === 'Transferencia' || $(this).val() === 'Conclusão') {{
+                  $('#historico-container').show();
+              }} else {{
+                  $('#historico-container').hide();
+                  $('#unidade-anterior-container').hide();
+                  $('input[name="deve_historico"]').prop('checked', false);
+                  $('#unidade_anterior').val(null).trigger('change');
+                  $('#unidade_anterior_manual').val('');
+              }}
           }});
 
           $('input[name="deve_historico"]').on('change', function() {{
-            if ($(this).val() === 'sim') {{
-              $('#info-historico').show();
-              $('#unidade-anterior-container').show();
-            }} else {{
-              $('#info-historico').hide();
-              $('#unidade-anterior-container').hide();
-              $('#unidade_anterior').val('');
-            }}
+              if ($(this).val() === 'sim') {{
+                  $('#unidade-anterior-container').show();
+              }} else {{
+                  $('#unidade-anterior-container').hide();
+                  $('#unidade_anterior').val(null).trigger('change');
+                  $('#unidade_anterior_manual').val('');
+              }}
           }});
-        }});
+      }});
 
-        function validarFormulario() {{
+      function validarFormulario() {{
           var tipo = document.getElementById('tipo').value;
-          if (tipo === 'Transferencia') {{
-            var radios = document.getElementsByName('deve_historico');
-            var marcado = false;
-            for (var i = 0; i < radios.length; i++) {{
-              if (radios[i].checked) {{
-                marcado = true;
-                break;
+          if (tipo === 'Transferencia' || tipo === 'Conclusão') {{
+              var radios = document.getElementsByName('deve_historico');
+              var marcado = false;
+              for (var i = 0; i < radios.length; i++) {{
+                  if (radios[i].checked) {{ marcado = true; break; }}
               }}
-            }}
-            if (!marcado) {{
-              alert('Por favor, responda se o aluno deve o histórico escolar.');
-              return false;
-            }}
-            if (document.getElementById('historico_sim').checked) {{
-              var unidade = document.getElementById('unidade_anterior').value.trim();
-              if (!unidade) {{
-                alert('Por favor, informe a unidade escolar anterior.');
-                return false;
+              if (!marcado) {{
+                  alert('Por favor, responda se o aluno deve o histórico escolar.');
+                  return false;
               }}
-            }}
-            return confirm("Você está gerando uma declaração de transferência, essa é a declaração correta a ser gerada?");
+              if (document.getElementById('historico_sim').checked) {{
+                  var unidade_select = $('#unidade_anterior').val();
+                  var unidade_manual = $('#unidade_anterior_manual').val().trim();
+                  if (!unidade_select && !unidade_manual) {{
+                      alert('Por favor, informe a unidade escolar anterior.');
+                      return false;
+                  }}
+              }}
+              return confirm("Você está gerando uma declaração de transferência ou conclusão, essa é a declaração correta a ser gerada?");
           }}
           return true;
-        }}
+      }}
       </script>
     </body>
     </html>
     '''
     return render_template_string(select_form)
+
 
 @app.route('/declaracao/tipo', methods=['GET', 'POST'])
 @login_required
