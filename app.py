@@ -29,8 +29,8 @@ ACCESS_TOKEN = "minha_senha"  # Token de acesso
 app.config['UPLOAD_FOLDER'] = 'uploads'
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
 
-# Caminho fixo do arquivo CSV de escolas
-CSV_PATH = r"C:\Users\Neto\Desktop\Projetos\Em uso\secretariapadin\uploads\escolas.csv"
+# Caminho do arquivo CSV relativo ao diretório do script
+CSV_PATH = os.path.join(os.path.dirname(__file__), "uploads", "escolas.csv")
 
 # Variável global para armazenar os dados do CSV
 escolas_df = None
