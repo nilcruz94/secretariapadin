@@ -1026,10 +1026,12 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
                     municipio = esc_df.iloc[0, 2]
                     uf = esc_df.iloc[0, 1]
                     declaracao_text += (
+                        f"<div style='font-size:14px;'>"
                         f"<strong>Unidade:</strong> {unidade_nome}<br>"
                         f"<strong>INEP:</strong> {inep}<br>"
                         f"<strong>Cidade:</strong> {municipio}<br>"
                         f"<strong>Estado:</strong> {uf}<br><br>"
+                        f"</div>"
                     )
                 else:
                     # Caso manual, mostra diretamente
@@ -1131,7 +1133,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
   body {{
     margin: 0;
     padding: 1.5cm 1.5cm;  /* margens laterais reduzidas para 1.5cm */
-    font-size: 16px;
+    font-size: 14px;
     font-family: 'Montserrat', sans-serif;
     color: #000;
   }}
@@ -1158,12 +1160,14 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
     white-space: normal !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
+    
   }}
 
   .content p {{
     margin: 0 0 1em 0;
     text-align: justify !important;
     hyphens: none !important; /* desativa hifenização */
+    
   }}
 
   body, .content, .content p {{
@@ -1186,7 +1190,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
   align-items: center;
   gap: 8px;
   text-align: left !important;
-  font-size: 16px;
+  font-size: 14px;
   margin-top: 8px;
   margin-bottom: 8px;
   flex-wrap: wrap;
