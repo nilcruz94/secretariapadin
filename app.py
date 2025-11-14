@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, url_for, render_template_string, jsonify, session, flash, send_file, render_template, send_from_directory
+from flask import Flask, request, redirect, url_for, render_template_string, jsonify, session, flash, get_flashed_messages, send_file, render_template, send_from_directory
 import pandas as pd
 import os
 import uuid
@@ -800,6 +800,7 @@ import pandas as pd
 import re
 from flask import session
 
+
 def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historico=False, unidade_anterior=None):
     # Verifica o tipo de declaração salvo na sessão para distinguir Regular e EJA
     if session.get('declaracao_tipo') != "EJA":
@@ -1011,7 +1012,7 @@ def gerar_declaracao_escolar(file_path, rm, tipo, file_path2=None, deve_historic
     valor_bolsa = str(row.get('BOLSA FAMILIA', '')).strip().upper()
     if deve_historico or (valor_bolsa == "SIM" and tipo != "Escolaridade"):
         declaracao_text += "<br><br><strong>Observações:</strong><br>"
-        declaracao_text += '<label class="checkbox-label" style="display: block; text-align: justify;">'
+        declaracao_text += '<label class="checkbox-label" style="display: block; text-align: justify; font-size:14px;">'
 
         # Histórico, se houver
         if deve_historico:
@@ -1976,7 +1977,7 @@ def declaracao_upload():
             return redirect(url_for('declaracao_upload'))
 
         session['declaracao_excel'] = file_path
-        session['declaracao_tipo'] = "Fundamental"
+        session['declaracao_tipo'] = "Fundamental"  # garante que fica marcado como Fundamental
 
         if hasattr(file, 'close'):
             file.close()
@@ -2075,7 +2076,7 @@ def declaracao_upload_eja():
             flash("Nenhum arquivo enviado.", "error")
             return redirect(url_for('declaracao_upload_eja'))
 
-        session['declaracao_excel'] = file_path  # Para EJA, usamos o mesmo nome de sessão
+        session['declaracao_excel'] = file_path  # EJA usa a mesma chave
         session['declaracao_tipo'] = "EJA"
 
         if hasattr(file, 'close'):
@@ -2183,7 +2184,7 @@ def declaracao_select():
 
         df['RA'] = df.apply(get_ra, axis=1)
         df['SÉRIE'] = df.iloc[:, 0]
-        alunos = df[df['RM_str'] != ""][['RM_str', 'NOME']].drop_duplicates()
+        alunos_df = df[df['RM_str'] != ""][['RM_str', 'NOME']].drop_duplicates()
     else:
         planilha = pd.read_excel(file_path, sheet_name='LISTA CORRIDA')
 
@@ -2194,11 +2195,11 @@ def declaracao_select():
                 return str(x)
 
         planilha['RM_str'] = planilha['RM'].apply(format_rm)
-        alunos = planilha[planilha['RM_str'] != "0"][['RM_str', 'NOME']].drop_duplicates()
+        alunos_df = planilha[planilha['RM_str'] != "0"][['RM_str', 'NOME']].drop_duplicates()
 
-    # Gera HTML das opções de alunos
+    # monta texto das <option>
     options_html = ""
-    for _, row in alunos.iterrows():
+    for _, row in alunos_df.iterrows():
         rm_str = row['RM_str']
         nome = row['NOME']
         options_html += f'<option value="{rm_str}">{rm_str} - {nome}</option>'
@@ -2207,7 +2208,8 @@ def declaracao_select():
         rm = request.form.get('rm')
         tipo = request.form.get('tipo')
         deve_historico_str = request.form.get('deve_historico')
-        # Seleção ou input manual
+
+        # Seleção ou input manual da unidade anterior
         unidade_select = request.form.get('unidade_anterior_select', '').strip()
         unidade_manual = request.form.get('unidade_anterior_manual', '').strip()
         unidade_anterior = unidade_select if unidade_select else unidade_manual
@@ -2241,190 +2243,601 @@ def declaracao_select():
 
         return declaracao_html
 
-    # HTML do formulário com Select2 e input manual
-    select_form = f'''
+    # GET – monta a página de seleção
+    dashboard_url = url_for('dashboard')
+    conclusao_5ano_url = url_for('declaracao_conclusao_5ano')
+    declaracao_tipo = session.get('declaracao_tipo', '')
+
+    # mensagens flash
+    flash_msgs = get_flashed_messages(with_categories=True)
+    flash_html = ""
+    for category, message in flash_msgs:
+        if category == 'success':
+            css_class = 'alert-success'
+        elif category == 'error':
+            css_class = 'alert-danger'
+        else:
+            css_class = 'alert-info'
+        flash_html += f'<div class="alert {css_class}" role="alert">{message}</div>'
+
+    select_form = '''
+        <!doctype html>
+        <html lang="pt-br">
+        <head>
+          <meta charset="utf-8">
+          <title>Declaração Escolar - Seleção de Aluno</title>
+          <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+          <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+          <style>
+            body { background: #eef2f3; font-family: 'Montserrat', sans-serif; }
+            header {
+              background: linear-gradient(90deg, #283E51, #4B79A1);
+              color: #fff; padding: 20px; text-align: center;
+              border-bottom: 3px solid #1d2d3a; border-radius: 0 0 15px 15px;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .container-form {
+              background: #fff; padding: 40px; border-radius: 10px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              margin: 40px auto; max-width: 600px;
+            }
+            .btn-primary { background-color: #283E51; border: none; }
+            .btn-primary:hover { background-color: #1d2d3a; }
+            footer {
+              background-color: #424242; color: #fff; text-align: center;
+              padding: 10px; position: fixed; bottom: 0; width: 100%;
+            }
+            #historico-container {
+              display: none; margin-top: 15px; border: 1px solid #ccc;
+              padding: 15px; border-radius: 8px; background: #f9f9f9;
+            }
+            #unidade-anterior-container { display: none; margin-top: 15px; }
+
+            /* Container flex pros botões */
+            #btn-container {
+              margin-top: 20px;
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: center;
+              gap: 10px;
+            }
+
+            .btn-voltar {
+              display: inline-block;
+              padding: 10px 20px;
+              font-size: 16px;
+              font-weight: 600;
+              font-family: 'Montserrat', sans-serif;
+              color: #fff;
+              background-color: #4B79A1;
+              border: none;
+              border-radius: 5px;
+              text-decoration: none;
+              transition: background-color 0.3s;
+              margin-top: 0;  /* não cria degrau em relação aos outros botões */
+            }
+            .btn-voltar:hover { background-color: #3a5d78; }
+
+            .btn-5ano {
+              background-color: #28a745;
+              border: none;
+            }
+            .btn-5ano:hover {
+              background-color: #218838;
+            }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>E.M José Padin Mouta - Declaração Escolar</h1>
+            <p>Escolha o aluno para realizar a declaração</p>
+          </header>
+          <div class="container container-form">
+            __FLASHES__
+            <form method="POST" onsubmit="return validarFormulario();">
+              <div class="form-group">
+                <label for="rm">Aluno:</label>
+                <select class="form-control" id="rm" name="rm" required>
+                  <option value="">Selecione</option>
+                  __OPTIONS__
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="tipo">Tipo de Declaração:</label>
+                <select class="form-control" id="tipo" name="tipo" required>
+                  <option value="">Selecione</option>
+                  <option value="Escolaridade">Declaração de Escolaridade</option>
+                  <option value="Transferencia">Declaração de Transferência</option>
+                  <option value="Conclusão">Declaração de Conclusão</option>
+                </select>
+              </div>
+
+              <div id="historico-container">
+                <label>Deve Histórico Escolar? <span style="color:red;">*</span></label><br>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="deve_historico" id="historico_sim" value="sim">
+                  <label class="form-check-label" for="historico_sim">Sim</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="deve_historico" id="historico_nao" value="nao">
+                  <label class="form-check-label" for="historico_nao">Não</label>
+                </div>
+              </div>
+
+              <div id="unidade-anterior-container" class="form-group">
+                <label for="unidade_anterior">Nome da unidade escolar anterior: <span style="color:red;">*</span></label>
+                <select class="form-control" id="unidade_anterior" name="unidade_anterior_select"></select>
+                <input type="text" id="unidade_anterior_manual" name="unidade_anterior_manual"
+                      class="form-control mt-2"
+                      placeholder="Ou digite o nome da unidade">
+              </div>
+
+              <div id="btn-container">
+                <button type="submit" class="btn btn-primary">Gerar Declaração</button>
+
+                <button type="button" id="btn-5ano" class="btn btn-5ano text-white" style="display:none;">
+                  Gerar Declarações de 5º Ano
+                </button>
+
+                <a href="__DASHBOARD_URL__" class="btn-voltar">Voltar ao Dashboard</a>
+              </div>
+            </form>
+          </div>
+          <footer>
+            Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
+          </footer>
+
+          <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+          <script>
+          $(document).ready(function() {
+              $('#rm').select2({
+                  placeholder: "Selecione o aluno",
+                  allowClear: true,
+                  width: '100%'
+              });
+
+              $('#unidade_anterior').select2({
+                  placeholder: "Selecione ou busque a escola",
+                  allowClear: true,
+                  width: '100%',
+                  ajax: {
+                      url: '/escolas/search',
+                      dataType: 'json',
+                      delay: 250,
+                      data: function(params) {
+                          return { q: params.term };
+                      },
+                      processResults: function(data) {
+                          var results = data.map(function(item) {
+                              return { id: item.id, text: item.text };
+                          });
+                          return { results: results };
+                      },
+                      cache: true
+                  },
+                  minimumInputLength: 1
+              });
+
+              var declaracaoTipo = "__DECLARACAO_TIPO__";
+
+              function atualizarBotao5Ano() {
+                  var valor = $('#tipo').val();
+                  if (declaracaoTipo === 'Fundamental' && valor === 'Conclusão') {
+                      $('#btn-5ano').show();
+                  } else {
+                      $('#btn-5ano').hide();
+                  }
+              }
+
+              // estado inicial
+              atualizarBotao5Ano();
+
+              // Mostrar/ocultar perguntas de histórico e atualizar botão 5º ano
+              $('#tipo').on('change', function() {
+                  var valor = $(this).val();
+                  if (valor === 'Transferencia' || valor === 'Conclusão') {
+                      $('#historico-container').show();
+                  } else {
+                      $('#historico-container').hide();
+                      $('#unidade-anterior-container').hide();
+                      $('input[name="deve_historico"]').prop('checked', false);
+                      $('#unidade_anterior').val(null).trigger('change');
+                      $('#unidade_anterior_manual').val('');
+                  }
+                  atualizarBotao5Ano();
+              });
+
+              $('input[name="deve_historico"]').on('change', function() {
+                  if ($(this).val() === 'sim') {
+                      $('#unidade-anterior-container').show();
+                  } else {
+                      $('#unidade-anterior-container').hide();
+                      $('#unidade_anterior').val(null).trigger('change');
+                      $('#unidade_anterior_manual').val('');
+                  }
+              });
+
+              $('#btn-5ano').on('click', function() {
+                  if (confirm('Gerar declarações de conclusão para todos os alunos de 5º ano?')) {
+                      window.location.href = "__CONCLUSAO_5ANO_URL__";
+                  }
+              });
+          });
+
+          function validarFormulario() {
+              var tipo = document.getElementById('tipo').value;
+              if (tipo === 'Transferencia' || tipo === 'Conclusão') {
+                  var radios = document.getElementsByName('deve_historico');
+                  var marcado = false;
+                  for (var i = 0; i < radios.length; i++) {
+                      if (radios[i].checked) { marcado = true; break; }
+                  }
+                  if (!marcado) {
+                      alert('Por favor, responda se o aluno deve o histórico escolar.');
+                      return false;
+                  }
+                  if (document.getElementById('historico_sim').checked) {
+                      var unidade_select = $('#unidade_anterior').val();
+                      var unidade_manual = $('#unidade_anterior_manual').val().trim();
+                      if (!unidade_select && !unidade_manual) {
+                          alert('Por favor, informe a unidade escolar anterior.');
+                          return false;
+                      }
+                  }
+                  return confirm("Você está gerando uma declaração de transferência ou conclusão, essa é a declaração correta a ser gerada?");
+              }
+              return true;
+          }
+          </script>
+        </body>
+        </html>
+        '''
+
+    select_form = select_form.replace('__OPTIONS__', options_html)
+    select_form = select_form.replace('__DASHBOARD_URL__', dashboard_url)
+    select_form = select_form.replace('__DECLARACAO_TIPO__', declaracao_tipo)
+    select_form = select_form.replace('__CONCLUSAO_5ANO_URL__', conclusao_5ano_url)
+    select_form = select_form.replace('__FLASHES__', flash_html)
+
+    return select_form
+
+@app.route('/declaracao/conclusao_5ano')
+@login_required
+def declaracao_conclusao_5ano():
+    """
+    Gera TODAS as declarações de CONCLUSÃO dos alunos de 5º ano (Fundamental)
+    em um único HTML com quebras de página para impressão/PDF.
+    """
+    if session.get('declaracao_tipo') != 'Fundamental':
+        flash("As declarações em lote de 5º ano estão disponíveis apenas para o Fundamental.", "error")
+        return redirect(url_for('declaracao_tipo'))
+
+    file_path = session.get('declaracao_excel') or session.get('lista_fundamental')
+    if not file_path or not os.path.exists(file_path):
+        flash("Arquivo Excel do Fundamental não encontrado. Anexe a lista piloto novamente.", "error")
+        return redirect(url_for('declaracao_upload'))
+
+    planilha = pd.read_excel(file_path, sheet_name='LISTA CORRIDA')
+    planilha.columns = [c.strip().upper() for c in planilha.columns]
+
+    def format_rm(x):
+        try:
+            return str(int(float(x)))
+        except Exception:
+            return str(x)
+
+    planilha['RM_str'] = planilha['RM'].apply(format_rm)
+
+    registros = []
+
+    for _, row in planilha.iterrows():
+        rm_str = str(row.get('RM_str', '')).strip()
+        if rm_str in ("", "0"):
+            continue
+
+        serie_raw = str(row.get('SÉRIE', '')).strip()
+        if not serie_raw:
+            continue
+
+        # apenas 5º ano (5ºA, 5º B, 5º ano A, etc.)
+        if '5º' not in serie_raw and '5°' not in serie_raw:
+            continue
+
+        nome = str(row.get('NOME', '')).strip()
+        ra = str(row.get('RA', '')).strip()
+
+        data_nasc_val = row.get('DATA NASC.')
+        if pd.notna(data_nasc_val):
+            try:
+                data_nasc_dt = pd.to_datetime(data_nasc_val, errors='coerce')
+                data_nasc = data_nasc_dt.strftime('%d/%m/%Y') if pd.notna(data_nasc_dt) else "Desconhecida"
+            except Exception:
+                data_nasc = "Desconhecida"
+        else:
+            data_nasc = "Desconhecida"
+
+        horario = str(row.get('HORÁRIO', '')).strip()
+        if not horario:
+            horario = "Desconhecido"
+
+        # Formata série para "5º ano A" (mesma lógica da singular)
+        serie_fmt = serie_raw
+        try:
+            serie_fmt = re.sub(r"(\d+º)\s*([A-Za-z])", r"\1 ano \2", serie_fmt)
+        except Exception:
+            pass
+
+        # Série subsequente (6º ano)
+        series_text = "a série subsequente"
+        m = re.search(r"(\d+)º", serie_fmt)
+        if m:
+            try:
+                next_year = int(m.group(1)) + 1
+                series_text = f"{next_year}º ano"
+            except Exception:
+                pass
+
+        # Bolsa Família
+        valor_bolsa = str(row.get('BOLSA FAMILIA', '')).strip().upper()
+
+        # Texto base – igual à declaração singular (Fundamental)
+        declaracao_text = (
+            f"Declaro, para os devidos fins, que o(a) aluno(a) <strong><u>{nome}</u></strong>, "
+            f"portador(a) do RA <strong><u>{ra}</u></strong>, nascido(a) em <strong><u>{data_nasc}</u></strong>, "
+            f"concluiu com êxito o <strong><u>{serie_fmt}</u></strong>, estando apto(a) a ingressar no "
+            f"<strong><u>{series_text}</u></strong>."
+        )
+
+        # Observações – mesma estrutura da singular (só Bolsa Família aqui)
+        if valor_bolsa == "SIM":
+            declaracao_text += "<br><br><strong>Observações:</strong><br>"
+            declaracao_text += (
+                '<label class="checkbox-label" '
+                'style="display: block; text-align: justify; font-size:14px;">'
+            )
+            declaracao_text += (
+                '<img src="/static/logos/bolsa_familia.jpg" alt="Bolsa Família" '
+                'style="width:28px; vertical-align:middle; margin-right:5px;">'
+                "O aluno é beneficiário do Programa Bolsa Família."
+            )
+            declaracao_text += "</label>"
+
+        registros.append({
+            "nome": nome,
+            "ra": ra,
+            "data_nasc": data_nasc,
+            "serie_fmt": serie_fmt,
+            "series_text": series_text,
+            "texto": declaracao_text,
+        })
+
+    if not registros:
+        flash("Nenhum aluno de 5º ano encontrado na lista piloto.", "error")
+        return redirect(url_for('declaracao_select'))
+
+    # Data por extenso
+    now = datetime.now()
+    meses = {
+        1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 5: "maio", 6: "junho",
+        7: "julho", 8: "agosto", 9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+    }
+    mes = meses[now.month].capitalize()
+    data_extenso = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
+    titulo = "Declaração de Conclusão"
+
+    # CSS – agora cada declaração é um flex container em coluna, com rodapé colado embaixo
+    css = """
+    <style>
+      @page {
+        margin: 0;
+      }
+      html, body {
+        margin: 0;
+        padding: 0.5cm;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #333;
+      }
+
+      .declaration-container {
+        page-break-after: always;
+        display: flex;
+        flex-direction: column;
+        min-height: 26cm; /* aproxima a altura de uma página A4 considerando as margens */
+      }
+
+      .header {
+        text-align: center;
+        border-bottom: 2px solid #283E51;
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 24px;
+        text-transform: uppercase;
+        color: #283E51;
+      }
+      .header p {
+        margin: 3px 0;
+        font-size: 16px;
+      }
+
+      .date {
+        text-align: right;
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+
+      .content {
+        text-align: justify;
+        margin-bottom: 10px;
+        padding: 0 2cm;
+        box-sizing: border-box;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+      .content p {
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: break-word;
+      }
+
+      /* empurra assinatura/rodapé para o final da página */
+      .declaration-bottom {
+        margin-top: auto;
+      }
+
+      .signature {
+        text-align: center;
+        margin: 0;
+        padding: 0;
+      }
+      .signature .line {
+        height: 1px;
+        background-color: #333;
+        width: 60%;
+        margin: 0 auto 5px auto;
+      }
+
+      .footer {
+        text-align: center;
+        border-top: 2px solid #283E51;
+        padding-top: 5px;
+        margin: 0;
+        font-size: 14px;
+        color: #555;
+      }
+
+      .print-button {
+        background-color: #283E51;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 20px;
+      }
+      .print-button:hover {
+        background-color: #1d2d3a;
+      }
+
+      .warning-icon {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        color: red;
+        font-weight: bold;
+        font-size: 18px;
+        line-height: 18px;
+        vertical-align: middle;
+        user-select: none;
+      }
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-align: left !important;
+        font-size: 14px;
+        margin-top: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+
+      @media print {
+        .no-print { display: none !important; }
+        body {
+          margin: 0;
+          padding: 1.5cm 1.5cm;
+          font-size: 14px;
+          font-family: 'Montserrat', sans-serif;
+          color: #000;
+        }
+      }
+    </style>
+    """
+
+    # Monta todas as declarações
+    blocos = []
+    for reg in registros:
+        bloco = f"""
+        <div class="declaration-container">
+          <div class="header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <img src="/static/logos/escola.png" alt="Escola Logo" style="height: 80px;">
+              <div>
+                <h1>Secretaria de Educação</h1>
+                <p>E.M José Padin Mouta</p>
+                <p>Município da Estância Balneária de Praia Grande</p>
+                <p>Estado de São Paulo</p>
+              </div>
+              <img src="/static/logos/municipio.png" alt="Município Logo" style="height: 80px;">
+            </div>
+          </div>
+          <div class="date">
+            <p>{data_extenso}</p>
+          </div>
+          <div class="content">
+            <h2 style="text-align: center; text-transform: uppercase; color: #283E51;">{titulo}</h2>
+            <p>{reg['texto']}</p>
+          </div>
+          <div class="declaration-bottom">
+            <div class="signature">
+              <div class="line"></div>
+              <p>Luciana Rocha Augustinho</p>
+              <p>Diretora da Unidade Escolar</p>
+            </div>
+            <div class="footer">
+              <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390</p>
+              <p>Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
+            </div>
+          </div>
+        </div>
+        """
+        blocos.append(bloco)
+
+    html = f"""
     <!doctype html>
     <html lang="pt-br">
     <head>
       <meta charset="utf-8">
-      <title>Declaração Escolar - Seleção de Aluno</title>
-      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-      <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+      <title>Declarações de Conclusão - 5º Ano</title>
       <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-      <style>
-        body {{ background: #eef2f3; font-family: 'Montserrat', sans-serif; }}
-        header {{
-          background: linear-gradient(90deg, #283E51, #4B79A1);
-          color: #fff; padding: 20px; text-align: center;
-          border-bottom: 3px solid #1d2d3a; border-radius: 0 0 15px 15px;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }}
-        .container-form {{ background: #fff; padding: 40px; border-radius: 10px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin: 40px auto; max-width: 600px; }}
-        .btn-primary {{ background-color: #283E51; border: none; }}
-        .btn-primary:hover {{ background-color: #1d2d3a; }}
-        footer {{ background-color: #424242; color: #fff; text-align: center; padding: 10px;
-          position: fixed; bottom: 0; width: 100%; }}
-        #historico-container {{ display: none; margin-top: 15px; border: 1px solid #ccc;
-          padding: 15px; border-radius: 8px; background: #f9f9f9; }}
-        #unidade-anterior-container {{ display: none; margin-top: 15px; }}
-        #btn-container {{ margin-top: 20px; }}
-      </style>
+      {css}
     </head>
     <body>
-      <header>
-        <h1>E.M José Padin Mouta - Declaração Escolar</h1>
-        <p>Escolha o aluno para realizar a declaração</p>
-      </header>
-      <div class="container container-form">
-        <form method="POST" onsubmit="return validarFormulario();">
-          <div class="form-group">
-            <label for="rm">Aluno:</label>
-            <select class="form-control" id="rm" name="rm" required>
-              <option value="">Selecione</option>
-              {options_html}
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="tipo">Tipo de Declaração:</label>
-            <select class="form-control" id="tipo" name="tipo" required>
-              <option value="">Selecione</option>
-              <option value="Escolaridade">Declaração de Escolaridade</option>
-              <option value="Transferencia">Declaração de Transferência</option>
-              <option value="Conclusão">Declaração de Conclusão</option>
-            </select>
-          </div>
-
-          <div id="historico-container">
-            <label>Deve Histórico Escolar? <span style="color:red;">*</span></label><br>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="deve_historico" id="historico_sim" value="sim">
-              <label class="form-check-label" for="historico_sim">Sim</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="deve_historico" id="historico_nao" value="nao">
-              <label class="form-check-label" for="historico_nao">Não</label>
-            </div>
-          </div>
-
-          <div id="unidade-anterior-container" class="form-group">
-            <label for="unidade_anterior">Nome da unidade escolar anterior: <span style="color:red;">*</span></label>
-            
-            <!-- Select AJAX -->
-            <select class="form-control" id="unidade_anterior" name="unidade_anterior_select"></select>
-            <!-- Input manual -->
-            <input type="text" id="unidade_anterior_manual" name="unidade_anterior_manual" class="form-control mt-2"
-              placeholder="Ou digite o nome da unidade">
-          </div>
-
-          <div id="btn-container">
-            <button type="submit" class="btn btn-primary">Gerar Declaração</button>
-          </div>
-        </form>
+      <div class="no-print" style="text-align: center; margin-top: 20px;">
+        <p>Foram geradas <strong>{len(registros)}</strong> declarações de conclusão para alunos do 5º ano.</p>
+        <button onclick="window.print()" class="print-button">Imprimir todas as declarações</button>
       </div>
-      <footer>
-        Desenvolvido por Nilson Cruz © 2025. Todos os direitos reservados.
-      </footer>
-
-      <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
-      <script>
-      $(document).ready(function() {{
-          // Select2 para alunos
-          $('#rm').select2({{
-              placeholder: "Selecione o aluno",
-              allowClear: true,
-              width: '100%'
-          }});
-
-          // Select2 AJAX para unidades
-          $('#unidade_anterior').select2({{
-              placeholder: "Selecione ou busque a escola",
-              allowClear: true,
-              width: '100%',
-              ajax: {{
-                  url: '/escolas/search',
-                  dataType: 'json',
-                  delay: 250,
-                  data: function(params) {{
-                      return {{ q: params.term }};
-                  }},
-                  processResults: function(data) {{
-                      var results = data.map(function(item) {{
-                          return {{ id: item.id, text: item.text }};
-                      }});
-                      return {{ results: results }};
-                  }},
-                  cache: true
-              }},
-              minimumInputLength: 1
-          }});
-
-          // Histórico e unidade anterior
-          $('#tipo').on('change', function() {{
-              if ($(this).val() === 'Transferencia' || $(this).val() === 'Conclusão') {{
-                  $('#historico-container').show();
-              }} else {{
-                  $('#historico-container').hide();
-                  $('#unidade-anterior-container').hide();
-                  $('input[name="deve_historico"]').prop('checked', false);
-                  $('#unidade_anterior').val(null).trigger('change');
-                  $('#unidade_anterior_manual').val('');
-              }}
-          }});
-
-          $('input[name="deve_historico"]').on('change', function() {{
-              if ($(this).val() === 'sim') {{
-                  $('#unidade-anterior-container').show();
-              }} else {{
-                  $('#unidade-anterior-container').hide();
-                  $('#unidade_anterior').val(null).trigger('change');
-                  $('#unidade_anterior_manual').val('');
-              }}
-          }});
-      }});
-
-      function validarFormulario() {{
-          var tipo = document.getElementById('tipo').value;
-          if (tipo === 'Transferencia' || tipo === 'Conclusão') {{
-              var radios = document.getElementsByName('deve_historico');
-              var marcado = false;
-              for (var i = 0; i < radios.length; i++) {{
-                  if (radios[i].checked) {{ marcado = true; break; }}
-              }}
-              if (!marcado) {{
-                  alert('Por favor, responda se o aluno deve o histórico escolar.');
-                  return false;
-              }}
-              if (document.getElementById('historico_sim').checked) {{
-                  var unidade_select = $('#unidade_anterior').val();
-                  var unidade_manual = $('#unidade_anterior_manual').val().trim();
-                  if (!unidade_select && !unidade_manual) {{
-                      alert('Por favor, informe a unidade escolar anterior.');
-                      return false;
-                  }}
-              }}
-              return confirm("Você está gerando uma declaração de transferência ou conclusão, essa é a declaração correta a ser gerada?");
-          }}
-          return true;
-      }}
-      </script>
+      {''.join(blocos)}
     </body>
     </html>
-    '''
-    return render_template_string(select_form)
+    """
 
+    return html
+
+from flask import session, request, redirect, url_for, render_template_string
+# ...
 
 @app.route('/declaracao/tipo', methods=['GET', 'POST'])
 @login_required
 def declaracao_tipo():
     if request.method == 'POST':
         tipo = request.form.get('tipo')
+
+        # Guarda o tipo de declaração na sessão
+        session['declaracao_tipo'] = tipo
+
         if tipo == 'Fundamental':
             return redirect(url_for('declaracao_upload'))
         elif tipo == 'EJA':
             return redirect(url_for('declaracao_upload_eja'))
+        # se cair aqui, volta pra tela (tipo vazio ou inválido)
 
     form_html = '''
     <!doctype html>
