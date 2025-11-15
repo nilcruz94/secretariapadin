@@ -166,11 +166,22 @@ def load_workbook_model(file):
 
 
 def gerar_html_carteirinhas(arquivo_excel):
+    # Lê a planilha do Fundamental
     planilha = pd.read_excel(arquivo_excel, sheet_name='LISTA CORRIDA')
     dados = planilha[['RM', 'NOME', 'DATA NASC.', 'RA', 'SAI SOZINHO?', 'SÉRIE', 'HORÁRIO']]
     dados['RM'] = dados['RM'].fillna(0).astype(int)
 
+    # Filtra apenas alunos com RM válido
+    registros_validos = []
+    for _, row in dados.iterrows():
+        rm_str = str(row['RM']).strip()
+        if not rm_str or rm_str == "0":
+            continue
+        registros_validos.append(row)
+
+    total_validos = len(registros_validos)
     alunos_sem_fotos_list = []
+
     html_content = """
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -179,155 +190,271 @@ def gerar_html_carteirinhas(arquivo_excel):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>E.M José Padin Mouta - Carteirinhas</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Estilos CSS para carteirinhas */
+    @page {
+      size: A4 portrait;
+      margin: 0.6cm;
+    }
+
     body {
       font-family: 'Montserrat', sans-serif;
       margin: 0;
-      padding: 20px;
-      background-color: #f4f4f4;
+      padding: 10px;
+      background-color: #f4f6f8;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
+
     #search-container {
       margin-top: 10px;
     }
+
     #localizarAluno {
-      padding: 0.2cm;
-      font-size: 0.3cm;
-      width: 3.5cm;
+      padding: 0.25cm;
+      font-size: 0.32cm;
+      width: 4.5cm;
+      border-radius: 0.25cm;
+      border: 0.05cm solid #b0bec5;
     }
+
     .carteirinhas-container {
       width: 100%;
-      max-width: 1100px;
+      max-width: 1200px;
     }
+
     .page {
-      margin-bottom: 40px;
+      margin-bottom: 30px;
       position: relative;
     }
+
     .page-number {
       text-align: center;
-      font-size: 0.3cm;
+      font-size: 0.32cm;
       font-weight: 600;
-      color: #333;
+      color: #455a64;
       margin-bottom: 0.2cm;
     }
+
     .cards-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 0.2cm;
+      grid-template-columns: repeat(2, 1fr); /* 2 por linha */
+      gap: 0.35cm;              /* levemente menor */
       justify-items: center;
     }
+
     .borda-pontilhada {
-      border: 0.05cm dotted #ccc;
-      padding: 0.1cm;
+      border: 0.05cm dotted #b0bec5;
+      padding: 0.18cm;
       position: relative;
+      border-radius: 0.35cm;
+      background-color: #ffffff;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
+
     .borda-pontilhada::after {
       content: "✂️";
       position: absolute;
       top: -0.35cm;
       right: -0.30cm;
       font-size: 0.3cm;
-      color: #2196F3;
+      color: #1976d2;
     }
-    input {
-      width: 100%;
-      padding: 0.2cm;
-      margin: 0.1cm 0;
-      border: 0.05cm solid #ccc;
-      border-radius: 0.2cm;
-      box-sizing: border-box;
-      font-size: 0.3cm;
-    }
-    input:focus {
-      border-color: #008CBA;
-      box-shadow: 0 0 0.2cm rgba(0, 140, 186, 0.5);
-      outline: none;
-    }
+
     .carteirinha {
-      background-color: #fff;
-      border-radius: 0.3cm;
-      box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.1);
+      background: linear-gradient(180deg, #fdfefe 0%, #f5f7fb 40%, #ffffff 100%);
+      border-radius: 0.4cm;
+      box-shadow: 0 0.1cm 0.25cm rgba(0,0,0,0.15);
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      width: 6.0cm;
-      height: 9.0cm;
-      padding: 0.2cm;
+      width: 11cm;
+      min-height: 7.6cm;   /* antes 8.0cm */
       position: relative;
-      border: 0.05cm solid #2196F3;
+      border: 0.06cm solid #1976d2;
     }
-    .escola {
-      font-size: 0.35cm;
-      font-weight: 600;
-      color: #2196F3;
-      margin-bottom: 0.1cm;
-      text-align: center;
-      text-transform: uppercase;
-      letter-spacing: 0.05cm;
-      margin-top: 0.1cm;
-      white-space: nowrap;
-    }
-    .foto {
-      width: 1.8cm;
-      height: 1.8cm;
-      margin-bottom: 0.1cm;
-      border-radius: 50%;
-      object-fit: cover;
-      margin-left: auto;
-      margin-right: auto;
-      border: 0.1cm solid #2196F3;
-      cursor: pointer;
-    }
-    .info {
+
+    /* TOPO DO CRACHÁ (suporte + furo) */
+    .card-top {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      text-align: left;
-      margin-left: 0.1cm;
-      margin-bottom: 0.1cm;
-      font-size: 0.3cm;
-      color: #333;
+      align-items: stretch;
     }
-    .info div, .info span { margin: 0.08cm 0; }
-    .info .titulo {
-      font-weight: 600;
-      color: #2196F3;
-      text-transform: uppercase;
-      letter-spacing: 0.02cm;
-    }
-    .info .descricao { color: #555; }
-    .linha-nome { display: flex; align-items: center; gap: 0.1cm; }
-    .linha, .linha-ra, .linha-horario, .linha-rm { display: flex; flex-direction: row; align-items: center; gap: 0.2cm; }
-    .status {
-      padding: 0.2cm;
-      font-weight: 600;
-      border-radius: 0.2cm;
-      color: #fff;
-      text-transform: uppercase;
-      margin-bottom: 0.1cm;
+
+    .card-slot {
+      height: 0.7cm;  /* antes 0.8cm */
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 0.6cm;
-      min-width: 1.5cm;
-      text-align: center;
+      background: linear-gradient(180deg, #f9fbfd 0%, #e1e9f4 100%);
+      border-bottom: 0.03cm solid #c2cddc;
     }
-    .verde { background-color: #81C784; }
-    .vermelho { background-color: #E57373; }
-    .ano {
-      position: absolute;
-      bottom: 0.2cm;
-      left: 0;
-      right: 0;
-      text-align: center;
+
+    .slot-inner {
+      width: 1.7cm;
+      height: 0.32cm;
+      border-radius: 999px;
+      background: #f4f6f8;
+      box-shadow: inset 0 0 0 0.05cm #d0d9e5;
+    }
+
+    /* FAIXA SUPERIOR DA ESCOLA */
+    .card-header-band {
+      position: relative;
+      height: 1.15cm; /* leve ajuste */
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 700;
       font-size: 0.4cm;
-      font-weight: 600;
-      color: #2196F3;
+      letter-spacing: 0.08cm;
+      text-transform: uppercase;
     }
+
+    .card-body {
+      display: flex;
+      flex: 1;
+      padding: 0.55cm 0.55cm 0.55cm 0.55cm;  /* antes 0.6 */
+      box-sizing: border-box;
+      align-items: stretch;
+      gap: 0.38cm;
+    }
+
+    /* FOTO */
+    .photo-wrapper {
+      width: 3.3cm;   /* -0.1cm */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .foto {
+      width: 2.9cm;   /* -0.1cm */
+      height: 3.8cm;  /* -0.1cm */
+      border-radius: 0.4cm;
+      object-fit: cover;
+      border: 0.08cm solid #1976d2;
+      cursor: pointer;
+      background-color: #eceff1;
+    }
+
+    /* CARD DE INFORMAÇÕES */
+    .info-panel {
+      flex: 1;
+      background-color: #ffffff;
+      border-radius: 0.3cm;
+      padding: 0.28cm 0.38cm 0.28cm 0.38cm;  /* um tiquinho menor */
+      box-shadow: inset 0 0 0 0.02cm #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    .info-name {
+      margin-bottom: 0.13cm;
+      border-bottom: 0.02cm solid #e0e0e0;
+      padding-bottom: 0.09cm;
+    }
+
+    .info-name-label {
+      font-size: 0.26cm;
+      font-weight: 700;
+      color: #1565c0;
+      letter-spacing: 0.04cm;
+      text-transform: uppercase;
+    }
+
+    .info-name-text {
+      font-size: 0.36cm;
+      font-weight: 700;
+      color: #263238;
+      text-transform: uppercase;
+      line-height: 1.15;
+    }
+
+    .info-row {
+      display: flex;
+      font-size: 0.30cm;
+      margin: 0.045cm 0;
+      padding: 0.035cm 0;
+      align-items: baseline;
+    }
+
+    .info-row + .info-row {
+      border-top: 0.02cm solid #eef1f3;
+    }
+
+    .info-label {
+      font-weight: 700;
+      color: #1565c0;
+      min-width: 2.2cm;
+      text-transform: uppercase;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #37474f;
+      padding-left: 0.12cm;
+      word-wrap: break-word;
+    }
+
+    /* RODAPÉ DA CARTEIRINHA */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0.65cm 0.45cm 0.65cm; /* levemente menor */
+      box-sizing: border-box;
+      gap: 0.3cm;
+    }
+
+    .status {
+      flex: 1;
+      padding: 0.24cm 0.45cm;
+      font-weight: 700;
+      border-radius: 999px;
+      color: #ffffff;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      letter-spacing: 0.06cm;
+      font-size: 0.30cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.35);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      white-space: nowrap;
+    }
+
+    .status span.icon {
+      font-size: 0.34cm;
+      margin-right: 0.14cm;
+    }
+
+    .status.verde {
+      background-color: #1B5E20;
+      border: 0.03cm solid #2E7D32;
+    }
+
+    .status.vermelho {
+      background-color: #B71C1C;
+      border: 0.03cm solid #D32F2F;
+    }
+
+    .year-pill {
+      font-weight: 700;
+      font-size: 0.38cm;
+      letter-spacing: 0.12cm;
+      color: #1565c0;
+      text-align: right;
+      min-width: 2.0cm;
+    }
+
     #loading-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -337,6 +464,7 @@ def gerar_html_carteirinhas(arquivo_excel):
       justify-content: center;
       z-index: 9999;
     }
+
     #cards-success {
       display: none;
       position: fixed;
@@ -348,58 +476,81 @@ def gerar_html_carteirinhas(arquivo_excel):
       padding: 0.2cm;
       border-radius: 0.2cm;
       z-index: 10000;
+      box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.3);
     }
+
     .no-print { }
+
     @media print {
       .no-print { display: none !important; }
       body {
         margin: 0;
-        padding: 0;
+        padding: 0.3cm;
         font-size: 16px;
-        background-color: #fff !important;
+        background-color: #ffffff !important;
       }
       .page {
-        page-break-after: always;
+        margin-bottom: 0.15cm;
+      }
+      .carteirinha,
+      .status,
+      .card-header-band,
+      .year-pill,
+      .card-slot,
+      .slot-inner {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
     }
+
     .imprimir-carteirinhas {
       position: fixed;
       bottom: 0.5cm;
       right: 0.5cm;
-      background-color: #2196F3;
+      background-color: #1976d2;
       color: #fff;
-      padding: 0.2cm 0.4cm;
+      padding: 0.2cm 0.5cm;
       font-size: 0.3cm;
-      border-radius: 0.2cm;
+      border-radius: 0.25cm;
       cursor: pointer;
-      box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.2);
+      box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.3);
+      border: none;
     }
+    .imprimir-carteirinhas:hover {
+      background-color: #0d47a1;
+    }
+
     .imprimir-pagina {
-      background-color: #FF5722;
+      background-color: #ff5722;
       color: #fff;
       padding: 0.2cm 0.4cm;
       font-size: 0.3cm;
-      border-radius: 0.2cm;
+      border-radius: 0.25cm;
       cursor: pointer;
       margin: 0.2cm auto;
       display: block;
+      border: none;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.25);
     }
     .imprimir-pagina:hover {
-      background-color: #FF7043;
+      background-color: #e64a19;
     }
+
     .alunos-sem-fotos-btn {
       background-color: #4B79A1;
       color: #fff;
       border: none;
       padding: 0.2cm 0.5cm;
       font-size: 0.3cm;
-      border-radius: 0.2cm;
+      border-radius: 0.25cm;
       cursor: pointer;
       margin-bottom: 0.2cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.2);
     }
     .alunos-sem-fotos-btn:hover {
       background-color: #3a5d78;
     }
+
     #relatorio-container {
       display: none;
       position: fixed;
@@ -436,15 +587,6 @@ def gerar_html_carteirinhas(arquivo_excel):
       background: none;
       cursor: pointer;
     }
-    header {
-      background: linear-gradient(90deg, #283E51, #4B79A1);
-      color: #fff;
-      padding: 20px;
-      text-align: center;
-      border-bottom: 3px solid #1d2d3a;
-      border-radius: 0 0 15px 15px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
   </style>
 </head>
 <body>
@@ -466,18 +608,22 @@ def gerar_html_carteirinhas(arquivo_excel):
       <input type="text" id="localizarAluno" placeholder="Localizar Aluno">
     </div>
 """
+
     contador = 0
     num_pagina = 1
-    html_content += '<div class="page"><div class="page-number">Página ' + str(num_pagina) + '</div>'
-    html_content += '<button class="imprimir-pagina no-print" onclick="imprimirPagina(this)">Imprimir Página</button>'
-    html_content += '<div class="cards-grid">'
-    for _, row in dados.iterrows():
-        if not str(row['RM']).strip() or str(row['RM']).strip() == "0":
-            continue
+
+    if total_validos > 0:
+        html_content += f'<div class="page"><div class="page-number">Página {num_pagina}</div>'
+        html_content += '<button class="imprimir-pagina no-print" onclick="imprimirPagina(this)">Imprimir Página</button>'
+        html_content += '<div class="cards-grid">'
+
+    for row in registros_validos:
         nome = row['NOME']
         data_nasc = row['DATA NASC.']
         serie = row['SÉRIE']
         horario = row['HORÁRIO']
+
+        # Data de nascimento
         if pd.notna(data_nasc):
             try:
                 data_nasc = pd.to_datetime(data_nasc, errors='coerce')
@@ -489,14 +635,21 @@ def gerar_html_carteirinhas(arquivo_excel):
                 data_nasc = "Desconhecida"
         else:
             data_nasc = "Desconhecida"
+
         ra = row['RA']
-        sai_sozinho = row['SAI SOZINHO?']
-        if sai_sozinho == 'Sim':
+
+        # Sai sozinho?
+        sai_sozinho_raw = str(row['SAI SOZINHO?']).strip().upper()
+        if sai_sozinho_raw in ('SIM', 'S', 'YES', 'Y'):
             classe_cor = 'verde'
-            status_texto = "Sai Sozinho"
+            status_texto = "Sai sozinho"
+            status_icon = "&#10003;"  # check
         else:
             classe_cor = 'vermelho'
-            status_texto = "Não Sai Sozinho"
+            status_texto = "Não sai sozinho"
+            status_icon = "&#9888;"   # warning
+
+        # Foto
         allowed_exts = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
         found_photo = None
         for ext in allowed_exts:
@@ -504,72 +657,96 @@ def gerar_html_carteirinhas(arquivo_excel):
             if os.path.exists(caminho_foto):
                 found_photo = f"/static/fotos/{row['RM']}{ext}"
                 break
+
         if not found_photo:
             alunos_sem_fotos_list.append({
                 'rm': row['RM'],
                 'nome': nome,
                 'serie': serie
             })
+
         if found_photo:
             foto_tag = f'<img src="{found_photo}" alt="Foto" class="foto uploadable" data-rm="{row["RM"]}">'
         else:
             foto_tag = f'''
-            <div class="foto uploadable" data-rm="{row["RM"]}" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-              <span style="font-size:0.8cm; opacity:0.5; color: grey; margin-bottom: 0.1cm;">&#128247;</span>
-              <small style="font-size:0.2cm; opacity:0.5; color: grey;">Anexe uma foto</small>
+            <div class="foto uploadable" data-rm="{row["RM"]}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="font-size:1.0cm; opacity:0.5; color: grey; margin-bottom: 0.1cm;">&#128247;</span>
+              <small style="font-size:0.24cm; opacity:0.7; color: grey;">Anexe uma foto</small>
             </div>
             '''
+
         hidden_input = f'<input type="file" class="inline-upload" data-rm="{row["RM"]}" style="display:none;" accept="image/*">'
+
         html_content += f"""
       <div class="borda-pontilhada">
         <div class="carteirinha">
-          <div class="escola">E.M José Padin Mouta</div>
-          {foto_tag}
-          {hidden_input}
-          <div class="info">
-            <div class="linha-nome">
-              <span class="titulo">Nome:</span>
-              <span class="descricao">{nome}</span>
+          <div class="card-top">
+            <div class="card-slot">
+              <div class="slot-inner"></div>
             </div>
-            <div class="linha-rm">
-              <span class="titulo">RM:</span>
-              <span class="descricao">{row['RM']}</span>
+            <div class="card-header-band">E.M JOSÉ PADIN MOUTA</div>
+          </div>
+          <div class="card-body">
+            <div class="photo-wrapper">
+              {foto_tag}
+              {hidden_input}
             </div>
-            <div class="linha">
-              <div class="titulo">Série:</div>
-              <div class="descricao">{serie}</div>
-            </div>
-            <div class="linha">
-              <div class="titulo">Data Nasc.:</div>
-              <div class="descricao">{data_nasc}</div>
-            </div>
-            <div class="linha-ra">
-              <span class="titulo">RA:</span>
-              <span class="descricao">{ra}</span>
-            </div>
-            <div class="linha-horario">
-              <div class="titulo">Horário:</div>
-              <div class="descricao">{horario}</div>
+            <div class="info-panel">
+              <div class="info-name">
+                <div class="info-name-label">Nome</div>
+                <div class="info-name-text">{nome}</div>
+              </div>
+              <div class="info-row">
+                <div class="info-label">RM:</div>
+                <div class="info-value">{row['RM']}</div>
+              </div>
+              <div class="info-row">
+                <div class="info-label">Série:</div>
+                <div class="info-value">{serie}</div>
+              </div>
+              <div class="info-row">
+                <div class="info-label">Data nasc.:</div>
+                <div class="info-value">{data_nasc}</div>
+              </div>
+              <div class="info-row">
+                <div class="info-label">RA:</div>
+                <div class="info-value">{ra}</div>
+              </div>
+              <div class="info-row">
+                <div class="info-label">Horário:</div>
+                <div class="info-value">{horario}</div>
+              </div>
             </div>
           </div>
-          <div class="status {classe_cor}">{status_texto}</div>
-          <div class="ano">2025</div>
+          <div class="card-footer">
+            <div class="status {classe_cor}">
+              <span class="icon">{status_icon}</span>
+              <span class="status-text">{status_texto}</span>
+            </div>
+            <div class="year-pill">2025</div>
+          </div>
         </div>
       </div>
 """
+
         contador += 1
-        if contador % 4 == 0:
+        # AGRUPA 6 CARTEIRINHAS POR PÁGINA (2 colunas x 3 linhas)
+        if contador % 6 == 0 and contador < total_validos:
             html_content += '</div></div>'
-            if contador < len(dados):
-                num_pagina += 1
-                html_content += '<div class="page"><div class="page-number">Página ' + str(num_pagina) + '</div>'
-                html_content += '<button class="imprimir-pagina no-print" onclick="imprimirPagina(this)">Imprimir Página</button>'
-                html_content += '<div class="cards-grid">'
-    if contador % 4 != 0:
+            num_pagina += 1
+            html_content += f'<div class="page"><div class="page-number">Página {num_pagina}</div>'
+            html_content += '<button class="imprimir-pagina no-print" onclick="imprimirPagina(this)">Imprimir Página</button>'
+            html_content += '<div class="cards-grid">'
+
+    # Fecha a última página se houver carteirinhas
+    if total_validos > 0:
         html_content += '</div></div>'
+
+    # Relatório de alunos sem fotos
     relatorio_linhas = ""
     for aluno in alunos_sem_fotos_list:
         relatorio_linhas += f"<tr><td>{aluno['rm']}</td><td>{aluno['nome']}</td><td>{aluno['serie']}</td></tr>"
+
     html_content += f"""
   </div>
   <div id="relatorio-container" class="no-print">
@@ -589,15 +766,6 @@ def gerar_html_carteirinhas(arquivo_excel):
     </table>
   </div>
 <script>
-// Função para confirmar o envio se a declaração for do tipo Transferencia
-function confirmDeclaration() {{
-    var tipo = document.getElementById('tipo').value;
-    if (tipo === "Transferencia") {{
-        return confirm("Você está gerando uma declaração de transferência, essa é a declaração correta a ser gerada?");
-    }}
-    return true;
-}}
-
 function showLoading() {{
     var existingOverlay = document.getElementById('loading-overlay');
     if (existingOverlay) {{
@@ -617,7 +785,6 @@ function showLoading() {{
     loadingOverlay.style.justifyContent = 'center';
     loadingOverlay.style.zIndex = '9999';
 
-    // AQUI é um string normal; não substituímos nada dentro da string
     loadingOverlay.innerHTML = 
       `<div style="text-align: center; color: white; font-family: Arial, sans-serif;">
         <svg width="3.0cm" height="4.5cm" viewBox="0 0 6.0 9.0" xmlns="http://www.w3.org/2000/svg">
@@ -630,7 +797,7 @@ function showLoading() {{
     document.body.appendChild(loadingOverlay);
 
     let fillHeight = 0;
-    const maxHeight = 8.4; 
+    const maxHeight = 8.4;
     function animateBadge() {{
       fillHeight += 0.2;
       if (fillHeight > maxHeight) {{
@@ -646,10 +813,8 @@ function showLoading() {{
     loadingOverlay.dataset.animationId = interval;
 }}
 
-// Chama showLoading() imediatamente
 showLoading();
 
-// Quando a janela terminar de carregar
 window.onload = function() {{
     var overlay = document.getElementById('loading-overlay');
     if (overlay) {{
@@ -667,12 +832,10 @@ window.onload = function() {{
     }}
 }};
 
-// Imprimir todas as carteirinhas
 function imprimirCarteirinhas() {{
     window.print();
 }}
 
-// Imprimir só a página em que o botão foi clicado
 function imprimirPagina(botao) {{
     let pagina = botao.closest('.page');
     let todasPaginas = document.querySelectorAll('.page');
@@ -683,29 +846,25 @@ function imprimirPagina(botao) {{
     }});
     setTimeout(() => {{
       window.print();
-      // Restaura a visibilidade
       todasPaginas.forEach(p => {{
         p.style.display = '';
       }});
     }}, 100);
 }}
 
-// Exibir relatório de Alunos sem fotos
 function mostrarRelatorioAlunosSemFotos() {{
     document.getElementById('relatorio-container').style.display = 'block';
 }}
 
-// Fechar relatório de Alunos sem fotos
 function fecharRelatorio() {{
     document.getElementById('relatorio-container').style.display = 'none';
 }}
 
-// Filtro de busca pelo nome do aluno
 document.getElementById('localizarAluno').addEventListener('keyup', function() {{
     var filtro = this.value.toLowerCase();
     var cards = document.querySelectorAll('.borda-pontilhada');
     cards.forEach(function(card) {{
-      var nomeElem = card.querySelector('.linha-nome .descricao');
+      var nomeElem = card.querySelector('.info-name-text');
       if (nomeElem) {{
         var nome = nomeElem.textContent.toLowerCase();
         if (nome.indexOf(filtro) > -1) {{
@@ -728,7 +887,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         }}
       }});
     }});
-    
+
     document.querySelectorAll('.inline-upload').forEach(function(input) {{
       input.addEventListener('change', function() {{
         var file = input.files[0];
@@ -737,7 +896,7 @@ document.addEventListener('DOMContentLoaded', function() {{
           var formData = new FormData();
           formData.append('rm', rm);
           formData.append('foto_file', file);
-          
+
           fetch('/upload_inline_foto', {{
             method: 'POST',
             body: formData
@@ -1682,25 +1841,33 @@ def dashboard():
 @login_required
 def carteirinhas():
     if request.method == 'POST':
-        file = None
+        file_path = None
+
+        # Se veio um arquivo novo no POST, salva e guarda na sessão
         if 'excel_file' in request.files and request.files['excel_file'].filename != '':
             file = request.files['excel_file']
             filename = secure_filename(file.filename)
             unique_filename = f"carteirinhas_{uuid.uuid4().hex}_{filename}"
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(file_path)
+
+            # guarda para reutilizar depois sem precisar reenviar
             session['lista_fundamental'] = file_path
-            file = open(file_path, 'rb')
         else:
+            # tenta reaproveitar a última lista usada
             file_path = session.get('lista_fundamental')
-            if file_path and os.path.exists(file_path):
-                file = open(file_path, 'rb')
-        if not file:
-            return "Nenhum arquivo selecionado", 400
+
+        # Se mesmo assim não tiver caminho válido, volta pra tela de upload
+        if not file_path or not os.path.exists(file_path):
+            flash("Nenhum arquivo selecionado. Envie a lista piloto do Fundamental.", "info")
+            return redirect(url_for('carteirinhas'))
+
         flash("Gerando carteirinhas. Aguarde...", "info")
-        html_result = gerar_html_carteirinhas(file)
-        file.close()
+        # gerar_html_carteirinhas aceita o caminho do arquivo
+        html_result = gerar_html_carteirinhas(file_path)
         return html_result
+
+    # GET – tela de upload / gerenciamento de fotos
     carteirinhas_html = '''
     <!doctype html>
     <html lang="pt-br">
@@ -1830,7 +1997,7 @@ def carteirinhas():
           <h2 class="mb-4">Envie a lista piloto (Excel)</h2>
           <form method="POST" enctype="multipart/form-data" onsubmit="showLoading()">
             <div class="form-group">
-              <label for="excel_file">Selecione a Lista do Fundamental (opcional caso tenha anexado no inicio do sistema):</label>
+              <label for="excel_file">Selecione a Lista do Fundamental (opcional caso tenha anexado no início do sistema):</label>
               <input type="file" class="form-control-file" name="excel_file" id="excel_file" accept=".xlsx, .xls">
             </div>
             <button type="submit" class="btn btn-primary">Gerar Carteirinhas</button>
@@ -2934,70 +3101,107 @@ def declaracao_tipo():
 
 
 @app.route('/upload_foto', methods=['POST'])
+@login_required
 def upload_foto():
-    if 'foto_file' not in request.files:
-        return "Nenhum arquivo de foto enviado", 400
-
-    rm = request.form.get('rm')
+    rm = (request.form.get('rm') or '').strip()
     if not rm:
-        return "RM não fornecido", 400
+        flash("RM não fornecido.", "error")
+        return redirect(url_for('carteirinhas'))
 
-    file = request.files['foto_file']
-    if file.filename == '':
-        return "Nenhuma foto selecionada", 400
+    file = request.files.get('foto_file')
+    if not file or file.filename == '':
+        flash("Nenhuma foto selecionada.", "error")
+        return redirect(url_for('carteirinhas'))
 
     if not allowed_file(file.filename):
-        return "Formato de imagem não permitido", 400
+        flash("Formato de imagem não permitido. Envie JPG, PNG, GIF ou BMP.", "error")
+        return redirect(url_for('carteirinhas'))
+
     original_filename = secure_filename(file.filename)
     _, ext = os.path.splitext(original_filename)
+
+    fotos_dir = os.path.join('static', 'fotos')
+    os.makedirs(fotos_dir, exist_ok=True)
+
     new_filename = secure_filename(f"{rm}{ext.lower()}")
-    file_path = os.path.join('static', 'fotos', new_filename)
+    file_path = os.path.join(fotos_dir, new_filename)
     file.save(file_path)
 
-    flash("Foto anexada com sucesso", "success")
+    flash("Foto anexada com sucesso.", "success")
     return redirect(url_for('carteirinhas'))
 
 
 @app.route('/upload_multiplas_fotos', methods=['POST'])
+@login_required
 def upload_multiplas_fotos():
     rms = request.form.getlist("rm[]")
     files = request.files.getlist("foto_file[]")
+
     if not files:
-        return "Nenhuma foto enviada", 400
+        flash("Nenhuma foto enviada.", "error")
+        return redirect(url_for('carteirinhas'))
+
+    fotos_dir = os.path.join('static', 'fotos')
+    os.makedirs(fotos_dir, exist_ok=True)
+
+    total_salvas = 0
+    total_ignoradas = 0
+
     for rm, file in zip(rms, files):
-        if file.filename == '' or not rm or not allowed_file(file.filename):
+        rm = (rm or '').strip()
+
+        # Pula se não tiver RM, arquivo ou formato inválido
+        if not rm or not file or file.filename == '' or not allowed_file(file.filename):
+            total_ignoradas += 1
             continue
 
         original_filename = secure_filename(file.filename)
         _, ext = os.path.splitext(original_filename)
         new_filename = secure_filename(f"{rm}{ext.lower()}")
-        file_path = os.path.join('static', 'fotos', new_filename)
+        file_path = os.path.join(fotos_dir, new_filename)
         file.save(file_path)
+        total_salvas += 1
 
-    flash("Foto(s) anexada(s) com sucesso", "success")
+    if total_salvas:
+        msg = f"Foto(s) anexada(s) com sucesso: {total_salvas} arquivo(s)."
+        if total_ignoradas:
+            msg += f" {total_ignoradas} arquivo(s) foram ignorados por RM ou formato inválido."
+        flash(msg, "success")
+    else:
+        flash("Nenhuma foto válida foi enviada.", "error")
+
     return redirect(url_for('carteirinhas'))
 
 
 @app.route('/upload_inline_foto', methods=['POST'])
+@login_required
 def upload_inline_foto():
-    if 'foto_file' not in request.files:
-        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+    file = request.files.get('foto_file')
+    rm = (request.form.get('rm') or '').strip()
 
-    rm = request.form.get('rm')
     if not rm:
         return jsonify({'error': 'RM não fornecido'}), 400
 
-    file = request.files['foto_file']
-    if file.filename == '' or not allowed_file(file.filename):
+    if not file or file.filename == '':
+        return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+
+    if not allowed_file(file.filename):
         return jsonify({'error': 'Formato de imagem não permitido'}), 400
 
     original_filename = secure_filename(file.filename)
     _, ext = os.path.splitext(original_filename)
+
+    fotos_dir = os.path.join('static', 'fotos')
+    os.makedirs(fotos_dir, exist_ok=True)
+
     new_filename = secure_filename(f"{rm}{ext.lower()}")
-    file_path = os.path.join('static', 'fotos', new_filename)
+    file_path = os.path.join(fotos_dir, new_filename)
     file.save(file_path)
 
-    return jsonify({'url': f"/static/fotos/{new_filename}", 'message': "Foto anexada com sucesso"})
+    return jsonify({
+        'url': f"/static/fotos/{new_filename}",
+        'message': "Foto anexada com sucesso"
+    }), 200
 
 
 @app.route('/quadros')
