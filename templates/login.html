@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Acesso Restrito{% endblock %}
+
+{% block content %}
+  <div class="container-login">
+    <div class="login-brand">
+      <div class="brand-circle">JP</div>
+      <h2>Acesso Restrito</h2>
+      <p>Informe o token de acesso para entrar no sistema.</p>
+    </div>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="token-input">Token de acesso</label>
+
+        <div class="password-wrapper">
+          <input
+            type="password"
+            name="token"
+            id="token-input"
+            class="form-control"
+            placeholder="Digite o token fornecido pela direção"
+            required
+            autofocus
+          >
+          <button
+            type="button"
+            class="toggle-password"
+            onclick="toggleTokenVisibility()"
+            tabindex="-1"
+            aria-label="Mostrar ou ocultar token"
+          >
+            <i id="toggle-password-icon" class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block mt-2">
+        Entrar no sistema
+      </button>
+    </form>
+
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <div class="helper-box">
+      <div class="helper-dot"></div>
+      <div>
+        Sistema de uso interno da unidade escolar.
+        Em caso de dúvida sobre o token, procure a equipe da secretaria ou a direção.
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function toggleTokenVisibility() {
+    const input = document.getElementById('token-input');
+    const icon = document.getElementById('toggle-password-icon');
+
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+</script>
+{% endblock %}

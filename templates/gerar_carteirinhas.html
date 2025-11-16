@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E.M José Padin Mouta - Carteirinhas</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0.6cm;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 10px;
+      background-color: #f4f6f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #search-container {
+      margin-top: 10px;
+    }
+
+    #localizarAluno {
+      padding: 0.25cm;
+      font-size: 0.32cm;
+      width: 4.5cm;
+      border-radius: 0.25cm;
+      border: 0.05cm solid #b0bec5;
+    }
+
+    .carteirinhas-container {
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .page {
+      margin-bottom: 30px;
+      position: relative;
+    }
+
+    .page-number {
+      text-align: center;
+      font-size: 0.32cm;
+      font-weight: 600;
+      color: #455a64;
+      margin-bottom: 0.25cm;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr); /* 2 por linha */
+      gap: 0.4cm;
+      justify-items: center;
+    }
+
+    .borda-pontilhada {
+      border: 0.05cm dotted #b0bec5;
+      padding: 0.18cm;
+      position: relative;
+      border-radius: 0.35cm;
+      background-color: #ffffff;
+    }
+
+    .borda-pontilhada::after {
+      content: "✂️";
+      position: absolute;
+      top: -0.35cm;
+      right: -0.30cm;
+      font-size: 0.3cm;
+      color: #1976d2;
+    }
+
+    .carteirinha {
+      background-color: #ffffff;
+      border-radius: 0.4cm;
+      box-shadow: 0 0.1cm 0.25cm rgba(0,0,0,0.15);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      width: 11cm;          /* mantém largura original */
+      min-height: 8.0cm;
+      position: relative;
+      border: 0.06cm solid #1976d2;
+    }
+
+    /* FAIXA SUPERIOR DA ESCOLA */
+    .card-header-band {
+      position: relative;
+      height: 1.2cm;
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 0.4cm;
+      letter-spacing: 0.08cm;
+      text-transform: uppercase;
+    }
+
+    .card-body {
+      display: flex;
+      flex: 1;
+      padding: 0.7cm 0.55cm 0.6cm 0.55cm;
+      box-sizing: border-box;
+      align-items: stretch;
+      gap: 0.4cm;
+    }
+
+    /* FOTO */
+    .photo-wrapper {
+      width: 3.4cm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .foto {
+      width: 3.0cm;
+      height: 3.9cm;
+      border-radius: 0.4cm;
+      object-fit: cover;
+      border: 0.08cm solid #1976d2;
+      cursor: pointer;
+      background-color: #eceff1;
+    }
+
+    /* CARD DE INFORMAÇÕES */
+    .info-panel {
+      flex: 1;
+      background-color: #ffffff;
+      border-radius: 0.3cm;
+      padding: 0.3cm 0.4cm 0.3cm 0.4cm;
+      box-shadow: inset 0 0 0 0.02cm #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    .info-name {
+      margin-bottom: 0.14cm;
+      border-bottom: 0.02cm solid #e0e0e0;
+      padding-bottom: 0.1cm;
+    }
+
+    .info-name-label {
+      font-size: 0.26cm;
+      font-weight: 700;
+      color: #1565c0;
+      letter-spacing: 0.04cm;
+      text-transform: uppercase;
+    }
+
+    .info-name-text {
+      font-size: 0.36cm;
+      font-weight: 700;
+      color: #263238;
+      text-transform: uppercase;
+      line-height: 1.15;
+    }
+
+    .info-row {
+      display: flex;
+      font-size: 0.30cm;
+      margin: 0.05cm 0;
+      padding: 0.04cm 0;
+      align-items: baseline;
+    }
+
+    .info-row + .info-row {
+      border-top: 0.02cm solid #eef1f3;
+    }
+
+    .info-label {
+      font-weight: 700;
+      color: #1565c0;
+      min-width: 2.2cm;
+      text-transform: uppercase;
+    }
+
+    .info-value {
+      flex: 1;
+      color: #37474f;
+      padding-left: 0.12cm;
+      word-wrap: break-word;
+    }
+
+    /* RODAPÉ DA CARTEIRINHA */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0.7cm 0.5cm 0.7cm;
+      box-sizing: border-box;
+      gap: 0.3cm;
+    }
+
+    .status {
+      flex: 1;
+      padding: 0.24cm 0.45cm;
+      font-weight: 700;
+      border-radius: 999px;
+      color: #ffffff;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      letter-spacing: 0.06cm;
+      font-size: 0.30cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.35);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      white-space: nowrap;
+    }
+
+    .status span.icon {
+      font-size: 0.34cm;
+      margin-right: 0.14cm;
+    }
+
+    .status.verde {
+      background-color: #1B5E20;
+      border: 0.03cm solid #2E7D32;
+    }
+
+    .status.vermelho {
+      background-color: #B71C1C;
+      border: 0.03cm solid #D32F2F;
+    }
+
+    .year-pill {
+      font-weight: 700;
+      font-size: 0.38cm;
+      letter-spacing: 0.12cm;
+      color: #1565c0;
+      text-align: right;
+      min-width: 2.0cm;
+    }
+
+    #loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    #cards-success {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #d4edda;
+      color: #155724;
+      padding: 0.2cm;
+      border-radius: 0.2cm;
+      z-index: 10000;
+      box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.3);
+    }
+
+    .no-print { }
+
+    @media print {
+      .no-print { display: none !important; }
+      body {
+        margin: 0;
+        padding: 0.3cm;
+        font-size: 16px;
+        background-color: #ffffff !important;
+      }
+      .page {
+        page-break-after: always;
+      }
+      .carteirinha,
+      .status,
+      .card-header-band,
+      .year-pill {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      #relatorio-container {
+        display: none !important;
+      }
+    }
+
+    .imprimir-carteirinhas {
+      position: fixed;
+      bottom: 0.5cm;
+      right: 0.5cm;
+      background-color: #1976d2;
+      color: #fff;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      box-shadow: 0 0.1cm 0.2cm rgba(0,0,0,0.3);
+      border: none;
+    }
+    .imprimir-carteirinhas:hover {
+      background-color: #0d47a1;
+    }
+
+    .imprimir-pagina {
+      background-color: #ff5722;
+      color: #fff;
+      padding: 0.2cm 0.4cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      margin: 0.2cm auto;
+      display: block;
+      border: none;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.25);
+    }
+    .imprimir-pagina:hover {
+      background-color: #e64a19;
+    }
+
+    .alunos-sem-fotos-btn {
+      background-color: #4B79A1;
+      color: #fff;
+      border: none;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.3cm;
+      border-radius: 0.25cm;
+      cursor: pointer;
+      margin-bottom: 0.2cm;
+      box-shadow: 0 0.06cm 0.15cm rgba(0,0,0,0.2);
+    }
+    .alunos-sem-fotos-btn:hover {
+      background-color: #3a5d78;
+    }
+
+    /* ====== RELATÓRIO ALUNOS SEM FOTO (MODAL) ====== */
+
+    #relatorio-container {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    #relatorio-container .relatorio-inner {
+      background: #f5f7fa;
+      border-radius: 0.4cm;
+      max-width: 24cm;
+      width: 100%;
+      max-height: 85vh;
+      box-shadow: 0 0.15cm 0.4cm rgba(0,0,0,0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #cfd8dc;
+      position: relative;
+    }
+
+    .relatorio-header {
+      background: linear-gradient(90deg, #283E51, #4B79A1);
+      padding: 0.4cm 0.6cm;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4cm;
+    }
+
+    .relatorio-title-area h2 {
+      margin: 0;
+      font-size: 0.42cm;
+      letter-spacing: 0.08cm;
+      text-transform: uppercase;
+    }
+
+    .badge-pendentes {
+      display: inline-block;
+      margin-top: 0.08cm;
+      padding: 0.12cm 0.35cm;
+      border-radius: 999px;
+      background-color: rgba(255,255,255,0.15);
+      font-size: 0.28cm;
+    }
+
+    #filtro-relatorio {
+      border-radius: 999px;
+      border: none;
+      padding: 0.2cm 0.5cm;
+      font-size: 0.28cm;
+      width: 7cm;
+      outline: none;
+    }
+
+    #relatorio-container button.close-relatorio {
+      position: absolute;
+      top: 0.25cm;
+      right: 0.35cm;
+      border: none;
+      background: transparent;
+      color: #ffffff;
+      font-size: 0.45cm;
+      cursor: pointer;
+    }
+
+    .relatorio-tabela-wrapper {
+      padding: 0.3cm 0.6cm 0.45cm 0.6cm;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .relatorio-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.30cm;
+    }
+
+    .relatorio-table thead th {
+      text-align: left;
+      padding: 0.18cm 0.15cm;
+      color: #607d8b;
+      font-weight: 700;
+      border-bottom: 0.03cm solid #cfd8dc;
+      font-size: 0.29cm;
+    }
+
+    .relatorio-table tbody td {
+      padding: 0.16cm 0.15cm;
+      vertical-align: middle;
+      border-bottom: 0.02cm solid #eceff1;
+    }
+
+    .relatorio-table tbody tr.relatorio-row:nth-child(even) {
+      background-color: #f3f6f9;
+    }
+
+    .serie-divider td {
+      padding: 0.18cm 0.15cm;
+      font-weight: 700;
+      color: #455a64;
+      background-color: #e3f2fd;
+      border-bottom: 0.03cm solid #bbdefb;
+      text-transform: uppercase;
+      letter-spacing: 0.04cm;
+      font-size: 0.29cm;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 0.06cm 0.25cm;
+      border-radius: 999px;
+      font-size: 0.26cm;
+    }
+
+    .badge-status.pendente {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .relatorio-acoes {
+      width: 4cm;
+    }
+
+    .relatorio-acao-link,
+    .relatorio-acao-primary {
+      display: block;
+      width: 100%;
+      border-radius: 0.3cm;
+      border: none;
+      cursor: pointer;
+      font-size: 0.28cm;
+      padding: 0.12cm 0.25cm;
+      margin-bottom: 0.08cm;
+      text-align: center;
+    }
+
+    .relatorio-acao-link {
+      background: #eceff1;
+      color: #37474f;
+    }
+
+    .relatorio-acao-primary {
+      background: #1976d2;
+      color: #ffffff;
+    }
+
+    .relatorio-acao-link i,
+    .relatorio-acao-primary i {
+      margin-right: 0.1cm;
+    }
+
+    .card-highlight {
+      box-shadow: 0 0 0 0.15cm rgba(255, 193, 7, 0.9) !important;
+      transition: box-shadow 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div style="text-align: center; color: white;">
+      <div class="spinner-border" role="status">
+        <span class="sr-only">Carregando...</span>
+      </div>
+      <p>Carregando carteirinhas...</p>
+    </div>
+  </div>
+  <div id="cards-success">Carteirinhas geradas com sucesso</div>
+
+  <div class="carteirinhas-container">
+    <div class="no-print" style="margin-bottom: 10px;">
+      <button class="alunos-sem-fotos-btn" onclick="mostrarRelatorioAlunosSemFotos()">Alunos sem fotos</button>
+      <button class="imprimir-carteirinhas" onclick="imprimirCarteirinhas()">Imprimir Carteirinhas</button>
+    </div>
+    <div id="search-container" class="no-print">
+      <input type="text" id="localizarAluno" placeholder="Localizar Aluno">
+    </div>
+
+    {% if pages %}
+      {% for page in pages %}
+        <div class="page">
+          <div class="page-number">Página {{ loop.index }}</div>
+          <button class="imprimir-pagina no-print" onclick="imprimirPagina(this)">Imprimir Página</button>
+          <div class="cards-grid">
+            {% for aluno in page %}
+              <div class="borda-pontilhada" data-rm="{{ aluno.rm }}">
+                <div class="carteirinha">
+                  <div class="card-header-band">E.M JOSÉ PADIN MOUTA</div>
+                  <div class="card-body">
+                    <div class="photo-wrapper">
+                      {% if aluno.foto_url %}
+                        <img src="{{ aluno.foto_url }}" alt="Foto" class="foto uploadable" data-rm="{{ aluno.rm }}">
+                      {% else %}
+                        <div class="foto uploadable" data-rm="{{ aluno.rm }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                          <span style="font-size:1.0cm; opacity:0.5; color: grey; margin-bottom: 0.1cm;">&#128247;</span>
+                          <small style="font-size:0.24cm; opacity:0.7; color: grey;">Anexe uma foto</small>
+                        </div>
+                      {% endif %}
+                      <input type="file" class="inline-upload" data-rm="{{ aluno.rm }}" style="display:none;" accept="image/*">
+                    </div>
+                    <div class="info-panel">
+                      <div class="info-name">
+                        <div class="info-name-label">Nome</div>
+                        <div class="info-name-text">{{ aluno.nome }}</div>
+                      </div>
+                      <div class="info-row">
+                        <div class="info-label">RM:</div>
+                        <div class="info-value">{{ aluno.rm }}</div>
+                      </div>
+                      <div class="info-row">
+                        <div class="info-label">Série:</div>
+                        <div class="info-value">{{ aluno.serie }}</div>
+                      </div>
+                      <div class="info-row">
+                        <div class="info-label">Data nasc.:</div>
+                        <div class="info-value">{{ aluno.data_nasc }}</div>
+                      </div>
+                      <div class="info-row">
+                        <div class="info-label">RA:</div>
+                        <div class="info-value">{{ aluno.ra }}</div>
+                      </div>
+                      <div class="info-row">
+                        <div class="info-label">Horário:</div>
+                        <div class="info-value">{{ aluno.horario }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card-footer">
+                    <div class="status {{ aluno.classe_cor }}">
+                      <span class="icon">{{ aluno.status_icon|safe }}</span>
+                      <span class="status-text">{{ aluno.status_texto }}</span>
+                    </div>
+                    <div class="year-pill">2025</div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div id="relatorio-container" class="no-print">
+    <div class="relatorio-inner">
+      <div class="relatorio-header">
+        <div class="relatorio-title-area">
+          <h2>Alunos sem foto</h2>
+          <span class="badge-pendentes" data-total="{{ total_sem_foto }}">{{ total_sem_foto }} pendente(s)</span>
+        </div>
+        <input type="text" id="filtro-relatorio" placeholder="Filtrar por nome, RM ou série">
+        <button class="close-relatorio" onclick="fecharRelatorio()">&times;</button>
+      </div>
+      <div class="relatorio-tabela-wrapper">
+        <table class="relatorio-table">
+          <thead>
+            <tr>
+              <th>RM</th>
+              <th>Nome</th>
+              <th>Série</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set grupos = alunos_sem_foto|groupby('serie') %}
+            {% for grupo in grupos|sort(attribute='grouper') %}
+              <tr class="serie-divider"><td colspan="5">{{ grupo.grouper }}</td></tr>
+              {% for aluno in grupo.list %}
+                <tr class="relatorio-row" data-rm="{{ aluno.rm }}" data-nome="{{ aluno.nome }}" data-serie="{{ aluno.serie }}">
+                  <td class="col-rm">{{ aluno.rm }}</td>
+                  <td class="col-nome">{{ aluno.nome }}</td>
+                  <td class="col-serie">{{ aluno.serie }}</td>
+                  <td class="col-status"><span class="badge-status pendente">Pendente</span></td>
+                  <td class="relatorio-acoes">
+                    <button type="button" class="relatorio-acao-link" onclick="verCarteirinha('{{ aluno.rm }}')">
+                      <i class="fas fa-eye"></i> Ver carteirinha
+                    </button>
+                    <button type="button" class="relatorio-acao-primary" onclick="abrirUploadFoto('{{ aluno.rm }}')">
+                      <i class="fas fa-camera"></i> Adicionar foto
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+function showLoading() {
+    var existingOverlay = document.getElementById('loading-overlay');
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+
+    var loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay';
+    loadingOverlay.style.position = 'fixed';
+    loadingOverlay.style.top = '0';
+    loadingOverlay.style.left = '0';
+    loadingOverlay.style.right = '0';
+    loadingOverlay.style.bottom = '0';
+    loadingOverlay.style.background = 'rgba(0,0,0,0.5)';
+    loadingOverlay.style.display = 'flex';
+    loadingOverlay.style.alignItems = 'center';
+    loadingOverlay.style.justifyContent = 'center';
+    loadingOverlay.style.zIndex = '9999';
+
+    loadingOverlay.innerHTML = 
+      `<div style="text-align: center; color: white; font-family: Arial, sans-serif;">
+        <svg width="3.0cm" height="4.5cm" viewBox="0 0 6.0 9.0" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.3" y="0.3" width="5.4" height="8.4" rx="0.3" ry="0.3" stroke="white" stroke-width="0.1" fill="none" />
+          <rect id="badge-fill" x="0.3" y="8.7" width="5.4" height="0" rx="0.3" ry="0.3" fill="white" />
+        </svg>
+        <p id="loading-text" style="margin-top: 0.2cm;">Gerando carteirinhas...</p>
+      </div>`;
+
+    document.body.appendChild(loadingOverlay);
+
+    let fillHeight = 0;
+    const maxHeight = 8.4;
+    function animateBadge() {
+      fillHeight += 0.2;
+      if (fillHeight > maxHeight) {
+        fillHeight = maxHeight;
+        clearInterval(interval);
+      }
+      const badgeFill = document.getElementById('badge-fill');
+      if (badgeFill) {
+        badgeFill.setAttribute('y', 8.7 - fillHeight);
+        badgeFill.setAttribute('height', fillHeight);
+      }
+    }
+
+    var interval = setInterval(animateBadge, 100);
+    loadingOverlay.dataset.animationId = interval;
+}
+
+showLoading();
+
+window.onload = function() {
+    var overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      var animationId = Number(overlay.dataset.animationId);
+      if (animationId) {
+        clearInterval(animationId);
+      }
+      overlay.style.display = 'none';
+    }
+    var cardsMsg = document.getElementById('cards-success');
+    if (cardsMsg) {
+      cardsMsg.style.display = 'block';
+      cardsMsg.innerHTML = 'Carteirinhas geradas com sucesso!';
+      setTimeout(function() {
+        cardsMsg.style.display = 'none';
+      }, 3000);
+    }
+};
+
+function imprimirCarteirinhas() {
+    var container = document.querySelector('.carteirinhas-container');
+    if (!container) {
+      window.print();
+      return;
+    }
+
+    var styleTag = document.querySelector('style');
+    var css = styleTag ? styleTag.innerHTML : '';
+
+    var printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(
+      '<!DOCTYPE html><html lang="pt-br"><head>' +
+      '<meta charset="utf-8"><title>Carteirinhas - Impressão</title>' +
+      '<style>' + css + '</style>' +
+      '</head><body>' +
+      container.outerHTML +
+      '</body></html>'
+    );
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = function() {
+      printWindow.print();
+      printWindow.close();
+    };
+}
+
+function imprimirPagina(botao) {
+    let pagina = botao.closest('.page');
+    let todasPaginas = document.querySelectorAll('.page');
+    todasPaginas.forEach(p => {
+      if (p !== pagina) {
+        p.style.display = 'none';
+      }
+    });
+    setTimeout(() => {
+      window.print();
+      todasPaginas.forEach(p => {
+        p.style.display = '';
+      });
+    }, 100);
+}
+
+function mostrarRelatorioAlunosSemFotos() {
+    var container = document.getElementById('relatorio-container');
+    if (container) {
+      container.style.display = 'flex';
+    }
+}
+
+function fecharRelatorio() {
+    var container = document.getElementById('relatorio-container');
+    if (container) {
+      container.style.display = 'none';
+    }
+}
+
+function verCarteirinha(rm) {
+    fecharRelatorio();
+    var card = document.querySelector('.borda-pontilhada[data-rm="' + rm + '"]');
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('card-highlight');
+      setTimeout(function() {
+        card.classList.remove('card-highlight');
+      }, 1500);
+    }
+}
+
+function abrirUploadFoto(rm) {
+    var input = document.querySelector('.inline-upload[data-rm="' + rm + '"]');
+    if (input) {
+      input.click();
+    } else {
+      alert('Não foi possível localizar o campo de upload dessa carteirinha.');
+    }
+}
+
+function removerAlunoSemFotoDaTabela(rm) {
+    var row = document.querySelector('#relatorio-container .relatorio-row[data-rm="' + rm + '"]');
+    if (!row) return;
+
+    var tbody = row.parentNode;
+    var prev = row.previousElementSibling;
+    var divider = null;
+    while (prev) {
+      if (prev.classList.contains('serie-divider')) {
+        divider = prev;
+        break;
+      }
+      if (prev.classList.contains('relatorio-row')) break;
+      prev = prev.previousElementSibling;
+    }
+
+    tbody.removeChild(row);
+
+    if (divider) {
+      var hasVisible = false;
+      var next = divider.nextElementSibling;
+      while (next && !next.classList.contains('serie-divider')) {
+        if (next.classList.contains('relatorio-row')) {
+          hasVisible = true;
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+      if (!hasVisible) {
+        tbody.removeChild(divider);
+      }
+    }
+
+    var badge = document.querySelector('.badge-pendentes');
+    if (badge) {
+      var atual = parseInt(badge.dataset.total || '0', 10);
+      var novo = Math.max(atual - 1, 0);
+      badge.dataset.total = String(novo);
+      badge.textContent = novo + (novo === 1 ? ' pendente' : ' pendente(s)');
+    }
+}
+
+function filtrarRelatorio() {
+    var input = document.getElementById('filtro-relatorio');
+    if (!input) return;
+    var termo = input.value.toLowerCase();
+
+    var linhas = document.querySelectorAll('#relatorio-container .relatorio-row');
+    linhas.forEach(function(linha) {
+      var texto = (linha.dataset.rm + ' ' + linha.dataset.nome + ' ' + linha.dataset.serie).toLowerCase();
+      linha.style.display = texto.indexOf(termo) > -1 ? '' : 'none';
+    });
+
+    var divisores = document.querySelectorAll('#relatorio-container .serie-divider');
+    divisores.forEach(function(div) {
+      var next = div.nextElementSibling;
+      var hasVisible = false;
+      while (next && !next.classList.contains('serie-divider')) {
+        if (next.classList.contains('relatorio-row') && next.style.display !== 'none') {
+          hasVisible = true;
+          break;
+        }
+        next = next.nextElementSibling;
+      }
+      div.style.display = hasVisible ? '' : 'none';
+    });
+}
+
+var filtroRelatorioInput = document.getElementById('filtro-relatorio');
+if (filtroRelatorioInput) {
+  filtroRelatorioInput.addEventListener('input', filtrarRelatorio);
+}
+
+document.getElementById('localizarAluno').addEventListener('keyup', function() {
+    var filtro = this.value.toLowerCase();
+    var cards = document.querySelectorAll('.borda-pontilhada');
+    cards.forEach(function(card) {
+      var nomeElem = card.querySelector('.info-name-text');
+      if (nomeElem) {
+        var nome = nomeElem.textContent.toLowerCase();
+        if (nome.indexOf(filtro) > -1) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      }
+    });
+});
+
+var flashTimeout = null;
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.uploadable').forEach(function(element) {
+      element.addEventListener('click', function() {
+        var rm = element.getAttribute('data-rm');
+        var input = document.querySelector('.inline-upload[data-rm="' + rm + '"]');
+        if(input) {
+          input.click();
+        }
+      });
+    });
+
+    document.querySelectorAll('.inline-upload').forEach(function(input) {
+      input.addEventListener('change', function() {
+        var file = input.files[0];
+        if(file) {
+          var rm = input.getAttribute('data-rm');
+          var formData = new FormData();
+          formData.append('rm', rm);
+          formData.append('foto_file', file);
+
+          fetch('/upload_inline_foto', {
+            method: 'POST',
+            body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+            if(data.url) {
+              var uploadable = document.querySelector('.uploadable[data-rm="' + rm + '"]');
+              if(uploadable.tagName.toLowerCase() === 'img') {
+                uploadable.src = data.url;
+              } else {
+                var img = document.createElement('img');
+                img.src = data.url;
+                img.alt = "Foto";
+                img.className = "foto uploadable";
+                img.setAttribute('data-rm', rm);
+                uploadable.parentNode.replaceChild(img, uploadable);
+              }
+              removerAlunoSemFotoDaTabela(rm);
+
+              var msgDiv = document.getElementById('upload-success');
+              if(!msgDiv) {
+                msgDiv = document.createElement('div');
+                msgDiv.id = 'upload-success';
+                msgDiv.style.position = 'fixed';
+                msgDiv.style.top = '0.2cm';
+                msgDiv.style.right = '0.2cm';
+                msgDiv.style.backgroundColor = '#d4edda';
+                msgDiv.style.color = '#155724';
+                msgDiv.style.padding = '0.2cm';
+                msgDiv.style.borderRadius = '0.2cm';
+                document.body.appendChild(msgDiv);
+              }
+              msgDiv.style.display = 'block';
+              msgDiv.innerHTML = data.message || 'Foto atualizada com sucesso!';
+              if(flashTimeout) {
+                clearTimeout(flashTimeout);
+              }
+              flashTimeout = setTimeout(function() {
+                msgDiv.style.display = 'none';
+              }, 3000);
+            } else {
+              alert("Erro ao fazer upload: " + (data.error || "Erro desconhecido"));
+            }
+          })
+          .catch(error => {
+            console.error('Erro:', error);
+            alert("Erro no upload da foto.");
+          });
+        }
+      });
+    });
+});
+</script>
+</body>
+</html>

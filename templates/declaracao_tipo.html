@@ -1,0 +1,1616 @@
+{% extends "base.html" %}  
+
+{% block title %}Declaração Escolar - Tipo{% endblock %}
+
+{# CSS externos (Select2) #}
+{% block extra_css %}
+  {{ super() }}
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+{% endblock %}
+
+{# CSS específico desta página (apenas regras, sem <style>) #}
+{% block extra_styles %}
+
+  .page-card {
+    position: relative;
+    z-index: 1;
+    background: #fdfdfd;
+    padding: 32px 32px 40px;
+    border-radius: 18px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    max-width: 980px;
+    color: #283E51;
+  }
+
+  .page-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    color: #283E51;
+  }
+
+  .page-subtitle {
+    text-align: center;
+    font-size: 0.95rem;
+    color: #5b6f92;
+    margin-bottom: 16px;
+  }
+
+  .page-subtitle strong {
+    color: #283E51;
+  }
+
+  /* Indicador de passo (tutorial) */
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #1e293b;
+    font-size: 0.9rem;
+    margin-bottom: 18px;
+  }
+
+  .step-indicator i {
+    color: #4B79A1;
+    font-size: 1rem;
+  }
+
+  .segmento-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .segmento-card {
+    border-radius: 14px;
+    border: 2px solid #dde3ea;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    text-decoration: none;
+    background: linear-gradient(135deg, #f7fbff, #ffffff);
+    transition: all 0.18s ease-in-out;
+    color: #283E51;
+  }
+
+  .segmento-card-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #e3f2fd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1e88e5;
+    flex-shrink: 0;
+  }
+
+  .segmento-card-title {
+    font-weight: 700;
+    font-size: 0.98rem;
+  }
+
+  .segmento-card-text {
+    margin: 2px 0 0;
+    font-size: 0.84rem;
+    color: #607d8b;
+  }
+
+  .segmento-card:hover {
+    border-color: #4B79A1;
+    box-shadow: 0 10px 22px rgba(75, 121, 161, 0.25);
+    transform: translateY(-1px);
+  }
+
+  .segmento-card.ativo {
+    border-color: #283E51;
+    box-shadow: 0 12px 26px rgba(40, 62, 81, 0.35);
+    background: linear-gradient(135deg, #f0f6ff, #ffffff);
+  }
+
+  /* Destaque do tutorial no bloco de segmentos */
+  @keyframes tutorialPulse {
+    0% {
+      transform: translateY(0);
+      box-shadow: 0 0 0 0 rgba(75, 121, 161, 0.0);
+    }
+    50% {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(75, 121, 161, 0.35);
+    }
+    100% {
+      transform: translateY(0);
+      box-shadow: 0 0 0 0 rgba(75, 121, 161, 0.0);
+    }
+  }
+
+  .segmento-cards.step-highlight .segmento-card {
+    border-color: #4B79A1;
+    animation: tutorialPulse 1.8s ease-in-out infinite;
+  }
+
+  .status-alert {
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    margin-bottom: 18px;
+  }
+
+  .status-alert.success {
+    background: #e3f8e6;
+    border: 1px solid #52b56b;
+    color: #256029;
+  }
+
+  .status-alert.info {
+    background: #e3f5ff;
+    border: 1px solid #49a3ff;
+    color: #0a4b78;
+  }
+
+  .status-alert i {
+    margin-right: 8px;
+  }
+
+  .form-section-title {
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #283E51;
+  }
+
+  .form-section-title i {
+    margin-right: 6px;
+    color: #283E51;
+  }
+
+  .page-card label {
+    color: #37474f;
+  }
+
+  .page-card .form-control {
+    border-radius: 10px;
+    border: 1px solid #d0d7de;
+    font-size: 0.94rem;
+    color: #283E51;
+    background-color: #ffffff;
+  }
+
+  .page-card .form-control:focus {
+    border-color: #4B79A1;
+    box-shadow: 0 0 0 0.15rem rgba(75, 121, 161, 0.25);
+  }
+
+  /* Select2 – mesmos estilos para todos os selects */
+  .select2-container--default .select2-selection--single {
+    border-radius: 10px;
+    border: 1px solid #d0d7de;
+    height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: #283E51 !important;
+    padding-left: 12px;
+    font-size: 0.94rem;
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100%;
+    right: 8px;
+  }
+
+  .select2-dropdown {
+    border-radius: 10px;
+    border: 1px solid #d0d7de;
+  }
+
+  .select2-search--dropdown .select2-search__field {
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    font-size: 0.9rem;
+  }
+
+  .select2-results__option {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    color: #283E51 !important;
+  }
+
+  .select2-results__option--highlighted {
+    background-color: #4B79A1 !important;
+    color: #ffffff !important;
+  }
+
+  /* Esconde o "X" de limpar do Select2 */
+  .select2-container--default .select2-selection--single .select2-selection__clear {
+    display: none !important;
+  }
+
+  #historico-container,
+  #unidade-anterior-container {
+    display: none;
+    border-radius: 12px;
+    border: 1px dashed #cfd8dc;
+    padding: 12px 14px;
+    background: #f8fafc;
+    margin-bottom: 16px;
+  }
+
+  #historico-container legend,
+  #unidade-anterior-container legend {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #37474f;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #historico-container legend i,
+  #unidade-anterior-container legend i {
+    color: #283E51;
+    font-size: 0.9rem;
+  }
+
+  /* Destaque do passo atual (campos do formulário) – com pulso */
+  .step-highlight-field {
+    position: relative;
+    border-radius: 12px;
+    box-shadow: 0 0 0 2px rgba(75, 121, 161, 0.55), 0 8px 18px rgba(15, 23, 42, 0.25);
+    background: linear-gradient(135deg, #f0f4ff, #ffffff);
+    animation: tutorialPulse 1.8s ease-in-out infinite;
+  }
+
+  .declaracao-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+
+  .btn-declaracao,
+  .btn-lote,
+  .btn-voltar,
+  .btn-clear {
+    border-radius: 999px;
+    padding: 10px 24px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-declaracao {
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(40, 62, 81, 0.35);
+  }
+
+  /* ESTADO INATIVO do botão Gerar declaração */
+  .btn-declaracao:disabled {
+    background: #cbd5e1;
+    color: #9ca3af;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+    animation: none;
+    opacity: 0.9;
+  }
+
+  .btn-lote {
+    background: #28a745;
+    color: #fff;
+  }
+  .btn-lote:hover {
+    background: #218838;
+    color: #fff;
+  }
+
+  .btn-voltar {
+    background: #e0e7ff;
+    color: #283E51;
+  }
+  .btn-voltar:hover {
+    background: #c7d2ff;
+    color: #1f2933;
+  }
+
+  .btn-clear {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .btn-clear:hover {
+    background: #fecaca;
+    color: #7f1d1d;
+  }
+
+  /* Animação suave no botão Gerar declaração (quando habilitado) */
+  @keyframes pulseBtn {
+    0% {
+      transform: translateY(0) scale(1);
+      box-shadow: 0 4px 10px rgba(40, 62, 81, 0.35);
+    }
+    50% {
+      transform: translateY(-1px) scale(1.03);
+      box-shadow: 0 10px 22px rgba(75, 121, 161, 0.45);
+    }
+    100% {
+      transform: translateY(0) scale(1);
+      box-shadow: 0 4px 10px rgba(40, 62, 81, 0.35);
+    }
+  }
+
+  .btn-declaracao:not(:disabled) {
+    animation: pulseBtn 2s ease-in-out infinite;
+  }
+
+  .btn-declaracao.step-highlight-field {
+    animation: tutorialPulse 1.8s ease-in-out infinite !important;
+  }
+
+  /* Overlay de carregamento */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .loading-box {
+    background: #ffffff;
+    padding: 22px 26px;
+    border-radius: 14px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+    text-align: center;
+    min-width: 260px;
+    color: #283E51;
+  }
+
+  .loading-spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 4px solid #4B79A1;
+    border-top-color: transparent;
+    margin: 0 auto 12px;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  /* ------------------------------ */
+  /* Modal de confirmação customizado (Fundamental/EJA) */
+  /* ------------------------------ */
+
+  .confirm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+  }
+
+  .confirm-modal-overlay.show {
+    display: flex;
+  }
+
+  .confirm-modal-box {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    padding: 18px 22px 20px;
+    max-width: 480px;
+    width: calc(100% - 32px);
+    color: #111827;
+  }
+
+  .confirm-modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .confirm-modal-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: #eff6ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1d4ed8;
+    flex-shrink: 0;
+  }
+
+  .confirm-modal-headline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .confirm-modal-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #6b7280;
+  }
+
+  .confirm-modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+  }
+
+  .confirm-modal-body {
+    font-size: 0.94rem;
+    color: #4b5563;
+    margin: 0;
+  }
+
+  .confirm-modal-body + .confirm-modal-body {
+    margin-top: 6px;
+    margin-bottom: 18px;
+  }
+
+  .confirm-modal-body strong {
+    color: #111827;
+  }
+
+  .confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .confirm-btn {
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .confirm-btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+  }
+  .confirm-btn-secondary:hover {
+    background: #d1d5db;
+  }
+
+  .confirm-btn-primary {
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(40, 62, 81, 0.45);
+  }
+  .confirm-btn-primary:hover {
+    filter: brightness(1.05);
+  }
+
+  /* ------------------------------ */
+  /* Tutorial interativo - tip mais afastado do ícone (libs externas) */
+  /* ------------------------------ */
+
+  .driver-popover,
+  .introjs-tooltip {
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+  }
+
+  @media (max-width: 768px) {
+    .page-card {
+      padding: 24px 18px 30px;
+    }
+    .segmento-cards {
+      grid-template-columns: 1fr;
+    }
+    .declaracao-actions {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .declaracao-actions .btn-declaracao,
+    .declaracao-actions .btn-lote,
+    .declaracao-actions .btn-voltar,
+    .declaracao-actions .btn-clear {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+{% endblock %}
+
+{% block content %}
+  <div class="page-card">
+    <h2 class="page-title">Selecione o tipo de declaração</h2>
+    <p class="page-subtitle">
+      Escolha se a declaração será emitida para aluno do
+      <strong>Ensino Fundamental</strong>, da <strong>EJA</strong>
+      ou utilize a opção de <strong>Declaração Personalizada</strong>
+      para casos em que o aluno não está mais ativo na unidade.
+    </p>
+
+    <div id="step-indicator" class="step-indicator">
+      <i class="fas fa-route"></i>
+      <span id="step-indicator-text">
+        Siga os passos abaixo para gerar a declaração.
+      </span>
+    </div>
+
+    <div class="segmento-cards">
+      <a href="{{ url_for('declaracao_tipo', segmento='Fundamental') }}"
+         class="segmento-card {% if segmento == 'Fundamental' %}ativo{% endif %}">
+        <div class="segmento-card-icon">
+          <i class="fas fa-child"></i>
+        </div>
+        <div>
+          <div class="segmento-card-title">Declaração Fundamental</div>
+          <p class="segmento-card-text">
+            Emitida para alunos do Ensino Fundamental (2º ao 5º ano) da unidade.
+          </p>
+        </div>
+      </a>
+
+      <a href="{{ url_for('declaracao_tipo', segmento='EJA') }}"
+         class="segmento-card {% if segmento == 'EJA' %}ativo{% endif %}">
+        <div class="segmento-card-icon">
+          <i class="fas fa-moon"></i>
+        </div>
+        <div>
+          <div class="segmento-card-title">Declaração EJA</div>
+          <p class="segmento-card-text">
+            Emitida para estudantes matriculados na Educação de Jovens e Adultos (EJA).
+          </p>
+        </div>
+      </a>
+
+      <a href="{{ url_for('declaracao_tipo', segmento='Personalizado') }}"
+         class="segmento-card {% if segmento == 'Personalizado' %}ativo{% endif %}">
+        <div class="segmento-card-icon">
+          <i class="fas fa-user-edit"></i>
+        </div>
+        <div>
+          <div class="segmento-card-title">Declaração Personalizada</div>
+          <p class="segmento-card-text">
+            Para alunos que não constam mais na base ativa: dados preenchidos manualmente.
+          </p>
+        </div>
+      </a>
+    </div>
+
+    {# Mensagens #}
+    {% if not segmento %}
+      <div class="status-alert info">
+        <i class="fas fa-info-circle"></i>
+        Selecione um dos cartões acima para iniciar a emissão de declarações.
+      </div>
+    {% elif segmento == 'Personalizado' %}
+      <div class="status-alert info">
+        <i class="fas fa-info-circle"></i>
+        Você está na área de <strong>Declaração Personalizada</strong>. Os dados do aluno
+        serão preenchidos manualmente, inclusive segmento, ano/série e tipo de declaração.
+      </div>
+    {% else %}
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% set cls = 'info' %}
+            {% if category == 'success' %}{% set cls = 'success' %}{% endif %}
+            {% if category == 'error' %}{% set cls = 'info' %}{% endif %}
+            <div class="status-alert {{ cls }}">
+              <i class="fas fa-info-circle"></i> {{ message }}
+            </div>
+          {% endfor %}
+        {% else %}
+          {% if tem_lista %}
+            <div class="status-alert success">
+              <i class="fas fa-check-circle"></i>
+              Lista do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} já carregada.
+              Vamos utilizar a lista piloto enviada ao entrar no sistema para gerar as declarações.
+            </div>
+          {% else %}
+            <div class="status-alert info">
+              <i class="fas fa-info-circle"></i>
+              Nenhuma lista piloto do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} foi encontrada.
+              Anexe o arquivo em Excel abaixo para gerar as declarações.
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+
+    {# FORMULÁRIOS #}
+    {% if segmento == 'Personalizado' %}
+      {# --- FORMULÁRIO DE DECLARAÇÃO PERSONALIZADA --- #}
+      <form id="form-declaracao-personalizada" method="POST">
+        <input type="hidden" name="modo_declaracao" value="personalizada">
+
+        {# PASSO 1 – SEGMENTO #}
+        <div class="form-group" id="group-segmento-perso">
+          <div class="form-section-title">
+            <i class="fas fa-layer-group"></i> Segmento da declaração:
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio"
+                   name="segmento_personalizado" id="seg_fund" value="Fundamental">
+            <label class="form-check-label" for="seg_fund">Ensino Fundamental</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio"
+                   name="segmento_personalizado" id="seg_eja" value="EJA">
+            <label class="form-check-label" for="seg_eja">EJA</label>
+          </div>
+        </div>
+
+        {# PASSO 2 – DADOS BÁSICOS (aparecem após escolher segmento) #}
+        <div id="group-dados-basicos" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-id-card"></i> Dados básicos do aluno:
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="nome_aluno">Nome completo do aluno:</label>
+              <input type="text" id="nome_aluno" name="nome_aluno"
+                     class="form-control" required>
+            </div>
+            <div class="form-group col-md-3">
+              <label for="data_nascimento">Data de nascimento:</label>
+              <input type="date" id="data_nascimento" name="data_nascimento"
+                     class="form-control" required>
+            </div>
+            <div class="form-group col-md-3">
+              <label for="ra">RA:</label>
+              <input type="text" id="ra" name="ra"
+                     class="form-control" required>
+            </div>
+          </div>
+        </div>
+
+        {# PASSO 3 – TIPO (aparece após dados básicos) #}
+        <div class="form-group" id="group-tipo-perso" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-file-alt"></i> Tipo de declaração:
+          </div>
+          <select id="tipo_declaracao_personalizada"
+                  name="tipo_declaracao_personalizada"
+                  class="form-control" required>
+            <option value="">Selecione</option>
+            <option value="Conclusao">Conclusão</option>
+            <option value="MatriculaCancelada">Matrícula cancelada</option>
+            <option value="NCOM">Não Comparecimento (NCOM)</option>
+          </select>
+        </div>
+
+        {# PASSO 4 – DADOS ESPECÍFICOS (mostrados conforme tipo) #}
+
+        {# BLOCO – CONCLUSÃO #}
+        <div id="box-conclusao" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-check-double"></i> Dados para declaração de conclusão:
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="ano_serie_concluida">Ano/série concluída:</label>
+              <select id="ano_serie_concluida" name="ano_serie_concluida"
+                      class="form-control">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="ano_conclusao">Ano de conclusão:</label>
+              <select id="ano_conclusao" name="ano_conclusao"
+                      class="form-control year-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="group-semestre-conclusao">
+            <label class="d-block">Semestre da conclusão (somente para EJA):</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="semestre_conclusao" id="sem_conc_1" value="1º semestre">
+              <label class="form-check-label" for="sem_conc_1">1º semestre</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="semestre_conclusao" id="sem_conc_2" value="2º semestre">
+              <label class="form-check-label" for="sem_conc_2">2º semestre</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="d-block">Deve histórico escolar da unidade?</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="deve_historico_unidade" id="hist_unid_sim" value="Sim">
+              <label class="form-check-label" for="hist_unid_sim">Sim</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio"
+                     name="deve_historico_unidade" id="hist_unid_nao" value="Não">
+              <label class="form-check-label" for="hist_unid_nao">Não</label>
+            </div>
+          </div>
+        </div>
+
+        {# BLOCO – MATRÍCULA CANCELADA #}
+        <div id="box-matricula" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-user-times"></i> Dados para matrícula cancelada:
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="ano_serie_matricula">Ano/série da matrícula:</label>
+              <select id="ano_serie_matricula" name="ano_serie_matricula"
+                      class="form-control">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="ano_matricula">Ano da matrícula:</label>
+              <select id="ano_matricula" name="ano_matricula"
+                      class="form-control year-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4" id="group-semestre-matricula">
+              <label class="d-block">Semestre da matrícula (somente para EJA):</label>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_matricula_opcao" id="sem_mat_1" value="1º semestre">
+                <label class="form-check-label" for="sem_mat_1">1º semestre</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_matricula_opcao" id="sem_mat_2" value="2º semestre">
+                <label class="form-check-label" for="sem_mat_2">2º semestre</label>
+              </div>
+            </div>
+          </div>
+          {# campo oculto que será enviado para o backend #}
+          <input type="hidden" id="semestre_matricula_hidden" name="semestre_matricula" value="">
+        </div>
+
+        {# BLOCO – NCOM #}
+        <div id="box-ncom" style="display:none;">
+          <div class="form-section-title">
+            <i class="fas fa-user-slash"></i> Dados para Não Comparecimento (NCOM):
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="ano_serie_vaga">Ano/série da vaga:</label>
+              <select id="ano_serie_vaga" name="ano_serie_vaga"
+                      class="form-control">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="ano_referencia_ncom">Ano de referência:</label>
+              <select id="ano_referencia_ncom" name="ano_referencia_ncom"
+                      class="form-control year-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4" id="group-semestre-ncom">
+              <label class="d-block">Semestre de referência (somente para EJA / opcional):</label>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_referencia_ncom" id="sem_ncom_1" value="1º semestre">
+                <label class="form-check-label" for="sem_ncom_1">1º semestre</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio"
+                       name="semestre_referencia_ncom" id="sem_ncom_2" value="2º semestre">
+                <label class="form-check-label" for="sem_ncom_2">2º semestre</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="declaracao-actions">
+          <button type="submit" id="btn-gerar-personalizada"
+                  class="btn-declaracao" disabled>
+            <i class="fas fa-file-signature"></i> Gerar declaração personalizada
+          </button>
+
+          <button type="button" id="btn-limpar-personalizada" class="btn-clear">
+            <i class="fas fa-eraser"></i> Limpar campos
+          </button>
+
+          <a href="{{ dashboard_url }}" class="btn-voltar">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+        </div>
+      </form>
+
+    {% elif segmento %}
+      {# --- FORMULÁRIO PADRÃO (Fundamental / EJA) --- #}
+      <form id="form-declaracao" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="segmento_escolhido" value="{{ segmento }}">
+
+        {% if not tem_lista %}
+          <div class="form-group">
+            <div class="form-section-title">
+              <i class="fas fa-file-excel"></i>
+              Lista piloto - {{ 'ENSINO FUNDAMENTAL' if segmento == 'Fundamental' else 'EJA' }} (Excel):
+            </div>
+            <input type="file" class="form-control-file" name="excel_file"
+                   accept=".xlsx,.xls,.xlsm">
+          </div>
+        {% endif %}
+
+        <div class="form-group" id="group-aluno">
+          <div class="form-section-title">
+            <i class="fas fa-user-graduate"></i> Aluno:
+          </div>
+          <select id="rm" name="rm" class="form-control" required>
+            <option value="">Selecione o aluno</option>
+            {% for a in alunos %}
+              <option value="{{ a.rm }}">{{ a.rm }} - {{ a.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" id="group-tipo">
+          <div class="form-section-title">
+            <i class="fas fa-file-alt"></i> Tipo de declaração:
+          </div>
+          <select id="tipo" name="tipo" class="form-control" required>
+            <option value="">Selecione</option>
+            <option value="Escolaridade">Declaração de Escolaridade</option>
+            <option value="Transferencia">Declaração de Transferência</option>
+            <option value="Conclusão">Declaração de Conclusão</option>
+          </select>
+        </div>
+
+        <div id="historico-container">
+          <legend>
+            <i class="fas fa-scroll"></i>
+            Histórico escolar
+          </legend>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="deve_historico"
+                   id="historico_sim" value="sim">
+            <label class="form-check-label" for="historico_sim">Deve histórico escolar</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="deve_historico"
+                   id="historico_nao" value="nao">
+            <label class="form-check-label" for="historico_nao">Não deve histórico escolar</label>
+          </div>
+        </div>
+
+        <div id="unidade-anterior-container">
+          <legend>
+            <i class="fas fa-school"></i>
+            Unidade escolar anterior
+          </legend>
+          <div class="form-group mb-2">
+            <label for="unidade_anterior" style="font-size:0.82rem;">Buscar unidade (escolas.csv):</label>
+            <select id="unidade_anterior" name="unidade_anterior_select" style="width: 100%;"></select>
+          </div>
+          <div class="form-group mb-0">
+            <label for="unidade_anterior_manual" style="font-size:0.82rem;">
+              Ou digite o nome da unidade:
+            </label>
+            <input type="text" id="unidade_anterior_manual"
+                   name="unidade_anterior_manual"
+                   class="form-control"
+                   placeholder="Ex: E.E. Nome da Escola">
+          </div>
+        </div>
+
+        <div class="declaracao-actions">
+          <button type="submit" id="btn-gerar" class="btn-declaracao" disabled>
+            <i class="fas fa-file-signature"></i> Gerar declaração
+          </button>
+
+          {% if segmento == 'Fundamental' %}
+          <button type="button" id="btn-5ano" class="btn-lote" style="display:none;">
+            <i class="fas fa-layer-group"></i> Gerar declarações de 5º ano
+          </button>
+          {% endif %}
+
+          <button type="button" id="btn-limpar" class="btn-clear">
+            <i class="fas fa-eraser"></i> Limpar seleção
+          </button>
+
+          <a href="{{ dashboard_url }}" class="btn-voltar">
+            <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+          </a>
+        </div>
+      </form>
+    {% else %}
+      <div class="declaracao-actions">
+        <a href="{{ dashboard_url }}" class="btn-voltar">
+          <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Overlay de carregamento -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Gerando declaração, aguarde...</p>
+    </div>
+  </div>
+
+  <!-- Modal de confirmação (transferência / conclusão – fluxo padrão) -->
+  <div id="confirm-modal" class="confirm-modal-overlay">
+    <div class="confirm-modal-box">
+      <div class="confirm-modal-header">
+        <div class="confirm-modal-icon">
+          <i class="fas fa-info"></i>
+        </div>
+        <div class="confirm-modal-headline">
+          <span class="confirm-modal-tag">Confirmação</span>
+          <h3 class="confirm-modal-title">Confirmar tipo de declaração</h3>
+        </div>
+      </div>
+
+      <p class="confirm-modal-body">
+        Você está prestes a gerar uma declaração de
+        <strong>transferência</strong> ou <strong>conclusão</strong> para o aluno selecionado.
+      </p>
+      <p class="confirm-modal-body">
+        Essa é realmente a declaração correta a ser gerada?
+      </p>
+
+      <div class="confirm-modal-actions">
+        <button type="button" id="confirm-modal-cancel" class="confirm-btn confirm-btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="confirm-modal-confirm" class="confirm-btn confirm-btn-primary">
+          Sim, gerar declaração
+        </button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ super() }}
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+  <script>
+    $(function () {
+
+      {% if segmento == 'Personalizado' %}
+      /* ==========================================================
+         JS – DECLARAÇÃO PERSONALIZADA
+         ========================================================== */
+
+      var passoAtualPersonalizado = null;
+      function aplicarHighlightPersonalizado(selector) {
+        if (passoAtualPersonalizado === selector) {
+          return;
+        }
+        $('.step-highlight-field').removeClass('step-highlight-field');
+        if (selector) {
+          $(selector).addClass('step-highlight-field');
+        }
+        passoAtualPersonalizado = selector;
+      }
+
+      function preencherAnos() {
+        var currentYear = new Date().getFullYear();
+
+        // Quantos anos à frente você quer listar? (aqui coloquei +5)
+        var maxYear = currentYear + 20;
+
+        $('.year-select').each(function () {
+          var $sel = $(this);
+
+          // evita duplicar opções se chamar a função mais de uma vez
+          if ($sel.data('filled')) return;
+
+          // do mais recente (futuro) até 1900
+          for (var y = maxYear; y >= 1900; y--) {
+            var opt = $('<option>').val(y).text(y);
+            $sel.append(opt);
+          }
+
+          $sel.data('filled', true);
+        });
+      }
+
+      function opcoesFundamental() {
+        return [
+          '1º ano','2º ano','3º ano','4º ano','5º ano',
+          '6º ano','7º ano','8º ano','9º ano'
+        ];
+      }
+
+      function opcoesEJA() {
+        return [
+          '1ª Série do Ensino Fundamental',
+          '2ª Série do Ensino Fundamental',
+          '3ª Série do Ensino Fundamental',
+          '4ª Série do Ensino Fundamental',
+          '5ª Série do Ensino Fundamental',
+          '6ª Série do Ensino Fundamental',
+          '7ª Série do Ensino Fundamental',
+          '8ª Série do Ensino Fundamental',
+          '1º Ano do Ensino Médio',
+          '2º Ano do Ensino Médio',
+          '3º Ano do Ensino Médio'
+        ];
+      }
+
+      function atualizarSeriesPersonalizadas() {
+        var seg = $('input[name="segmento_personalizado"]:checked').val();
+        var ids = ['#ano_serie_concluida', '#ano_serie_matricula', '#ano_serie_vaga'];
+
+        if (!seg) {
+          ids.forEach(function (id) {
+            var $sel = $(id);
+            if ($sel.length) {
+              $sel.empty().append($('<option>').val('').text('Selecione'));
+            }
+          });
+          return;
+        }
+
+        var opcoes = seg === 'EJA' ? opcoesEJA() : opcoesFundamental();
+
+        ids.forEach(function (id) {
+          var $sel = $(id);
+          if (!$sel.length) return;
+          $sel.empty().append($('<option>').val('').text('Selecione'));
+          opcoes.forEach(function (txt) {
+            $sel.append($('<option>').val(txt).text(txt));
+          });
+        });
+      }
+
+      // Semestres apenas para EJA (e ajuste do hidden de matrícula)
+      function atualizarSemestresPersonalizados() {
+        var seg = $('input[name="segmento_personalizado"]:checked').val();
+
+        if (seg === 'EJA') {
+          $('#group-semestre-conclusao, #group-semestre-matricula, #group-semestre-ncom').show();
+          $('#semestre_matricula_hidden').val('');
+        } else if (seg === 'Fundamental') {
+          $('#group-semestre-conclusao, #group-semestre-matricula, #group-semestre-ncom').hide();
+          $('input[name="semestre_conclusao"], input[name="semestre_matricula_opcao"], input[name="semestre_referencia_ncom"]')
+            .prop('checked', false);
+          // Fundamental: período anual padrão
+          $('#semestre_matricula_hidden').val('Período anual');
+        } else {
+          $('#group-semestre-conclusao, #group-semestre-matricula, #group-semestre-ncom').hide();
+          $('input[name="semestre_conclusao"], input[name="semestre_matricula_opcao"], input[name="semestre_referencia_ncom"]')
+            .prop('checked', false);
+          $('#semestre_matricula_hidden').val('');
+        }
+      }
+
+      function atualizarBlocosTipoPersonalizado() {
+        var tipo = $('#tipo_declaracao_personalizada').val();
+        $('#box-conclusao, #box-matricula, #box-ncom').hide();
+
+        if (tipo === 'Conclusao') {
+          $('#box-conclusao').show();          // sem animação
+        } else if (tipo === 'MatriculaCancelada') {
+          $('#box-matricula').show();
+        } else if (tipo === 'NCOM') {
+          $('#box-ncom').show();
+        }
+      }
+
+      // Fluxo visual por passos (mostrar/ocultar blocos principais)
+      function atualizarFluxoPersonalizado() {
+        var seg   = $('input[name="segmento_personalizado"]:checked').val();
+        var nome  = ($('#nome_aluno').val() || '').trim();
+        var dataN = $('#data_nascimento').val();
+        var ra    = ($('#ra').val() || '').trim();
+        var tipo  = $('#tipo_declaracao_personalizada').val();
+
+        if (!seg) {
+          $('#group-dados-basicos').hide();
+          $('#group-tipo-perso').hide();
+          $('#box-conclusao, #box-matricula, #box-ncom').hide();
+          return;
+        }
+
+        $('#group-dados-basicos').show();
+
+        if (!nome || !dataN || !ra) {
+          $('#group-tipo-perso').hide();
+          $('#box-conclusao, #box-matricula, #box-ncom').hide();
+          return;
+        }
+
+        $('#group-tipo-perso').show();
+
+        if (!tipo) {
+          $('#box-conclusao, #box-matricula, #box-ncom').hide();
+          return;
+        }
+
+        atualizarBlocosTipoPersonalizado();
+      }
+
+      function validarFormularioPersonalizado() {
+        var seg   = $('input[name="segmento_personalizado"]:checked').val();
+        var nome  = ($('#nome_aluno').val() || '').trim();
+        var dataN = $('#data_nascimento').val();
+        var ra    = ($('#ra').val() || '').trim();
+        var tipo  = $('#tipo_declaracao_personalizada').val();
+
+        var valido = !!seg && !!nome && !!dataN && !!ra && !!tipo;
+
+        if (!valido) {
+          $('#btn-gerar-personalizada').prop('disabled', true);
+          return false;
+        }
+
+        if (tipo === 'Conclusao') {
+          var serieC = $('#ano_serie_concluida').val();
+          var anoC   = $('#ano_conclusao').val();
+          var hist   = $('input[name="deve_historico_unidade"]:checked').val();
+          var semC   = $('input[name="semestre_conclusao"]:checked').val();
+
+          if (!serieC || !anoC || !hist) {
+            valido = false;
+          }
+          if (seg === 'EJA' && !semC) {
+            valido = false;
+          }
+        } else if (tipo === 'MatriculaCancelada') {
+          var serieM = $('#ano_serie_matricula').val();
+          var anoM   = $('#ano_matricula').val();
+          var semM   = $('input[name="semestre_matricula_opcao"]:checked').val();
+
+          if (!serieM || !anoM) {
+            valido = false;
+          }
+          if (seg === 'EJA' && !semM) {
+            valido = false;
+          }
+        } else if (tipo === 'NCOM') {
+          var serieV = $('#ano_serie_vaga').val();
+          var anoN   = $('#ano_referencia_ncom').val();
+          if (!serieV || !anoN) {
+            valido = false;
+          }
+        }
+
+        $('#btn-gerar-personalizada').prop('disabled', !valido);
+        return valido;
+      }
+
+      function atualizarStepPersonalizado() {
+        var $indicatorText = $('#step-indicator-text');
+
+        var seg   = $('input[name="segmento_personalizado"]:checked').val();
+        var nome  = ($('#nome_aluno').val() || '').trim();
+        var dataN = $('#data_nascimento').val();
+        var ra    = ($('#ra').val() || '').trim();
+        var tipo  = $('#tipo_declaracao_personalizada').val();
+
+        var totalSteps = 4;
+
+        if (!seg) {
+          $indicatorText.text('Passo 1 de ' + totalSteps + ': selecione o segmento (Ensino Fundamental ou EJA).');
+          aplicarHighlightPersonalizado('#group-segmento-perso');
+          return;
+        }
+
+        if (!nome || !dataN || !ra) {
+          $indicatorText.text('Passo 2 de ' + totalSteps + ': preencha os dados básicos do aluno.');
+          aplicarHighlightPersonalizado('#group-dados-basicos');
+          return;
+        }
+
+        if (!tipo) {
+          $indicatorText.text('Passo 3 de ' + totalSteps + ': escolha o tipo de declaração (Conclusão, Matrícula cancelada ou NCOM).');
+          aplicarHighlightPersonalizado('#group-tipo-perso');
+          return;
+        }
+
+        if (tipo === 'Conclusao') {
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': preencha o bloco "Dados para declaração de conclusão" e gere a declaração.');
+          aplicarHighlightPersonalizado('#box-conclusao');
+        } else if (tipo === 'MatriculaCancelada') {
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': preencha os dados de matrícula cancelada e gere a declaração.');
+          aplicarHighlightPersonalizado('#box-matricula');
+        } else if (tipo === 'NCOM') {
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': preencha os dados de Não Comparecimento (NCOM) e gere a declaração.');
+          aplicarHighlightPersonalizado('#box-ncom');
+        } else {
+          aplicarHighlightPersonalizado(null);
+        }
+      }
+
+      // === EVENTOS ESPECÍFICOS ===
+
+      // Segmento
+      $('input[name="segmento_personalizado"]').on('change', function () {
+        atualizarSeriesPersonalizadas();
+        atualizarSemestresPersonalizados();
+        atualizarFluxoPersonalizado();
+        validarFormularioPersonalizado();
+        atualizarStepPersonalizado();
+      });
+
+      // Dados básicos
+      $('#nome_aluno, #data_nascimento, #ra').on('keyup change', function () {
+        atualizarFluxoPersonalizado();
+        validarFormularioPersonalizado();
+        atualizarStepPersonalizado();
+      });
+
+      // Tipo de declaração
+      $('#tipo_declaracao_personalizada').on('change', function () {
+        atualizarFluxoPersonalizado();
+        validarFormularioPersonalizado();
+        atualizarStepPersonalizado();
+      });
+
+      // Campos internos dos blocos
+      $('#box-conclusao, #box-matricula, #box-ncom').on('change', 'input, select', function () {
+        validarFormularioPersonalizado();
+        atualizarStepPersonalizado();
+      });
+
+      // Rádio semestre de matrícula (atualiza o hidden)
+      $('input[name="semestre_matricula_opcao"]').on('change', function () {
+        var v = $('input[name="semestre_matricula_opcao"]:checked').val() || '';
+        $('#semestre_matricula_hidden').val(v);
+        validarFormularioPersonalizado();
+        atualizarStepPersonalizado();
+      });
+
+      // Botão LIMPAR
+      $('#btn-limpar-personalizada').on('click', function () {
+        $('#form-declaracao-personalizada')[0].reset();
+        $('#box-conclusao, #box-matricula, #box-ncom').hide();
+        $('#group-dados-basicos, #group-tipo-perso').hide();
+        $('#semestre_matricula_hidden').val('');
+        atualizarSeriesPersonalizadas();
+        atualizarSemestresPersonalizados();
+        atualizarFluxoPersonalizado();
+        validarFormularioPersonalizado();
+        passoAtualPersonalizado = null;
+        $('.step-highlight-field').removeClass('step-highlight-field');
+        atualizarStepPersonalizado();
+      });
+
+      // Submit
+      $('#form-declaracao-personalizada').on('submit', function (e) {
+        if (!validarFormularioPersonalizado()) {
+          e.preventDefault();
+          return false;
+        }
+        $('#loading-overlay').css('display', 'flex');
+        return true;
+      });
+
+      // Inicialização
+      preencherAnos();
+      atualizarSeriesPersonalizadas();
+      atualizarSemestresPersonalizados();
+      atualizarFluxoPersonalizado();
+      validarFormularioPersonalizado();
+      atualizarStepPersonalizado();
+
+      {% else %}
+      /* ==========================================================
+         JS – FLUXO PADRÃO (Fundamental / EJA)
+         ========================================================== */
+
+      var passoAtualPadrao = null;
+      function aplicarHighlightPadrao(selector) {
+        if (passoAtualPadrao === selector) return;
+        $('.step-highlight-field').removeClass('step-highlight-field');
+        if (selector) {
+          $(selector).addClass('step-highlight-field');
+        }
+        passoAtualPadrao = selector;
+      }
+
+      // Select2 para alunos e tipo de declaração
+      $('#rm').select2({
+        placeholder: 'Selecione o aluno',
+        allowClear: true,
+        width: '100%'
+      });
+
+      $('#tipo').select2({
+        placeholder: 'Selecione',
+        allowClear: true,
+        width: '100%'
+      });
+
+      // Select2 para escolas (AJAX)
+      $('#unidade_anterior').select2({
+        placeholder: 'Selecione ou busque a escola',
+        allowClear: true,
+        width: '100%',
+        ajax: {
+          url: '{{ url_for("escolas_search") }}',
+          dataType: 'json',
+          delay: 250,
+          data: function (params) {
+            return { q: params.term };
+          },
+          processResults: function (data) {
+            return {
+              results: data.map(function (item) {
+                return { id: item.text, text: item.text };
+              })
+            };
+          },
+          cache: true
+        },
+        minimumInputLength: 1
+      });
+
+      function atualizarSecoesExtras() {
+        var tipo = $('#tipo').val();
+
+        if (tipo === 'Transferencia' || tipo === 'Conclusão') {
+          $('#historico-container').slideDown(150);
+        } else {
+          $('#historico-container').slideUp(150);
+          $('#unidade-anterior-container').slideUp(150);
+          $('input[name="deve_historico"]').prop('checked', false);
+          $('#unidade_anterior').val(null).trigger('change');
+          $('#unidade_anterior_manual').val('');
+        }
+
+        {% if segmento == 'Fundamental' %}
+        if (tipo === 'Conclusão') {
+          $('#btn-5ano').show();
+        } else {
+          $('#btn-5ano').hide();
+        }
+        {% endif %}
+      }
+
+      function atualizarEstadoBotao() {
+        var rm   = $('#rm').val();
+        var tipo = $('#tipo').val();
+        var valido = !!rm && !!tipo;
+
+        if (tipo === 'Transferencia' || tipo === 'Conclusão') {
+          var deveHist = $('input[name="deve_historico"]:checked').val();
+          if (!deveHist) {
+            valido = false;
+          } else if (deveHist === 'sim') {
+            var unidadeSelect = $('#unidade_anterior').val();
+            var unidadeManual = ($('#unidade_anterior_manual').val() || '').trim();
+            if (!unidadeSelect && !unidadeManual) {
+              valido = false;
+            }
+          }
+        }
+
+        $('#btn-gerar').prop('disabled', !valido);
+      }
+
+      // Tutorial: atualiza passo atual e destaque dos campos
+      function atualizarStep() {
+        var $indicatorText = $('#step-indicator-text');
+
+        $('.segmento-cards').removeClass('step-highlight');
+
+        var hasForm = $('#form-declaracao').length > 0;
+
+        if (!hasForm) {
+          $indicatorText.text('Passo 1 de 5: escolha o segmento (Fundamental ou EJA) nos cartões acima.');
+          $('.segmento-cards').addClass('step-highlight');
+          aplicarHighlightPadrao(null);
+          return;
+        }
+
+        var rm   = $('#rm').val();
+        var tipo = $('#tipo').val();
+        var deveHist = $('input[name="deve_historico"]:checked').val();
+        var unidadeSelect = $('#unidade_anterior').val();
+        var unidadeManual = ($('#unidade_anterior_manual').val() || '').trim();
+
+        var isTransfOuConc = (tipo === 'Transferencia' || tipo === 'Conclusão');
+        var totalSteps = isTransfOuConc ? 5 : 3;
+
+        if (!rm) {
+          $indicatorText.text('Passo 1 de ' + totalSteps + ': selecione o aluno na lista.');
+          aplicarHighlightPadrao('#group-aluno');
+          return;
+        }
+
+        if (!tipo) {
+          $indicatorText.text('Passo 2 de ' + totalSteps + ': selecione o tipo de declaração.');
+          aplicarHighlightPadrao('#group-tipo');
+          return;
+        }
+
+        if (!isTransfOuConc) {
+          $indicatorText.text('Passo 3 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
+          aplicarHighlightPadrao('#btn-gerar');
+          return;
+        }
+
+        if (!deveHist) {
+          $indicatorText.text('Passo 3 de ' + totalSteps + ': informe se o aluno deve histórico escolar.');
+          aplicarHighlightPadrao('#historico-container');
+          return;
+        }
+
+        if (deveHist === 'sim' && !unidadeSelect && !unidadeManual) {
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': informe a unidade escolar anterior.');
+          aplicarHighlightPadrao('#unidade-anterior-container');
+          return;
+        }
+
+        $indicatorText.text('Passo ' + totalSteps + ' de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
+        aplicarHighlightPadrao('#btn-gerar');
+      }
+
+      $('#tipo').on('change', function () {
+        atualizarSecoesExtras();
+        atualizarEstadoBotao();
+        atualizarStep();
+      });
+
+      $('#rm').on('change', function () {
+        atualizarEstadoBotao();
+        atualizarStep();
+      });
+
+      $('input[name="deve_historico"]').on('change', function () {
+        atualizarEstadoBotao();
+        if ($(this).val() === 'sim') {
+          $('#unidade-anterior-container').slideDown(150);
+        } else {
+          $('#unidade-anterior-container').slideUp(150);
+          $('#unidade_anterior').val(null).trigger('change');
+          $('#unidade_anterior_manual').val('');
+        }
+        atualizarStep();
+      });
+
+      $('#unidade_anterior').on('change', function () {
+        atualizarEstadoBotao();
+        atualizarStep();
+      });
+
+      $('#unidade_anterior_manual').on('keyup change', function () {
+        atualizarEstadoBotao();
+        atualizarStep();
+      });
+
+      // Botão LIMPAR SELEÇÃO
+      $('#btn-limpar').on('click', function () {
+        $('#rm').val(null).trigger('change');
+        $('#tipo').val(null).trigger('change');
+
+        $('input[name="deve_historico"]').prop('checked', false);
+        $('#historico-container').slideUp(0);
+        $('#unidade-anterior-container').slideUp(0);
+        $('#unidade_anterior').val(null).trigger('change');
+        $('#unidade_anterior_manual').val('');
+
+        {% if segmento == 'Fundamental' %}
+        $('#btn-5ano').hide();
+        {% endif %}
+
+        atualizarEstadoBotao();
+        passoAtualPadrao = null;
+        $('.step-highlight-field').removeClass('step-highlight-field');
+        atualizarStep();
+      });
+
+      // Inicialização
+      atualizarSecoesExtras();
+      atualizarEstadoBotao();
+      atualizarStep();
+
+      {% if segmento == 'Fundamental' %}
+      $('#btn-5ano').on('click', function () {
+        if (confirm('Gerar declarações de conclusão para todos os alunos de 5º ano?')) {
+          $('#loading-overlay').css('display', 'flex');
+          window.location.href = '{{ conclusao_5ano_url }}';
+        }
+      });
+      {% endif %}
+
+      // ---- Modal de confirmação customizado ----
+      var confirmandoEnvio = false;
+
+      $('#confirm-modal-cancel').on('click', function () {
+        $('#confirm-modal').removeClass('show');
+      });
+
+      $('#confirm-modal').on('click', function (e) {
+        if (e.target === this) {
+          $(this).removeClass('show');
+        }
+      });
+
+      $('#confirm-modal-confirm').on('click', function () {
+        $('#confirm-modal').removeClass('show');
+        confirmandoEnvio = true;
+        $('#form-declaracao').trigger('submit');
+      });
+
+      $('#form-declaracao').on('submit', function (e) {
+        var tipo = $('#tipo').val();
+
+        if (confirmandoEnvio) {
+          confirmandoEnvio = false;
+          $('#loading-overlay').css('display', 'flex');
+          return true;
+        }
+
+        if (tipo === 'Transferencia' || tipo === 'Conclusão') {
+          var deveHist = $('input[name="deve_historico"]:checked').val();
+          if (!deveHist) {
+            alert('Por favor, responda se o aluno deve o histórico escolar.');
+            e.preventDefault();
+            return false;
+          }
+
+          if (deveHist === 'sim') {
+            var unidadeSelect = $('#unidade_anterior').val();
+            var unidadeManual = ($('#unidade_anterior_manual').val() || '').trim();
+            if (!unidadeSelect && !unidadeManual) {
+              alert('Por favor, informe a unidade escolar anterior.');
+              e.preventDefault();
+              return false;
+            }
+          }
+
+          e.preventDefault();
+          $('#confirm-modal').addClass('show');
+          return false;
+        }
+
+        $('#loading-overlay').css('display', 'flex');
+        return true;
+      });
+
+      {% endif %}
+    });
+  </script>
+{% endblock %}

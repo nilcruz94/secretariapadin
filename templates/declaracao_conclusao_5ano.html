@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>Declarações de Conclusão - 5º Ano</title>
+
+  <!-- Fonte -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    @page {
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0.5cm;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #333;
+    }
+
+    .declaration-container {
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      min-height: 26cm; /* aproxima a altura de uma página A4 */
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #283E51;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      text-transform: uppercase;
+      color: #283E51;
+    }
+
+    .header p {
+      margin: 3px 0;
+      font-size: 16px;
+    }
+
+    .date {
+      text-align: right;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .content {
+      text-align: justify;
+      margin-bottom: 10px;
+      padding: 0 2cm;
+      box-sizing: border-box;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .content p {
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    /* empurra assinatura/rodapé para o final da página */
+    .declaration-bottom {
+      margin-top: auto;
+    }
+
+    .signature {
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    .signature .line {
+      height: 1px;
+      background-color: #333;
+      width: 60%;
+      margin: 0 auto 5px auto;
+    }
+
+    .footer {
+      text-align: center;
+      border-top: 2px solid #283E51;
+      padding-top: 5px;
+      margin: 0;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .print-button {
+      background-color: #283E51;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    .print-button:hover {
+      background-color: #1d2d3a;
+    }
+
+    .warning-icon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      color: red;
+      font-weight: bold;
+      font-size: 18px;
+      line-height: 18px;
+      vertical-align: middle;
+      user-select: none;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left !important;
+      font-size: 14px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+
+      body {
+        margin: 0;
+        padding: 1.5cm 1.5cm;
+        font-size: 14px;
+        font-family: 'Montserrat', sans-serif;
+        color: #000;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra de controle (some na impressão) -->
+  <div class="no-print" style="text-align: center; margin-top: 20px;">
+    <p>
+      Foram geradas
+      <strong>{{ registros|length }}</strong>
+      declarações de conclusão para alunos do 5º ano.
+    </p>
+    <button onclick="window.print()" class="print-button">
+      Imprimir todas as declarações
+    </button>
+  </div>
+
+  {% for reg in registros %}
+    <div class="declaration-container">
+      <div class="header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <img src="{{ url_for('static', filename='logos/escola.png') }}"
+               alt="Escola Logo"
+               style="height: 80px;">
+          <div>
+            <h1>Secretaria de Educação</h1>
+            <p>E.M José Padin Mouta</p>
+            <p>Município da Estância Balneária de Praia Grande</p>
+            <p>Estado de São Paulo</p>
+          </div>
+          <img src="{{ url_for('static', filename='logos/municipio.png') }}"
+               alt="Município Logo"
+               style="height: 80px;">
+        </div>
+      </div>
+
+      <div class="date">
+        <p>{{ data_extenso }}</p>
+      </div>
+
+      <div class="content">
+        <h2 style="text-align: center; text-transform: uppercase; color: #283E51;">
+          {{ titulo }}
+        </h2>
+        {# reg.texto já vem com <strong>, <u>, observações, imagem do Bolsa Família etc. #}
+        <p>{{ reg.texto|safe }}</p>
+      </div>
+
+      <div class="declaration-bottom">
+        <div class="signature">
+          <div class="line"></div>
+          <p>Luciana Rocha Augustinho</p>
+          <p>Diretora da Unidade Escolar</p>
+        </div>
+        <div class="footer">
+          <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390</p>
+          <p>Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+</body>
+</html>

@@ -1,0 +1,317 @@
+{% extends "base.html" %} 
+
+{% block title %}Upload de Listas Piloto{% endblock %}
+
+{% block extra_styles %}
+  .container-upload {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px 28px;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    max-width: 640px;
+    color: #283E51;
+  }
+
+  .container-upload h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .container-upload .page-description {
+    font-size: 0.9rem;
+    color: #5d6c7a;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .container-upload .section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374a5a;
+    margin-bottom: 6px;
+  }
+
+  .upload-steps {
+    font-size: 0.8rem;
+    color: #4a5563;
+    background: #f4f6fb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 18px;
+  }
+
+  .upload-steps strong {
+    color: #283E51;
+  }
+
+  .custom-file-label::after {
+    content: "Procurar";
+  }
+
+  /* Zona de drag & drop */
+  .drop-zone {
+    border: 2px dashed #cbd5e0;
+    border-radius: 10px;
+    padding: 14px 14px 10px 14px;
+    background-color: #f8fafc;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .drop-zone:hover {
+    border-color: #4B79A1;
+    background-color: #f1f6ff;
+  }
+
+  .drop-zone.dragover {
+    border-color: #4B79A1;
+    background-color: #e4efff;
+  }
+
+  .drop-hint {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 6px;
+  }
+
+  /* Overlay de carregamento */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .loading-overlay.active {
+    display: flex;
+  }
+
+  .loading-inner {
+    text-align: center;
+    color: #fff;
+  }
+
+  .loading-spinner {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #4B79A1;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 10px;
+  }
+
+  .loading-text {
+    font-size: 0.95rem;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="container-upload">
+    <h2>Upload de Listas Piloto</h2>
+    <p class="page-description">
+      Envie as planilhas oficiais da Lista Piloto do Ensino Fundamental e da Lista Piloto da EJA para liberar o uso do sistema.
+    </p>
+
+    <div class="upload-steps">
+      <strong>Como fazer:</strong><br>
+      1. Arraste o arquivo ou clique na área de seleção da Lista Piloto do Ensino Fundamental.<br>
+      2. Arraste o arquivo ou clique na área de seleção da Lista Piloto da EJA.<br>
+      3. Clique em <strong>Carregar listas</strong> e aguarde o processamento.
+    </div>
+
+    {# mensagens de sucesso/erro do flash() #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-3">
+          {% for category, message in messages %}
+            {% set bs_class = 'danger' if category == 'error' else category %}
+            <div class="alert alert-{{ bs_class }} mb-2" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form id="upload-form" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <div class="section-title">Lista Piloto do Ensino Fundamental</div>
+        <div class="drop-zone" data-input-id="lista_fundamental">
+          <div class="custom-file">
+            <input
+              type="file"
+              class="custom-file-input"
+              id="lista_fundamental"
+              name="lista_fundamental"
+              accept=".xlsx,.xls,.xlsm"
+              required
+            >
+            <label class="custom-file-label" for="lista_fundamental">
+              Selecione a Lista Piloto - Ensino Fundamental
+            </label>
+          </div>
+          <div class="drop-hint">
+            Arraste e solte a planilha aqui ou clique para procurar.
+          </div>
+        </div>
+        <small class="form-text text-muted">
+          Formatos aceitos: .xlsx, .xls, .xlsm
+        </small>
+      </div>
+
+      <div class="form-group mt-3">
+        <div class="section-title">Lista Piloto da EJA</div>
+        <div class="drop-zone" data-input-id="lista_eja">
+          <div class="custom-file">
+            <input
+              type="file"
+              class="custom-file-input"
+              id="lista_eja"
+              name="lista_eja"
+              accept=".xlsx,.xls,.xlsm"
+              required
+            >
+            <label class="custom-file-label" for="lista_eja">
+              Selecione a Lista Piloto - EJA
+            </label>
+          </div>
+          <div class="drop-hint">
+            Arraste e solte a planilha aqui ou clique para procurar.
+          </div>
+        </div>
+        <small class="form-text text-muted">
+          Formatos aceitos: .xlsx, .xls, .xlsm
+        </small>
+      </div>
+
+      <button id="upload-submit" type="submit" class="btn btn-primary btn-block mt-4">
+        Carregar listas
+      </button>
+    </form>
+  </div>
+
+  <!-- Overlay de carregamento -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-inner">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Processando listas, aguarde...</div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Atualiza o texto do input de arquivo com o nome do arquivo escolhido
+    var inputs = document.querySelectorAll('.custom-file-input');
+
+    Array.prototype.forEach.call(inputs, function (input) {
+      input.addEventListener('change', function () {
+        var fileName = this.files.length ? this.files[0].name : 'Nenhum arquivo selecionado';
+        var label = this.nextElementSibling;
+        if (label) {
+          label.textContent = fileName;
+        }
+      });
+    });
+
+    // Configura drag & drop para cada zona
+    var dropZones = document.querySelectorAll('.drop-zone');
+
+    Array.prototype.forEach.call(dropZones, function (zone) {
+      var inputId = zone.getAttribute('data-input-id');
+      var fileInput = document.getElementById(inputId);
+
+      if (!fileInput) return;
+
+      // Clique na zona abre o seletor de arquivo
+      zone.addEventListener('click', function (e) {
+        // Evita clicar diretamente no input (já abre de qualquer jeito)
+        if (e.target !== fileInput) {
+          fileInput.click();
+        }
+      });
+
+      // Função auxiliar para evitar comportamento padrão
+      var preventDefaults = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) {
+        zone.addEventListener(eventName, preventDefaults, false);
+      });
+
+      ['dragenter', 'dragover'].forEach(function (eventName) {
+        zone.addEventListener(eventName, function () {
+          zone.classList.add('dragover');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(function (eventName) {
+        zone.addEventListener(eventName, function () {
+          zone.classList.remove('dragover');
+        }, false);
+      });
+
+      zone.addEventListener('drop', function (e) {
+        var dtFiles = e.dataTransfer && e.dataTransfer.files;
+        if (!dtFiles || !dtFiles.length) return;
+
+        var file = dtFiles[0];
+        var nameLower = file.name.toLowerCase();
+        var allowedExt = ['.xlsx', '.xls', '.xlsm'];
+        var isValid = allowedExt.some(function (ext) {
+          return nameLower.endsWith(ext);
+        });
+
+        if (!isValid) {
+          alert('Formato inválido. Use apenas arquivos .xlsx, .xls ou .xlsm.');
+          return;
+        }
+
+        // Cria um DataTransfer para conseguir atribuir ao input
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+
+        // Dispara o evento change para atualizar o label
+        var changeEvent = new Event('change', { bubbles: true });
+        fileInput.dispatchEvent(changeEvent);
+      });
+    });
+
+    // Overlay de carregamento ao enviar o formulário
+    var form = document.getElementById('upload-form');
+    var overlay = document.getElementById('loading-overlay');
+    var submitBtn = document.getElementById('upload-submit');
+
+    if (form) {
+      form.addEventListener('submit', function () {
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Carregando...';
+        }
+        if (overlay) {
+          overlay.classList.add('active');
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

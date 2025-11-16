@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}Quadro de Inclusão{% endblock %}
+
+{% block extra_styles %}
+  .inclusao-wrapper {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px 28px 24px;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    width: 100%;
+    max-width: 720px;
+    color: #283E51;
+  }
+
+  .inclusao-header h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .inclusao-header p {
+    font-size: 0.9rem;
+    color: #5d6c7a;
+    margin-bottom: 18px;
+  }
+
+  .flash-container {
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374a5a;
+    margin-bottom: 6px;
+  }
+
+  .upload-group {
+    margin-bottom: 18px;
+  }
+
+  .dropzone {
+    position: relative;
+    border-radius: 12px;
+    border: 1px dashed #d0d7de;
+    padding: 16px 18px;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition:
+      border-color 0.18s ease,
+      background 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .dropzone:hover {
+    border-color: #4B79A1;
+    background: #f5f7ff;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.07);
+  }
+
+  .dropzone.dragover {
+    border-color: #4B79A1;
+    background: #eef2ff;
+  }
+
+  .dropzone-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .dropzone-icon-circle i {
+    color: #ffffff;
+    font-size: 1.3rem;
+  }
+
+  .dropzone-text-block {
+    flex: 1;
+  }
+
+  .dropzone-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #283E51;
+  }
+
+  .dropzone-subtitle {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .dropzone-filename {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    color: #4b5563;
+    font-style: italic;
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .helper-text {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  .btn-generate {
+    margin-top: 16px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    padding: 10px 18px;
+    font-weight: 600;
+  }
+
+  .back-links {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .back-links a {
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 768px) {
+    .inclusao-wrapper {
+      padding: 24px 18px 20px;
+    }
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="inclusao-wrapper">
+    <div class="inclusao-header">
+      <h2>Quadro de Inclusão</h2>
+      <p>
+        Gere o quadro de alunos com deficiência a partir das Listas Piloto do
+        Ensino Fundamental e da EJA. Caso as listas já tenham sido carregadas
+        no sistema, o envio é opcional e serve apenas para atualizar arquivos.
+      </p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-container">
+          {% for category, message in messages %}
+            {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
+            <div class="alert alert-{{ bs_class }} mb-2" role="alert">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data" onsubmit="showInclusaoLoading()">
+      <div class="upload-group">
+        <div class="section-title">Lista Piloto – Ensino Fundamental</div>
+        <div id="drop-fundamental" class="dropzone">
+          <div class="dropzone-icon-circle">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <div class="dropzone-text-block">
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+            <div class="dropzone-filename" id="fundamental-filename">
+              Nenhum arquivo selecionado.
+            </div>
+          </div>
+          <input
+            type="file"
+            id="lista_fundamental"
+            name="lista_fundamental"
+            accept=".xlsx,.xls,.xlsm"
+          >
+        </div>
+        <div class="helper-text">
+          Se você não selecionar nada, será utilizada a última lista salva no sistema
+          (caso exista).
+        </div>
+      </div>
+
+      <div class="upload-group">
+        <div class="section-title">Lista Piloto – EJA</div>
+        <div id="drop-eja" class="dropzone">
+          <div class="dropzone-icon-circle">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <div class="dropzone-text-block">
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+            <div class="dropzone-filename" id="eja-filename">
+              Nenhum arquivo selecionado.
+            </div>
+          </div>
+          <input
+            type="file"
+            id="lista_eja"
+            name="lista_eja"
+            accept=".xlsx,.xls,.xlsm"
+          >
+        </div>
+        <div class="helper-text">
+          Também é opcional. Use apenas se precisar trocar a Lista Piloto da EJA.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-generate">
+        Gerar Quadro de Inclusão
+      </button>
+
+      <div class="back-links">
+        <a href="{{ url_for('quadros') }}" class="btn btn-light btn-sm">
+          <i class="fas fa-arrow-left"></i> Voltar para Quadros
+        </a>
+        <span class="helper-text">
+          O arquivo será baixado automaticamente após a geração.
+        </span>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function setupDropzone(inputId, dropId, labelId) {
+    const input = document.getElementById(inputId);
+    const drop = document.getElementById(dropId);
+    const label = document.getElementById(labelId);
+
+    if (!input || !drop || !label) return;
+
+    // Clique em qualquer lugar da área
+    drop.addEventListener('click', function () {
+      input.click();
+    });
+
+    // Atualiza nome ao escolher pelo diálogo
+    input.addEventListener('change', function () {
+      if (input.files && input.files.length > 0) {
+        label.textContent = input.files[0].name;
+      } else {
+        label.textContent = 'Nenhum arquivo selecionado.';
+      }
+    });
+
+    // Efeitos de drag & drop
+    ['dragenter', 'dragover'].forEach(evtName => {
+      drop.addEventListener(evtName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+      drop.addEventListener(evtName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.remove('dragover');
+      });
+    });
+
+    drop.addEventListener('drop', function (e) {
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files || !dt.files.length) return;
+
+      const file = dt.files[0];
+      const name = file.name.toLowerCase();
+      const allowed = ['.xlsx', '.xls', '.xlsm'];
+      const isValid = allowed.some(ext => name.endsWith(ext));
+
+      if (!isValid) {
+        alert('Formato inválido. Use arquivos .xlsx, .xls ou .xlsm.');
+        return;
+      }
+
+      // Atribui o arquivo ao input e atualiza o rótulo
+      input.files = dt.files;
+      label.textContent = file.name;
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setupDropzone('lista_fundamental', 'drop-fundamental', 'fundamental-filename');
+    setupDropzone('lista_eja', 'drop-eja', 'eja-filename');
+  });
+
+  function showInclusaoLoading() {
+    const existing = document.getElementById('loading-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.55)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '9999';
+
+    overlay.innerHTML = `
+      <div style="text-align:center;color:white;font-family:Montserrat,Arial,sans-serif;">
+        <div class="spinner-border" role="status" style="width:3rem;height:3rem;border-width:0.3rem;">
+          <span class="sr-only">Carregando...</span>
+        </div>
+        <p style="margin-top:12px;font-size:0.95rem;">
+          Gerando Quadro de Inclusão, aguarde...
+        </p>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+  }
+</script>
+{% endblock %}
