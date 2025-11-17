@@ -1,4 +1,4 @@
-{% extends "base.html" %}  
+{% extends "base.html" %}   
 
 {% block title %}Declaração Escolar - Tipo{% endblock %}
 
@@ -642,14 +642,14 @@
           {% if tem_lista %}
             <div class="status-alert success">
               <i class="fas fa-check-circle"></i>
-              Lista do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} já carregada.
-              Vamos utilizar a lista piloto enviada ao entrar no sistema para gerar as declarações.
+              Lista do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} carregada.
+              Selecione o aluno e o tipo de declaração abaixo para gerar o documento.
             </div>
           {% else %}
             <div class="status-alert info">
               <i class="fas fa-info-circle"></i>
               Nenhuma lista piloto do {{ 'Ensino Fundamental' if segmento == 'Fundamental' else 'EJA' }} foi encontrada.
-              Anexe o arquivo em Excel abaixo para gerar as declarações.
+              Anexe o arquivo em Excel abaixo e clique em <strong>Carregar lista piloto</strong> para habilitar a seleção de alunos.
             </div>
           {% endif %}
         {% endif %}
@@ -939,6 +939,12 @@
         </div>
 
         <div class="declaracao-actions">
+          {% if not tem_lista %}
+          <button type="button" id="btn-carregar-lista" class="btn-lote">
+            <i class="fas fa-cloud-upload-alt"></i> Carregar lista piloto
+          </button>
+          {% endif %}
+
           <button type="submit" id="btn-gerar" class="btn-declaracao" disabled>
             <i class="fas fa-file-signature"></i> Gerar declaração
           </button>
@@ -1034,17 +1040,13 @@
 
       function preencherAnos() {
         var currentYear = new Date().getFullYear();
-
-        // Quantos anos à frente você quer listar? (aqui coloquei +5)
         var maxYear = currentYear + 20;
 
         $('.year-select').each(function () {
           var $sel = $(this);
 
-          // evita duplicar opções se chamar a função mais de uma vez
           if ($sel.data('filled')) return;
 
-          // do mais recente (futuro) até 1900
           for (var y = maxYear; y >= 1900; y--) {
             var opt = $('<option>').val(y).text(y);
             $sel.append(opt);
@@ -1114,7 +1116,6 @@
           $('#group-semestre-conclusao, #group-semestre-matricula, #group-semestre-ncom').hide();
           $('input[name="semestre_conclusao"], input[name="semestre_matricula_opcao"], input[name="semestre_referencia_ncom"]')
             .prop('checked', false);
-          // Fundamental: período anual padrão
           $('#semestre_matricula_hidden').val('Período anual');
         } else {
           $('#group-semestre-conclusao, #group-semestre-matricula, #group-semestre-ncom').hide();
@@ -1129,7 +1130,7 @@
         $('#box-conclusao, #box-matricula, #box-ncom').hide();
 
         if (tipo === 'Conclusao') {
-          $('#box-conclusao').show();          // sem animação
+          $('#box-conclusao').show();
         } else if (tipo === 'MatriculaCancelada') {
           $('#box-matricula').show();
         } else if (tipo === 'NCOM') {
@@ -1137,7 +1138,6 @@
         }
       }
 
-      // Fluxo visual por passos (mostrar/ocultar blocos principais)
       function atualizarFluxoPersonalizado() {
         var seg   = $('input[name="segmento_personalizado"]:checked').val();
         var nome  = ($('#nome_aluno').val() || '').trim();
@@ -1264,7 +1264,6 @@
 
       // === EVENTOS ESPECÍFICOS ===
 
-      // Segmento
       $('input[name="segmento_personalizado"]').on('change', function () {
         atualizarSeriesPersonalizadas();
         atualizarSemestresPersonalizados();
@@ -1273,27 +1272,23 @@
         atualizarStepPersonalizado();
       });
 
-      // Dados básicos
       $('#nome_aluno, #data_nascimento, #ra').on('keyup change', function () {
         atualizarFluxoPersonalizado();
         validarFormularioPersonalizado();
         atualizarStepPersonalizado();
       });
 
-      // Tipo de declaração
       $('#tipo_declaracao_personalizada').on('change', function () {
         atualizarFluxoPersonalizado();
         validarFormularioPersonalizado();
         atualizarStepPersonalizado();
       });
 
-      // Campos internos dos blocos
       $('#box-conclusao, #box-matricula, #box-ncom').on('change', 'input, select', function () {
         validarFormularioPersonalizado();
         atualizarStepPersonalizado();
       });
 
-      // Rádio semestre de matrícula (atualiza o hidden)
       $('input[name="semestre_matricula_opcao"]').on('change', function () {
         var v = $('input[name="semestre_matricula_opcao"]:checked').val() || '';
         $('#semestre_matricula_hidden').val(v);
@@ -1301,7 +1296,6 @@
         atualizarStepPersonalizado();
       });
 
-      // Botão LIMPAR
       $('#btn-limpar-personalizada').on('click', function () {
         $('#form-declaracao-personalizada')[0].reset();
         $('#box-conclusao, #box-matricula, #box-ncom').hide();
@@ -1316,7 +1310,6 @@
         atualizarStepPersonalizado();
       });
 
-      // Submit
       $('#form-declaracao-personalizada').on('submit', function (e) {
         if (!validarFormularioPersonalizado()) {
           e.preventDefault();
@@ -1339,7 +1332,9 @@
          JS – FLUXO PADRÃO (Fundamental / EJA)
          ========================================================== */
 
+      var temLista = {{ tem_lista | tojson }};
       var passoAtualPadrao = null;
+
       function aplicarHighlightPadrao(selector) {
         if (passoAtualPadrao === selector) return;
         $('.step-highlight-field').removeClass('step-highlight-field');
@@ -1400,7 +1395,7 @@
         }
 
         {% if segmento == 'Fundamental' %}
-        if (tipo === 'Conclusão') {
+        if (temLista && tipo === 'Conclusão') {
           $('#btn-5ano').show();
         } else {
           $('#btn-5ano').hide();
@@ -1409,6 +1404,11 @@
       }
 
       function atualizarEstadoBotao() {
+        if (!temLista) {
+          $('#btn-gerar').prop('disabled', true);
+          return;
+        }
+
         var rm   = $('#rm').val();
         var tipo = $('#tipo').val();
         var valido = !!rm && !!tipo;
@@ -1429,7 +1429,6 @@
         $('#btn-gerar').prop('disabled', !valido);
       }
 
-      // Tutorial: atualiza passo atual e destaque dos campos
       function atualizarStep() {
         var $indicatorText = $('#step-indicator-text');
 
@@ -1441,6 +1440,13 @@
           $indicatorText.text('Passo 1 de 5: escolha o segmento (Fundamental ou EJA) nos cartões acima.');
           $('.segmento-cards').addClass('step-highlight');
           aplicarHighlightPadrao(null);
+          return;
+        }
+
+        // Se ainda não há lista piloto carregada para o segmento atual:
+        if (!temLista && $('#btn-carregar-lista').length) {
+          $indicatorText.text('Passo 1: selecione o arquivo Excel da lista piloto e clique em "Carregar lista piloto".');
+          aplicarHighlightPadrao('#btn-carregar-lista');
           return;
         }
 
@@ -1541,6 +1547,18 @@
         atualizarStep();
       });
 
+      // Botão CARREGAR LISTA PILOTO (quando não há lista na sessão)
+      $('#btn-carregar-lista').on('click', function () {
+        var fileVal = $('input[name="excel_file"]').val();
+        if (!fileVal) {
+          alert('Selecione o arquivo Excel da lista piloto antes de carregar.');
+          return;
+        }
+        $('#loading-overlay').css('display', 'flex');
+        // Envia o formulário ignorando validações de RM/tipo (apenas upload da lista)
+        document.getElementById('form-declaracao').submit();
+      });
+
       // Inicialização
       atualizarSecoesExtras();
       atualizarEstadoBotao();
@@ -1576,6 +1594,10 @@
 
       $('#form-declaracao').on('submit', function (e) {
         var tipo = $('#tipo').val();
+
+        // Submissões que vierem do botão "Carregar lista piloto"
+        // usam document.getElementById('form-declaracao').submit()
+        // e não passam por aqui, o que é exatamente o desejado.
 
         if (confirmandoEnvio) {
           confirmandoEnvio = false;

@@ -352,15 +352,27 @@ def gerar_declaracao_escolar(
     """
     Gera o HTML de uma declaração escolar (Escolaridade, Transferência ou Conclusão)
     tanto para Fundamental quanto EJA, de acordo com session['declaracao_tipo'].
+
+    file_path  -> caminho/arquivo padrão da lista piloto (salvo em sessão/ao entrar no sistema)
+    file_path2 -> caminho/arquivo opcional, usado quando o usuário reenviar a lista
+                  (por exemplo, após o servidor free acordar). SE informado, TERÁ PRIORIDADE.
     """
     global escolas_df
 
+    # Se um segundo caminho foi informado (lista reenviada), ele tem prioridade.
+    effective_path = file_path2 if file_path2 is not None else file_path
+    if file_path2 is not None:
+        print("[DEBUG] gerar_declaracao_escolar: usando file_path2 =", effective_path)
+    else:
+        print("[DEBUG] gerar_declaracao_escolar: usando file_path  =", effective_path)
+
+    
     # ------------------------------------------------------
     # 1) CARREGAMENTO DOS DADOS DO ALUNO (FUNDAMENTAL x EJA)
     # ------------------------------------------------------
     if session.get("declaracao_tipo") != "EJA":
         # ---------- FUNDAMENTAL ----------
-        planilha = pd.read_excel(file_path, sheet_name="LISTA CORRIDA")
+        planilha = pd.read_excel(effective_path, sheet_name="LISTA CORRIDA")
         planilha.columns = [c.strip().upper() for c in planilha.columns]
 
         def format_rm(x):
@@ -415,7 +427,7 @@ def gerar_declaracao_escolar(
 
     else:
         # ---------- EJA ----------
-        df = pd.read_excel(file_path, sheet_name=0, header=None, skiprows=1)
+        df = pd.read_excel(effective_path, sheet_name=0, header=None, skiprows=1)
         df.columns = [str(c).strip().upper() for c in df.columns]
 
         # RM (coluna 2)
@@ -531,13 +543,14 @@ def gerar_declaracao_escolar(
     if tipo == "Escolaridade":
         titulo = "Declaração de Escolaridade"
         if session.get("declaracao_tipo") == "EJA":
-            declaracao_text = (
+                declaracao_text = (
                 f"Declaro, para os devidos fins, que o(a) aluno(a) "
                 f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
                 f"<strong><u>{data_nasc}</u></strong>, "
-                f"encontra-se regularmente matriculado(a) na "
-                f"E.M José Padin Mouta, cursando atualmente o "
+                f"encontra-se regularmente matriculado(a) no segmento de "
+                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong> da "
+                f"E.M José Padin Mouta, cursando atualmente o(a) "
                 f"<strong><u>{serie}</u></strong>."
             )
         else:
@@ -547,7 +560,7 @@ def gerar_declaracao_escolar(
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
                 f"<strong><u>{data_nasc}</u></strong>, "
                 f"encontra-se regularmente matriculado(a) na "
-                f"E.M José Padin Mouta, cursando atualmente o "
+                f"E.M José Padin Mouta, cursando atualmente o(a) "
                 f"<strong><u>{serie}</u></strong> no horário de aula: "
                 f"<strong><u>{horario}</u></strong>."
             )
@@ -559,9 +572,10 @@ def gerar_declaracao_escolar(
                 f"Declaro, para os devidos fins, que o(a) aluno(a) "
                 f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, "
-                f"solicitou transferência de nossa unidade escolar na data de "
-                f"hoje, estando apto(a) a cursar o "
+                f"<strong><u>{data_nasc}</u></strong>, matriculado(a) no segmento de "
+                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong> da "
+                f"E.M José Padin Mouta, solicitou transferência desta unidade escolar "
+                f"na data de hoje, estando apto(a) a cursar o(a) "
                 f"<strong><u>{serie}</u></strong>."
             )
         else:
@@ -572,7 +586,7 @@ def gerar_declaracao_escolar(
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
                 f"<strong><u>{data_nasc}</u></strong>, compareceu a nossa "
                 f"unidade escolar e solicitou transferência na data de hoje, "
-                f"o aluno está apto(a) a cursar o "
+                f"o aluno está apto(a) a cursar o(a) "
                 f"<strong><u>{serie_mod}</u></strong>."
             )
 
@@ -607,9 +621,10 @@ def gerar_declaracao_escolar(
                 f"Declaro, para os devidos fins, que o(a) aluno(a) "
                 f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, concluiu com êxito o "
-                f"<strong><u>{serie}</u></strong>{semestre_parte}, estando "
-                f"apto(a) a ingressar no "
+                f"<strong><u>{data_nasc}</u></strong>, concluiu com êxito o(a) "
+                f"<strong><u>{serie}</u></strong>{semestre_parte} no segmento de "
+                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong> da "
+                f"E.M José Padin Mouta, estando apto(a) a ingressar no(na) "
                 f"<strong><u>{series_text}</u></strong>."
             )
         else:
@@ -621,8 +636,8 @@ def gerar_declaracao_escolar(
                 f"Declaro, para os devidos fins, que o(a) aluno(a) "
                 f"<strong><u>{nome}</u></strong>, portador(a) do RA "
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
-                f"<strong><u>{data_nasc}</u></strong>, concluiu com êxito o "
-                f"<strong><u>{serie}</u></strong>, estando apto(a) a ingressar no "
+                f"<strong><u>{data_nasc}</u></strong>, concluiu com êxito o(a) "
+                f"<strong><u>{serie}</u></strong>, estando apto(a) a ingressar no(na) "
                 f"<strong><u>{series_text}</u></strong>."
             )
 
@@ -1013,9 +1028,9 @@ def gerar_declaracao_personalizada(dados):
                 f"<strong><u>{nome}</u></strong>, portador(a) do RA "
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
                 f"<strong><u>{data_nasc}</u></strong>, concluiu o(a) "
-                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
-                f"<strong><u>{segmento_label}</u></strong>, {periodo_conclusao}, "
-                "nesta unidade escolar."
+                f"<strong><u>{ano_serie}</u></strong> no segmento de "
+                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong>, "
+                f"{periodo_conclusao}, nesta unidade escolar."
             )
 
         if deve_hist_unidade:
@@ -1044,15 +1059,26 @@ def gerar_declaracao_personalizada(dados):
                 f"no ano de <strong><u>{ano_matricula}</u></strong>"
             )
 
-        declaracao_text = (
-            f"Declaro, para os devidos fins, que o(a) aluno(a) "
-            f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-            f"<strong><u>{ra}</u></strong>, nascido(a) em "
-            f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
-            f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
-            f"<strong><u>{segmento_label}</u></strong>, {periodo_matricula}, "
-            "nesta unidade escolar, tendo sua matrícula cancelada."
-        )
+        if segmento == "EJA":
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
+                f"<strong><u>{ano_serie}</u></strong> no segmento de "
+                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong>, "
+                f"{periodo_matricula}, nesta unidade escolar, tendo sua matrícula cancelada."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, esteve matriculado(a) no(a) "
+                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
+                f"<strong><u>{segmento_label}</u></strong>, {periodo_matricula}, "
+                "nesta unidade escolar, tendo sua matrícula cancelada."
+            )
 
     elif tipo_decl == "ncom":
         titulo = "Declaração de Não Comparecimento (NCOM)"
@@ -1074,17 +1100,31 @@ def gerar_declaracao_personalizada(dados):
                 f"para o ano de <strong><u>{ano_ref}</u></strong>"
             )
 
-        declaracao_text = (
-            f"Declaro, para os devidos fins, que o(a) aluno(a) "
-            f"<strong><u>{nome}</u></strong>, portador(a) do RA "
-            f"<strong><u>{ra}</u></strong>, nascido(a) em "
-            f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(à) "
-            f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
-            f"<strong><u>{segmento_label}</u></strong>, {periodo_ref} "
-            "nesta unidade escolar. Todavia, o(a) aluno(a) não compareceu à unidade "
-            "escolar, sendo considerado(a) NCOM – Não Comparecimento, motivo pelo qual "
-            "a vaga foi cancelada nesta unidade escolar."
-        )
+        if segmento == "EJA":
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(à) "
+                f"<strong><u>{ano_serie}</u></strong> no segmento de "
+                f"<strong><u>Educação de Jovens e Adultos (EJA)</u></strong>, "
+                f"{periodo_ref} nesta unidade escolar. Todavia, o(a) aluno(a) "
+                "não compareceu à unidade escolar, sendo considerado(a) NCOM – "
+                "Não Comparecimento, motivo pelo qual a vaga foi cancelada nesta "
+                "unidade escolar."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, teve vaga destinada ao(à) "
+                f"<strong><u>{ano_serie}</u></strong> {prep_segmento} "
+                f"<strong><u>{segmento_label}</u></strong>, {periodo_ref} "
+                "nesta unidade escolar. Todavia, o(a) aluno(a) não compareceu à unidade "
+                "escolar, sendo considerado(a) NCOM – Não Comparecimento, motivo pelo qual "
+                "a vaga foi cancelada nesta unidade escolar."
+            )
 
     else:
         # Tipo desconhecido
@@ -1249,7 +1289,7 @@ def gerar_declaracao_personalizada(dados):
       }}
       body, .content, .content p {{
         width: auto !important;
-        max-width: none !important;
+         max-width: none !important;
       }}
     }}
 
@@ -1448,10 +1488,18 @@ def declaracao_conclusao_5ano():
         )
         return redirect(url_for("declaracao_tipo"))
 
+    # Prioriza o caminho utilizado na última declaração singular,
+    # mas também aceita a lista_fundamental
     file_path = session.get("declaracao_excel") or session.get("lista_fundamental")
+
+    # Se o servidor “acordou” e o arquivo não existe mais, força o usuário a reenviar a lista
     if not file_path or not os.path.exists(file_path):
-        flash("Arquivo Excel do Fundamental não encontrado. Anexe a lista piloto novamente.", "error")
-        return redirect(url_for("declaracao_tipo"))
+        flash(
+            "Arquivo Excel do Fundamental não encontrado. "
+            "Anexe a lista piloto novamente pela tela de declarações.",
+            "error",
+        )
+        return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
 
     # Lê a LISTA CORRIDA
     planilha = pd.read_excel(file_path, sheet_name="LISTA CORRIDA")
@@ -1557,7 +1605,7 @@ def declaracao_conclusao_5ano():
 
     if not registros:
         flash("Nenhum aluno de 5º ano encontrado na lista piloto.", "error")
-        return redirect(url_for("declaracao_tipo"))
+        return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
 
     now = datetime.now()
     meses = {
@@ -1586,11 +1634,12 @@ def declaracao_conclusao_5ano():
         total=len(registros),
     )
 
+
 # ==========================================================
 #  DECLARAÇÕES – TELA ÚNICA (Fundamental / EJA / Personalizada)
 # ==========================================================
 
-@app.route("/declaracao/tipo", methods=["GET", "POST"]) 
+@app.route("/declaracao/tipo", methods=["GET", "POST"])
 @login_required
 def declaracao_tipo():
     """
@@ -1677,7 +1726,6 @@ def declaracao_tipo():
                         "ano_serie_concluida": ano_serie_concluida,
                         "ano_conclusao": ano_conclusao,
                         "deve_historico_unidade": (deve_hist_unidade == "Sim"),
-                        # ⚠️ campo que faltava: usado na geração da conclusão da EJA
                         "semestre_conclusao": semestre_conclusao,
                     }
                 )
@@ -1744,25 +1792,39 @@ def declaracao_tipo():
             flash("Selecione se a declaração é do Fundamental ou EJA antes de gerar.", "error")
             return redirect(url_for("declaracao_tipo"))
 
+        # Campos básicos já lidos aqui para podermos tratar o caso "upload apenas"
+        rm = (request.form.get("rm") or "").strip()
+        tipo = (request.form.get("tipo") or "").strip()
+        deve_historico_str = request.form.get("deve_historico")
+
+        unidade_select = (request.form.get("unidade_anterior_select") or "").strip()
+        unidade_manual = (request.form.get("unidade_anterior_manual") or "").strip()
+        unidade_anterior = unidade_select or unidade_manual
+
         # Upload ou reaproveita lista da sessão
         file_path = None
-        if "excel_file" in request.files and request.files["excel_file"].filename:
-            file = request.files["excel_file"]
-            filename = secure_filename(file.filename)
+        excel_file = request.files.get("excel_file")
+        novo_upload = excel_file is not None and excel_file.filename
+
+        if novo_upload:
+            # Novo envio de lista piloto (usado inclusive para “recuperar” após hibernação)
+            filename = secure_filename(excel_file.filename)
             unique_filename = f"declaracao_{uuid.uuid4().hex}_{filename}"
             file_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
-            file.save(file_path)
+            excel_file.save(file_path)
 
             if segmento == "Fundamental":
                 session["lista_fundamental"] = file_path
             else:
                 session["lista_eja"] = file_path
         else:
+            # Reaproveita o caminho já salvo na sessão
             if segmento == "Fundamental":
                 file_path = session.get("lista_fundamental")
             else:
                 file_path = session.get("lista_eja")
 
+        # Se ainda assim não houver arquivo válido, não há o que fazer
         if not file_path or not os.path.exists(file_path):
             flash(
                 "Nenhuma lista piloto encontrada para este segmento. Anexe o arquivo em Excel.",
@@ -1770,18 +1832,25 @@ def declaracao_tipo():
             )
             return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        # Salva na sessão para reutilizar em outras rotas
+        # Atualiza infos de declaração na sessão (usadas em outras rotas, ex: 5º ano)
         session["declaracao_tipo"] = segmento
         session["declaracao_excel"] = file_path
 
-        rm = request.form.get("rm")
-        tipo = request.form.get("tipo")
-        deve_historico_str = request.form.get("deve_historico")
+        # --------------------------------------------------
+        # CASO ESPECIAL: usuário acabou de ENVIAR APENAS A LISTA
+        # (sem RM / tipo) – típico após o servidor “acordar”
+        # --------------------------------------------------
+        if novo_upload and (not rm or not tipo):
+            flash(
+                "Lista piloto carregada com sucesso. "
+                "Agora selecione o aluno e o tipo de declaração.",
+                "success",
+            )
+            return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        unidade_select = (request.form.get("unidade_anterior_select") or "").strip()
-        unidade_manual = (request.form.get("unidade_anterior_manual") or "").strip()
-        unidade_anterior = unidade_select or unidade_manual
-
+        # --------------------------------------------------
+        # A partir daqui, fluxo normal de geração de declaração
+        # --------------------------------------------------
         if not rm or not tipo:
             flash("Escolha o aluno e o tipo de declaração.", "error")
             return redirect(url_for("declaracao_tipo", segmento=segmento))
@@ -1848,7 +1917,10 @@ def declaracao_tipo():
                 planilha[planilha["RM_str"] != "0"][["RM_str", "NOME"]].drop_duplicates()
             )
 
-            alunos = [{"rm": row["RM_str"], "nome": row["NOME"]} for _, row in alunos_df.iterrows()]
+            alunos = [
+                {"rm": row["RM_str"], "nome": row["NOME"]}
+                for _, row in alunos_df.iterrows()
+            ]
 
     elif segmento == "EJA":
         file_path = session.get("lista_eja")
@@ -1864,7 +1936,10 @@ def declaracao_tipo():
             df["NOME"] = df.iloc[:, 3]
             alunos_df = df[df["RM_str"] != ""][["RM_str", "NOME"]].drop_duplicates()
 
-            alunos = [{"rm": row["RM_str"], "nome": row["NOME"]} for _, row in alunos_df.iterrows()]
+            alunos = [
+                {"rm": row["RM_str"], "nome": row["NOME"]}
+                for _, row in alunos_df.iterrows()
+            ]
 
     # segmento == "Personalizado": não há lista piloto nem alunos pré-carregados
     dashboard_url = url_for("dashboard")
