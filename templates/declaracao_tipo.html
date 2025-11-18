@@ -237,7 +237,8 @@
   }
 
   #historico-container,
-  #unidade-anterior-container {
+  #unidade-anterior-container,
+  #frequencia-container {
     display: none;
     border-radius: 12px;
     border: 1px dashed #cfd8dc;
@@ -247,7 +248,8 @@
   }
 
   #historico-container legend,
-  #unidade-anterior-container legend {
+  #unidade-anterior-container legend,
+  #frequencia-container legend {
     font-size: 0.88rem;
     font-weight: 600;
     color: #37474f;
@@ -258,9 +260,26 @@
   }
 
   #historico-container legend i,
-  #unidade-anterior-container legend i {
+  #unidade-anterior-container legend i,
+  #frequencia-container legend i {
     color: #283E51;
     font-size: 0.9rem;
+  }
+
+  .freq-mes-row {
+    border-bottom: 1px dashed #e2e8f0;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+  }
+
+  .freq-mes-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .freq-mes-row small {
+    font-size: 0.78rem;
   }
 
   /* Destaque do passo atual (campos do formulário) – com pulso */
@@ -898,6 +917,7 @@
             <option value="Escolaridade">Declaração de Escolaridade</option>
             <option value="Transferencia">Declaração de Transferência</option>
             <option value="Conclusão">Declaração de Conclusão</option>
+            <option value="Frequencia">Declaração de Frequência</option>
           </select>
         </div>
 
@@ -936,6 +956,69 @@
                    class="form-control"
                    placeholder="Ex: E.E. Nome da Escola">
           </div>
+        </div>
+
+        {# BLOCO – FREQUÊNCIA POR MÊS #}
+        <div id="frequencia-container">
+          <legend>
+            <i class="fas fa-calendar-check"></i>
+            Frequência por mês (dias letivos x faltas)
+          </legend>
+          <p style="font-size:0.82rem; color:#4b5563; margin-bottom:6px;">
+            Preencha apenas os meses solicitados pelo responsável. Os meses em branco
+            serão ignorados na declaração ou poderão aparecer como
+            <strong>“Ainda não apurado”</strong>, conforme o modelo do documento.
+          </p>
+
+          {% set meses = [
+            ('jan', 'Janeiro'),
+            ('fev', 'Fevereiro'),
+            ('mar', 'Março'),
+            ('abr', 'Abril'),
+            ('mai', 'Maio'),
+            ('jun', 'Junho'),
+            ('jul', 'Julho'),
+            ('ago', 'Agosto'),
+            ('set', 'Setembro'),
+            ('out', 'Outubro'),
+            ('nov', 'Novembro'),
+            ('dez', 'Dezembro')
+          ] %}
+
+          {% for id, rotulo in meses %}
+          <div class="form-row freq-mes-row" data-mes="{{ id }}">
+            <div class="form-group col-md-4">
+              <label for="freq_{{ id }}_dias">Dias letivos em {{ rotulo }}:</label>
+              <input type="number" min="0"
+                     id="freq_{{ id }}_dias"
+                     name="freq_{{ id }}_dias"
+                     class="form-control freq-dias">
+            </div>
+            <div class="form-group col-md-4">
+              <label for="freq_{{ id }}_faltas">Faltas em {{ rotulo }}:</label>
+              <input type="number" min="0"
+                     id="freq_{{ id }}_faltas"
+                     name="freq_{{ id }}_faltas"
+                     class="form-control freq-faltas">
+            </div>
+            <div class="form-group col-md-4">
+              <label for="freq_{{ id }}_percent">Frequência em {{ rotulo }} (%):</label>
+              <input type="text"
+                     id="freq_{{ id }}_percent"
+                     name="freq_{{ id }}_percent"
+                     class="form-control freq-resultado"
+                     readonly
+                     placeholder="Ainda não apurado">
+            </div>
+          </div>
+          {% endfor %}
+
+          <small style="font-size:0.78rem; color:#6b7280;">
+            A frequência é calculada automaticamente pela fórmula
+            <em>((dias letivos - faltas) / dias letivos) × 100</em>. Meses com dados
+            inconsistentes (faltas maiores que dias letivos, por exemplo) serão
+            sinalizados para correção.
+          </small>
         </div>
 
         <div class="declaracao-actions">
@@ -1353,6 +1436,65 @@
         passoAtualPadrao = selector;
       }
 
+      // ====== FREQUÊNCIA – FUNÇÕES AUXILIARES ======
+      function resetarFrequencias() {
+        $('.freq-dias, .freq-faltas, .freq-resultado').val('');
+      }
+
+      function calcularFrequencias() {
+        $('.freq-mes-row').each(function () {
+          var $row = $(this);
+          var diasStr = ($row.find('.freq-dias').val() || '').replace(',', '.');
+          var faltasStr = ($row.find('.freq-faltas').val() || '').replace(',', '.');
+          var $resultado = $row.find('.freq-resultado');
+
+          if (!diasStr && !faltasStr) {
+            $resultado.val('');
+            return;
+          }
+
+          var dias = parseFloat(diasStr);
+          var faltas = parseFloat(faltasStr);
+
+          if (!isNaN(dias) && dias > 0 && !isNaN(faltas) && faltas >= 0 && faltas <= dias) {
+            var freq = ((dias - faltas) / dias) * 100;
+            var freqStr = freq.toFixed(1).replace('.', ',') + '%';
+            $resultado.val(freqStr);
+          } else {
+            $resultado.val('Verificar dados');
+          }
+        });
+      }
+
+      // Retorna se há pelo menos 1 mês válido e se existe algum erro/linha incompleta
+      function verificarMesesFrequencia() {
+        var info = { algumValido: false, temErro: false };
+
+        $('.freq-mes-row').each(function () {
+          var $row = $(this);
+          var diasStr = ($row.find('.freq-dias').val() || '').replace(',', '.');
+          var faltasStr = ($row.find('.freq-faltas').val() || '').replace(',', '.');
+
+          var temDias = diasStr !== '';
+          var temFaltas = faltasStr !== '';
+
+          if (!temDias && !temFaltas) {
+            return; // mês totalmente em branco
+          }
+
+          var dias = parseFloat(diasStr);
+          var faltas = parseFloat(faltasStr);
+
+          if (!isNaN(dias) && dias > 0 && !isNaN(faltas) && faltas >= 0 && faltas <= dias) {
+            info.algumValido = true;
+          } else {
+            info.temErro = true;
+          }
+        });
+
+        return info;
+      }
+
       // Select2 para alunos e tipo de declaração
       $('#rm').select2({
         placeholder: 'Selecione o aluno',
@@ -1394,13 +1536,24 @@
         var tipo = $('#tipo').val();
 
         if (tipo === 'Transferencia' || tipo === 'Conclusão') {
+          $('#frequencia-container').slideUp(150);
+          resetarFrequencias();
           $('#historico-container').slideDown(150);
-        } else {
+        } else if (tipo === 'Frequencia') {
           $('#historico-container').slideUp(150);
           $('#unidade-anterior-container').slideUp(150);
           $('input[name="deve_historico"]').prop('checked', false);
           $('#unidade_anterior').val(null).trigger('change');
           $('#unidade_anterior_manual').val('');
+          $('#frequencia-container').slideDown(150);
+        } else {
+          $('#historico-container').slideUp(150);
+          $('#unidade-anterior-container').slideUp(150);
+          $('#frequencia-container').slideUp(150);
+          $('input[name="deve_historico"]').prop('checked', false);
+          $('#unidade_anterior').val(null).trigger('change');
+          $('#unidade_anterior_manual').val('');
+          resetarFrequencias();
         }
 
         {% if segmento == 'Fundamental' %}
@@ -1433,6 +1586,12 @@
               valido = false;
             }
           }
+        } else if (tipo === 'Frequencia') {
+          var infoFreq = verificarMesesFrequencia();
+          // Pelo menos um mês válido e nenhum erro/linha incompleta
+          if (!infoFreq.algumValido || infoFreq.temErro) {
+            valido = false;
+          }
         }
 
         $('#btn-gerar').prop('disabled', !valido);
@@ -1446,7 +1605,7 @@
         var hasForm = $('#form-declaracao').length > 0;
 
         if (!hasForm) {
-          $indicatorText.text('Passo 1 de 5: escolha o segmento (Fundamental ou EJA) nos cartões acima.');
+          $indicatorText.text('Passo 1 de 5: escolha o segmento (Fundamental ou EJA) nos cartões abaixo.');
           $('.segmento-cards').addClass('step-highlight');
           aplicarHighlightPadrao(null);
           return;
@@ -1464,9 +1623,19 @@
         var deveHist = $('input[name="deve_historico"]:checked').val();
         var unidadeSelect = $('#unidade_anterior').val();
         var unidadeManual = ($('#unidade_anterior_manual').val() || '').trim();
+        var infoFreq = verificarMesesFrequencia();
 
         var isTransfOuConc = (tipo === 'Transferencia' || tipo === 'Conclusão');
-        var totalSteps = isTransfOuConc ? 5 : 3;
+        var isFreq = (tipo === 'Frequencia');
+        var totalSteps;
+
+        if (isTransfOuConc) {
+          totalSteps = 5;
+        } else if (isFreq) {
+          totalSteps = 4;
+        } else {
+          totalSteps = 3;
+        }
 
         if (!rm) {
           $indicatorText.text('Passo 1 de ' + totalSteps + ': selecione o aluno na lista.');
@@ -1477,6 +1646,22 @@
         if (!tipo) {
           $indicatorText.text('Passo 2 de ' + totalSteps + ': selecione o tipo de declaração.');
           aplicarHighlightPadrao('#group-tipo');
+          return;
+        }
+
+        if (isFreq) {
+          if (!infoFreq.algumValido) {
+            $indicatorText.text('Passo 3 de ' + totalSteps + ': informe dias letivos e faltas nos meses solicitados.');
+            aplicarHighlightPadrao('#frequencia-container');
+            return;
+          }
+          if (infoFreq.temErro) {
+            $indicatorText.text('Passo 3 de ' + totalSteps + ': corrija os meses com dados inconsistentes (faltas não podem ser maiores que os dias letivos).');
+            aplicarHighlightPadrao('#frequencia-container');
+            return;
+          }
+          $indicatorText.text('Passo 4 de ' + totalSteps + ': tudo pronto! Clique em "Gerar declaração".');
+          aplicarHighlightPadrao('#btn-gerar');
           return;
         }
 
@@ -1504,6 +1689,7 @@
 
       $('#tipo').on('change', function () {
         atualizarSecoesExtras();
+        calcularFrequencias();
         atualizarEstadoBotao();
         atualizarStep();
       });
@@ -1535,6 +1721,13 @@
         atualizarStep();
       });
 
+      // Mudanças nos campos de frequência
+      $(document).on('input', '.freq-dias, .freq-faltas', function () {
+        calcularFrequencias();
+        atualizarEstadoBotao();
+        atualizarStep();
+      });
+
       // Botão LIMPAR SELEÇÃO
       $('#btn-limpar').on('click', function () {
         $('#rm').val(null).trigger('change');
@@ -1545,6 +1738,8 @@
         $('#unidade-anterior-container').slideUp(0);
         $('#unidade_anterior').val(null).trigger('change');
         $('#unidade_anterior_manual').val('');
+        $('#frequencia-container').slideUp(0);
+        resetarFrequencias();
 
         {% if segmento == 'Fundamental' %}
         $('#btn-5ano').hide();
@@ -1571,6 +1766,7 @@
 
       // Inicialização
       atualizarSecoesExtras();
+      calcularFrequencias();
       atualizarEstadoBotao();
       atualizarStep();
 
@@ -1640,7 +1836,7 @@
           return false;
         }
 
-        // Geração de declaração sem modal (ex.: escolaridade)
+        // Geração de declaração sem modal (ex.: escolaridade ou frequência)
         mostrarOverlay('Gerando declaração, aguarde...');
         return true;
       });

@@ -341,6 +341,7 @@ from flask import session
 
 escolas_df = None
 
+
 def gerar_declaracao_escolar(
     file_path,
     rm,
@@ -348,14 +349,18 @@ def gerar_declaracao_escolar(
     file_path2=None,
     deve_historico=False,
     unidade_anterior=None,
+    dados_frequencia=None,
 ):
     """
-    Gera o HTML de uma declaração escolar (Escolaridade, Transferência ou Conclusão)
-    tanto para Fundamental quanto EJA, de acordo com session['declaracao_tipo'].
+    Gera o HTML de uma declaração escolar (Escolaridade, Transferência, Conclusão
+    ou Frequência) tanto para Fundamental quanto EJA, de acordo com
+    session['declaracao_tipo'].
 
     file_path  -> caminho/arquivo padrão da lista piloto (salvo em sessão/ao entrar no sistema)
     file_path2 -> caminho/arquivo opcional, usado quando o usuário reenviar a lista
                   (por exemplo, após o servidor free acordar). SE informado, TERÁ PRIORIDADE.
+    dados_frequencia -> dicionário opcional com os dados de frequência por mês,
+                        utilizado apenas quando tipo == "Frequencia".
     """
     global escolas_df
 
@@ -366,7 +371,6 @@ def gerar_declaracao_escolar(
     else:
         print("[DEBUG] gerar_declaracao_escolar: usando file_path  =", effective_path)
 
-    
     # ------------------------------------------------------
     # 1) CARREGAMENTO DOS DADOS DO ALUNO (FUNDAMENTAL x EJA)
     # ------------------------------------------------------
@@ -517,8 +521,8 @@ def gerar_declaracao_escolar(
         11: "novembro",
         12: "dezembro",
     }
-    mes = meses[now.month].capitalize()
-    data_extenso = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
+    mes_nome = meses[now.month].capitalize()
+    data_extenso = f"Praia Grande, {now.day:02d} de {mes_nome} de {now.year}"
 
     additional_css = """
 .print-button {
@@ -543,7 +547,7 @@ def gerar_declaracao_escolar(
     if tipo == "Escolaridade":
         titulo = "Declaração de Escolaridade"
         if session.get("declaracao_tipo") == "EJA":
-                declaracao_text = (
+            declaracao_text = (
                 f"Declaro, para os devidos fins, que o(a) aluno(a) "
                 f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
                 f"<strong><u>{ra}</u></strong>, nascido(a) em "
@@ -641,6 +645,165 @@ def gerar_declaracao_escolar(
                 f"<strong><u>{series_text}</u></strong>."
             )
 
+    elif tipo in ("Frequencia", "Frequência"):
+        titulo = "Declaração de Frequência"
+
+        # Se não vier dados de frequência, não há o que declarar
+        if not dados_frequencia or not dados_frequencia.get("meses"):
+            return None
+
+        # Frase inicial (EJA x Fundamental)
+        if session.get("declaracao_tipo") == "EJA":
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do {ra_label} "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, regularmente matriculado(a) "
+                f"no segmento de <strong><u>Educação de Jovens e Adultos (EJA)</u></strong> "
+                f"da E.M José Padin Mouta, teve sua frequência apurada nos meses abaixo "
+                f"conforme quadro a seguir."
+            )
+        else:
+            declaracao_text = (
+                f"Declaro, para os devidos fins, que o(a) aluno(a) "
+                f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+                f"<strong><u>{ra}</u></strong>, nascido(a) em "
+                f"<strong><u>{data_nasc}</u></strong>, regularmente matriculado(a) "
+                f"no(a) <strong><u>{serie}</u></strong> da E.M José Padin Mouta, "
+                f"teve sua frequência apurada nos meses abaixo conforme quadro a seguir."
+            )
+
+        def _fmt_num(n):
+            try:
+                f = float(n)
+                if f.is_integer():
+                    return str(int(f))
+                return f"{f:.1f}".replace(".", ",")
+            except Exception:
+                return str(n)
+
+        # mapa padrão de meses (1–12)
+        nomes_meses_padrao = {
+            1: "Janeiro",
+            2: "Fevereiro",
+            3: "Março",
+            4: "Abril",
+            5: "Maio",
+            6: "Junho",
+            7: "Julho",
+            8: "Agosto",
+            9: "Setembro",
+            10: "Outubro",
+            11: "Novembro",
+            12: "Dezembro",
+        }
+
+        linhas_tabela = ""
+
+        for idx, item in enumerate(dados_frequencia.get("meses", []), start=1):
+            # ---------- MÊS ----------
+            raw_mes = item.get("nome_mes")
+            if raw_mes in (None, ""):
+                raw_mes = item.get("mes")
+            if raw_mes in (None, ""):
+                raw_mes = item.get("mes_nome")
+            if raw_mes in (None, ""):
+                raw_mes = item.get("descricao_mes")
+            if raw_mes in (None, ""):
+                raw_mes = item.get("descricao")
+
+            nome_mes = ""
+
+            if raw_mes not in (None, ""):
+                if isinstance(raw_mes, (int, float)):
+                    idx_int = int(raw_mes)
+                    nome_mes = nomes_meses_padrao.get(idx_int, str(idx_int))
+                else:
+                    s = str(raw_mes).strip()
+                    if s.isdigit():
+                        idx_int = int(s)
+                        nome_mes = nomes_meses_padrao.get(idx_int, s)
+                    else:
+                        nome_mes = s
+
+            # fallback final: usa o índice do loop (1..12)
+            if not nome_mes:
+                nome_mes = nomes_meses_padrao.get(idx, f"Mês {idx}")
+
+            # ---------- DIAS / FALTAS / FREQUÊNCIA ----------
+            dias_val = item.get("dias_letivos_calculados")
+            if dias_val is None:
+                dias_val = item.get("dias_letivos")
+            if dias_val is None:
+                dias_val = item.get("dias")
+
+            faltas_val = item.get("faltas_calculadas")
+            if faltas_val is None:
+                faltas_val = item.get("faltas")
+
+            freq_val = item.get("frequencia")
+            if freq_val is None:
+                freq_val = item.get("freq")
+
+            # Se não vier flag 'preenchido', deduz pelo conteúdo
+            preenchido_raw = item.get("preenchido")
+            if preenchido_raw is None:
+                preenchido = any(
+                    v not in (None, "", 0, 0.0)
+                    for v in (dias_val, faltas_val, freq_val)
+                )
+            else:
+                preenchido = bool(preenchido_raw)
+
+            if preenchido:
+                dias_txt = _fmt_num(dias_val) if dias_val not in (None, "") else "0"
+                faltas_txt = _fmt_num(faltas_val) if faltas_val not in (None, "") else "0"
+                if freq_val in (None, ""):
+                    freq_txt = "—"
+                else:
+                    try:
+                        freq_txt = f"{float(freq_val):.1f}%".replace(".", ",")
+                    except Exception:
+                        freq_txt = str(freq_val)
+            else:
+                dias_txt = "—"
+                faltas_txt = "—"
+                freq_txt = "—"
+
+            linhas_tabela += (
+                "<tr>"
+                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{nome_mes}</td>"
+                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{dias_txt}</td>"
+                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{faltas_txt}</td>"
+                f"<td style='border:1px solid #444;padding:4px 6px;text-align:center;'>{freq_txt}</td>"
+                "</tr>"
+            )
+
+        declaracao_text += (
+            "<br><br>"
+            "<table style='width:75%;max-width:900px;margin:0 auto;"
+            "border-collapse:collapse;font-size:12px;margin-top:4px;'>"
+            "<thead>"
+            "<tr>"
+            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Mês</th>"
+            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Dias letivos</th>"
+            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Faltas</th>"
+            "<th style='border:1px solid #444;padding:4px 6px;text-align:center;'>Frequência</th>"
+            "</tr>"
+            "</thead>"
+            "<tbody>"
+            f"{linhas_tabela}"
+            "</tbody>"
+            "</table>"
+            "<br>"
+            "<span style='font-size:12px;color:#555;'>"
+            "</span>"
+        )
+
+    else:
+        # Tipo desconhecido
+        return None
+
     # ------------------------------------------------------
     # 4) OBSERVAÇÕES / HISTÓRICO / BOLSA FAMÍLIA
     # ------------------------------------------------------
@@ -709,6 +872,10 @@ def gerar_declaracao_escolar(
     # ------------------------------------------------------
     # 5) HTML FINAL (DECLARAÇÃO ÚNICA)
     # ------------------------------------------------------
+    # Classe específica só para a declaração de frequência
+    is_frequencia = tipo in ("Frequencia", "Frequência")
+    body_class_attr = ' class="tipo-frequencia"' if is_frequencia else ""
+
     base_template = f"""<!doctype html>
 <html lang="pt-br">
 <head>
@@ -793,6 +960,24 @@ def gerar_declaracao_escolar(
       user-select: none;
     }}
 
+    /* Ajustes específicos apenas para a declaração de Frequência */
+    body.tipo-frequencia {{
+      font-size: 14px;
+    }}
+    body.tipo-frequencia .content {{
+      padding: 0 1.5cm;
+      margin-bottom: 8px;
+    }}
+    body.tipo-frequencia table {{
+      font-size: 12px;
+    }}
+    body.tipo-frequencia .footer {{
+      font-size: 12px;
+    }}
+    body.tipo-frequencia .signature p {{
+      font-size: 12px;
+    }}
+
     @media print {{
       .no-print {{ display: none !important; }}
       body {{
@@ -831,6 +1016,26 @@ def gerar_declaracao_escolar(
         width: auto !important;
         max-width: none !important;
       }}
+
+      /* Override APENAS na declaração de frequência:
+         tira o position: fixed e reduz um pouco as margens/fontes
+         para garantir que assinatura e rodapé apareçam na página. */
+      body.tipo-frequencia {{
+        padding: 1.2cm 1.5cm;
+        font-size: 12px;
+      }}
+      body.tipo-frequencia .content {{
+        margin: 0 0 0.6cm 0;
+        padding: 0;
+      }}
+      body.tipo-frequencia .declaration-bottom {{
+        position: static;
+        margin-top: 2.5cm;
+      }}
+      body.tipo-frequencia .footer,
+      body.tipo-frequencia .signature p {{
+        font-size: 11px;
+      }}
     }}
 
     .content, .content p, .date {{
@@ -863,7 +1068,7 @@ def gerar_declaracao_escolar(
     }}
   </style>
 </head>
-<body>
+<body{body_class_attr}>
   <div class="declaration-container">
     <div class="header">
       <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -908,6 +1113,7 @@ def gerar_declaracao_escolar(
 
 
 from datetime import datetime
+
 
 def gerar_declaracao_personalizada(dados):
     """
@@ -1873,12 +2079,104 @@ def declaracao_tipo():
             deve_historico = False
             unidade_anterior = ""
 
+        # ---------------------------------------------
+        # NOVO BLOCO: TRATAMENTO DE DECLARAÇÃO DE FREQUÊNCIA
+        # ---------------------------------------------
+        dados_frequencia = None
+
+        if tipo == "Frequencia":
+            # mesma ordem de meses usada no template
+            meses = [
+                ("jan", "Janeiro"),
+                ("fev", "Fevereiro"),
+                ("mar", "Março"),
+                ("abr", "Abril"),
+                ("mai", "Maio"),
+                ("jun", "Junho"),
+                ("jul", "Julho"),
+                ("ago", "Agosto"),
+                ("set", "Setembro"),
+                ("out", "Outubro"),
+                ("nov", "Novembro"),
+                ("dez", "Dezembro"),
+            ]
+
+            dados_frequencia = {"meses": []}
+            algum_valido = False
+
+            for mes_id, mes_nome in meses:
+                dias_raw = (request.form.get(f"freq_{mes_id}_dias") or "").strip()
+                faltas_raw = (request.form.get(f"freq_{mes_id}_faltas") or "").strip()
+
+                # Se o mês foi deixado totalmente em branco, apenas marca como não preenchido
+                if not dias_raw and not faltas_raw:
+                    dados_frequencia["meses"].append(
+                        {
+                            "id": mes_id,
+                            "nome": mes_nome,
+                            "dias_letivos": None,
+                            "faltas": None,
+                            "frequencia": None,
+                            "preenchido": False,
+                        }
+                    )
+                    continue
+
+                # Se preencheu algo, precisa dos dois campos
+                try:
+                    dias = float(dias_raw.replace(",", ".")) if dias_raw else None
+                    faltas = float(faltas_raw.replace(",", ".")) if faltas_raw else None
+                except ValueError:
+                    flash(
+                        "Verifique os valores de dias letivos e faltas informados na frequência.",
+                        "error",
+                    )
+                    return redirect(url_for("declaracao_tipo", segmento=segmento))
+
+                if dias is None or faltas is None:
+                    flash(
+                        "Para cada mês de frequência preenchido, informe tanto os dias letivos quanto as faltas.",
+                        "error",
+                    )
+                    return redirect(url_for("declaracao_tipo", segmento=segmento))
+
+                if dias <= 0 or faltas < 0 or faltas > dias:
+                    flash(
+                        "Os valores de dias letivos e faltas são inválidos em um ou mais meses. "
+                        "Verifique e tente novamente.",
+                        "error",
+                    )
+                    return redirect(url_for("declaracao_tipo", segmento=segmento))
+
+                freq_percent = ((dias - faltas) / dias) * 100.0
+                algum_valido = True
+
+                dados_frequencia["meses"].append(
+                    {
+                        "id": mes_id,
+                        "nome": mes_nome,
+                        "dias_letivos": dias,
+                        "faltas": faltas,
+                        "frequencia": round(freq_percent, 1),
+                        "preenchido": True,
+                    }
+                )
+
+            if not algum_valido:
+                flash(
+                    "Informe ao menos um mês de frequência com dias letivos e faltas válidos.",
+                    "error",
+                )
+                return redirect(url_for("declaracao_tipo", segmento=segmento))
+
+        # Chamada para geração da declaração
         declaracao_html = gerar_declaracao_escolar(
             file_path=file_path,
             rm=rm,
             tipo=tipo,
             deve_historico=deve_historico,
             unidade_anterior=unidade_anterior,
+            dados_frequencia=dados_frequencia,  # novo parâmetro opcional
         )
 
         if declaracao_html is None:

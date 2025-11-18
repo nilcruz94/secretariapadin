@@ -581,7 +581,7 @@
                       <span class="icon">{{ aluno.status_icon|safe }}</span>
                       <span class="status-text">{{ aluno.status_texto }}</span>
                     </div>
-                    <div class="year-pill">2025</div>
+                    <div class="year-pill">2026</div>
                   </div>
                 </div>
               </div>
@@ -863,21 +863,40 @@ if (filtroRelatorioInput) {
   filtroRelatorioInput.addEventListener('input', filtrarRelatorio);
 }
 
-document.getElementById('localizarAluno').addEventListener('keyup', function() {
-    var filtro = this.value.toLowerCase();
+/* ====== NOVA BUSCA POR NOME OU RM + SCROLL ATÉ O PRIMEIRO RESULTADO ====== */
+var localizarInput = document.getElementById('localizarAluno');
+if (localizarInput) {
+  localizarInput.addEventListener('input', function () {
+    var filtro = this.value.trim().toLowerCase();
     var cards = document.querySelectorAll('.borda-pontilhada');
-    cards.forEach(function(card) {
+    var primeiroVisivel = null;
+
+    cards.forEach(function (card) {
       var nomeElem = card.querySelector('.info-name-text');
-      if (nomeElem) {
-        var nome = nomeElem.textContent.toLowerCase();
-        if (nome.indexOf(filtro) > -1) {
-          card.style.display = '';
-        } else {
-          card.style.display = 'none';
+      var nome = nomeElem ? nomeElem.textContent.toLowerCase() : '';
+      var rm = (card.getAttribute('data-rm') || '').toString().toLowerCase();
+
+      var textoBusca = nome + ' ' + rm;
+
+      if (!filtro || textoBusca.indexOf(filtro) > -1) {
+        card.style.display = '';
+        if (!primeiroVisivel) {
+          primeiroVisivel = card;
         }
+      } else {
+        card.style.display = 'none';
       }
     });
-});
+
+    if (filtro && primeiroVisivel) {
+      primeiroVisivel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      primeiroVisivel.classList.add('card-highlight');
+      setTimeout(function () {
+        primeiroVisivel.classList.remove('card-highlight');
+      }, 1500);
+    }
+  });
+}
 
 var flashTimeout = null;
 document.addEventListener('DOMContentLoaded', function() {
