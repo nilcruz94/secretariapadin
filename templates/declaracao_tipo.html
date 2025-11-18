@@ -1021,6 +1021,14 @@
   <script>
     $(function () {
 
+      // Função auxiliar para exibir o overlay com mensagem customizada
+      function mostrarOverlay(mensagem) {
+        if (mensagem) {
+          $('#loading-overlay .loading-text').text(mensagem);
+        }
+        $('#loading-overlay').css('display', 'flex');
+      }
+
       {% if segmento == 'Personalizado' %}
       /* ==========================================================
          JS – DECLARAÇÃO PERSONALIZADA
@@ -1315,7 +1323,8 @@
           e.preventDefault();
           return false;
         }
-        $('#loading-overlay').css('display', 'flex');
+        // Gerando declaração personalizada
+        mostrarOverlay('Gerando declaração, aguarde...');
         return true;
       });
 
@@ -1554,7 +1563,8 @@
           alert('Selecione o arquivo Excel da lista piloto antes de carregar.');
           return;
         }
-        $('#loading-overlay').css('display', 'flex');
+        // Carregando lista piloto
+        mostrarOverlay('Carregando lista piloto, aguarde...');
         // Envia o formulário ignorando validações de RM/tipo (apenas upload da lista)
         document.getElementById('form-declaracao').submit();
       });
@@ -1567,7 +1577,8 @@
       {% if segmento == 'Fundamental' %}
       $('#btn-5ano').on('click', function () {
         if (confirm('Gerar declarações de conclusão para todos os alunos de 5º ano?')) {
-          $('#loading-overlay').css('display', 'flex');
+          // Gerando lote de 5º ano
+          mostrarOverlay('Gerando declarações de 5º ano, aguarde...');
           window.location.href = '{{ conclusao_5ano_url }}';
         }
       });
@@ -1601,7 +1612,8 @@
 
         if (confirmandoEnvio) {
           confirmandoEnvio = false;
-          $('#loading-overlay').css('display', 'flex');
+          // Gerando declaração após confirmação
+          mostrarOverlay('Gerando declaração, aguarde...');
           return true;
         }
 
@@ -1628,7 +1640,8 @@
           return false;
         }
 
-        $('#loading-overlay').css('display', 'flex');
+        // Geração de declaração sem modal (ex.: escolaridade)
+        mostrarOverlay('Gerando declaração, aguarde...');
         return true;
       });
 
