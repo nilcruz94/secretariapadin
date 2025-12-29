@@ -1,4 +1,4 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 
 {% block title %}Upload de Listas Piloto{% endblock %}
 
@@ -124,13 +124,14 @@
   <div class="container-upload">
     <h2>Upload de Listas Piloto</h2>
     <p class="page-description">
-      Envie as planilhas oficiais da Lista Piloto do Ensino Fundamental e da Lista Piloto da EJA para liberar o uso do sistema.
+      Envie a planilha oficial da Lista Piloto do Ensino Fundamental para liberar o uso do sistema.
+      A Lista Piloto da EJA é opcional e pode ser enviada quando necessário.
     </p>
 
     <div class="upload-steps">
       <strong>Como fazer:</strong><br>
       1. Arraste o arquivo ou clique na área de seleção da Lista Piloto do Ensino Fundamental.<br>
-      2. Arraste o arquivo ou clique na área de seleção da Lista Piloto da EJA.<br>
+      2. (Opcional) Arraste o arquivo ou clique na área de seleção da Lista Piloto da EJA.<br>
       3. Clique em <strong>Carregar listas</strong> e aguarde o processamento.
     </div>
 
@@ -175,7 +176,7 @@
       </div>
 
       <div class="form-group mt-3">
-        <div class="section-title">Lista Piloto da EJA</div>
+        <div class="section-title">Lista Piloto da EJA (opcional)</div>
         <div class="drop-zone" data-input-id="lista_eja">
           <div class="custom-file">
             <input
@@ -184,10 +185,9 @@
               id="lista_eja"
               name="lista_eja"
               accept=".xlsx,.xls,.xlsm"
-              required
             >
             <label class="custom-file-label" for="lista_eja">
-              Selecione a Lista Piloto - EJA
+              Selecione a Lista Piloto - EJA (opcional)
             </label>
           </div>
           <div class="drop-hint">

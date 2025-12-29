@@ -85,6 +85,7 @@ def get_escolas_df():
 @app.before_request
 def inicializar_escolas():
     """Garante que escolas.csv está carregado antes de cada requisição."""
+    global escolas_df
     if escolas_df is None or (isinstance(escolas_df, pd.DataFrame) and escolas_df.empty):
         carregar_escolas()
 
@@ -319,7 +320,7 @@ def gerar_html_carteirinhas(arquivo_excel):
     # Paginação: 6 carteirinhas por página
     pages = []
     for i in range(0, len(alunos), 6):
-        pages.append(alunos[i : i + 6])
+        pages.append(alunos[i: i + 6])
 
     total_sem_foto = len(alunos_sem_fotos_list)
 
@@ -334,13 +335,6 @@ def gerar_html_carteirinhas(arquivo_excel):
 # ==========================================================
 #  DECLARAÇÕES – GERAÇÃO HTML (SINGULAR)
 # ==========================================================
-
-from datetime import datetime
-import pandas as pd, re
-from flask import session
-
-escolas_df = None
-
 
 def gerar_declaracao_escolar(
     file_path,
@@ -370,6 +364,9 @@ def gerar_declaracao_escolar(
         print("[DEBUG] gerar_declaracao_escolar: usando file_path2 =", effective_path)
     else:
         print("[DEBUG] gerar_declaracao_escolar: usando file_path  =", effective_path)
+
+    # HTML da tabela de notas (usado apenas na transferência do Fundamental)
+    notas_tabela_html = ""
 
     # ------------------------------------------------------
     # 1) CARREGAMENTO DOS DADOS DO ALUNO (FUNDAMENTAL x EJA)
@@ -429,6 +426,114 @@ def gerar_declaracao_escolar(
         else:
             data_nasc = "Desconhecida"
 
+        # --------------------------------------------------
+        # NOVO: busca as notas na aba NOTAS (apenas Transferência/Fundamental)
+        # --------------------------------------------------
+        if tipo == "Transferencia":
+            try:
+                notas_df = pd.read_excel(effective_path, sheet_name="NOTAS")
+                notas_df.columns = [str(c).strip().upper() for c in notas_df.columns]
+
+                # Descobre a coluna de RM (idealmente é "RM")
+                rm_col = None
+                for c in notas_df.columns:
+                    if str(c).strip().upper() == "RM":
+                        rm_col = c
+                        break
+                if rm_col is None and len(notas_df.columns) >= 3:
+                    # fallback: coluna C (índice 2)
+                    rm_col = notas_df.columns[2]
+
+                if rm_col is not None:
+                    notas_df["RM_str"] = notas_df[rm_col].apply(format_rm)
+                    notas_aluno = notas_df[notas_df["RM_str"] == rm_num]
+
+                    if not notas_aluno.empty:
+                        notas_row = notas_aluno.iloc[0]
+
+                        # devolve (texto, cor) – <5 vermelho, >=5 azul, SEMPRE com 2 casas decimais
+                        def _fmt_nota(v):
+                            if pd.isna(v):
+                                return "—", None
+                            s = str(v).strip()
+                            if s == "":
+                                return "—", None
+                            try:
+                                f = float(s.replace(",", "."))
+                            except Exception:
+                                # não conseguiu converter em número → sem cor especial
+                                return s, None
+
+                            # define cor
+                            cor = "red" if f < 5 else "blue"
+
+                            # formata SEMPRE com 2 casas decimais
+                            texto = f"{f:.2f}".replace(".", ",")
+
+                            return texto, cor
+
+                        materias = [
+                            ("Língua Portuguesa", "LP_1T", "LP_2T", "LP_3T"),
+                            ("História", "HIST_1T", "HIST_2T", "HIST_3T"),
+                            ("Geografia", "GEO_1T", "GEO_2T", "GEO_3T"),
+                            ("Matemática", "MAT_1T", "MAT_2T", "MAT_3T"),
+                            ("Ciências", "CIEN_1T", "CIEN_2T", "CIEN_3T"),
+                            ("Educação Física", "EDFIS_1T", "EDFIS_2T", "EDFIS_3T"),
+                            ("Arte", "ARTE_1T", "ARTE_2T", "ARTE_3T"),
+                        ]
+
+                        linhas_notas = ""
+
+                        for nome_disc, c1, c2, c3 in materias:
+                            n1_txt, n1_cor = _fmt_nota(notas_row.get(c1))
+                            n2_txt, n2_cor = _fmt_nota(notas_row.get(c2))
+                            n3_txt, n3_cor = _fmt_nota(notas_row.get(c3))
+
+                            style_n1 = "border:1px solid #444;padding:3px 6px;text-align:center;"
+                            style_n2 = "border:1px solid #444;padding:3px 6px;text-align:center;"
+                            style_n3 = "border:1px solid #444;padding:3px 6px;text-align:center;"
+
+                            if n1_cor:
+                                style_n1 += f"color:{n1_cor};"
+                            if n2_cor:
+                                style_n2 += f"color:{n2_cor};"
+                            if n3_cor:
+                                style_n3 += f"color:{n3_cor};"
+
+                            linhas_notas += (
+                                "<tr>"
+                                f"<td style='border:1px solid #444;padding:3px 6px;text-align:left;'>{nome_disc}</td>"
+                                f"<td style='{style_n1}'>{n1_txt}</td>"
+                                f"<td style='{style_n2}'>{n2_txt}</td>"
+                                f"<td style='{style_n3}'>{n3_txt}</td>"
+                                "</tr>"
+                            )
+
+                        if linhas_notas:
+                            notas_tabela_html = (
+                                "<br>"
+                                "<span style='font-size:12px;'>"
+                                "<strong>As notas do aluno, por componente curricular, são:</strong>"
+                                "</span>"
+                                "<br>"
+                                "<table style='width:85%;max-width:700px;margin:4px auto 0 auto;"
+                                "border-collapse:collapse;font-size:11px;'>"
+                                "<thead>"
+                                "<tr>"
+                                "<th style='border:1px solid #444;padding:3px 6px;text-align:left;'>Componente curricular</th>"
+                                "<th style='border:1px solid #444;padding:3px 6px;text-align:center;'>1º trim.</th>"
+                                "<th style='border:1px solid #444;padding:3px 6px;text-align:center;'>2º trim.</th>"
+                                "<th style='border:1px solid #444;padding:3px 6px;text-align:center;'>3º trim.</th>"
+                                "</tr>"
+                                "</thead>"
+                                "<tbody>"
+                                f"{linhas_notas}"
+                                "</tbody>"
+                                "</table>"
+                            )
+            except Exception as e:
+                print(f"[ERRO] Falha ao carregar notas do aluno (Transferência Fundamental): {e}")
+                notas_tabela_html = ""
     else:
         # ---------- EJA ----------
         df = pd.read_excel(effective_path, sheet_name=0, header=None, skiprows=1)
@@ -522,7 +627,7 @@ def gerar_declaracao_escolar(
         12: "dezembro",
     }
     mes_nome = meses[now.month].capitalize()
-    data_extenso = f"Praia Grande, {now.day:02d} de {mes_nome} de {now.year}"
+    data_extenso_str = f"Praia Grande, {now.day:02d} de {mes_nome} de {now.year}"
 
     additional_css = """
 .print-button {
@@ -543,6 +648,7 @@ def gerar_declaracao_escolar(
     # 3) MONTAGEM DO TEXTO DA DECLARAÇÃO
     # ------------------------------------------------------
     declaracao_text = ""
+    tem_observacoes = False  # controla se há bloco de observações
 
     if tipo == "Escolaridade":
         titulo = "Declaração de Escolaridade"
@@ -593,6 +699,9 @@ def gerar_declaracao_escolar(
                 f"o aluno está apto(a) a cursar o(a) "
                 f"<strong><u>{serie_mod}</u></strong>."
             )
+            # Anexa a tabela de notas (apenas Fundamental)
+            if notas_tabela_html:
+                declaracao_text += notas_tabela_html
 
     elif tipo == "Conclusão":
         titulo = "Declaração de Conclusão"
@@ -781,7 +890,7 @@ def gerar_declaracao_escolar(
 
         declaracao_text += (
             "<br><br>"
-            "<table style='width:75%;max-width:900px;margin:0 auto;"
+            "<table style='width:75%;max-width:600px;margin:0 auto;"
             "border-collapse:collapse;font-size:12px;margin-top:4px;'>"
             "<thead>"
             "<tr>"
@@ -810,6 +919,7 @@ def gerar_declaracao_escolar(
     valor_bolsa = str(row.get("BOLSA FAMILIA", "")).strip().upper()
 
     if deve_historico or (valor_bolsa == "SIM" and tipo != "Escolaridade"):
+        tem_observacoes = True
         declaracao_text += "<br><br><strong>Observações:</strong><br>"
         declaracao_text += (
             '<label class="checkbox-label" '
@@ -872,9 +982,13 @@ def gerar_declaracao_escolar(
     # ------------------------------------------------------
     # 5) HTML FINAL (DECLARAÇÃO ÚNICA)
     # ------------------------------------------------------
-    # Classe específica só para a declaração de frequência
-    is_frequencia = tipo in ("Frequencia", "Frequência")
-    body_class_attr = ' class="tipo-frequencia"' if is_frequencia else ""
+    classes_body = []
+    if tipo in ("Frequencia", "Frequência"):
+        classes_body.append("tipo-frequencia")
+    if tipo == "Transferencia" and tem_observacoes:
+        classes_body.append("transferencia-com-observacoes")
+
+    body_class_attr = f' class="{" ".join(classes_body)}"' if classes_body else ""
 
     base_template = f"""<!doctype html>
 <html lang="pt-br">
@@ -960,7 +1074,7 @@ def gerar_declaracao_escolar(
       user-select: none;
     }}
 
-    /* Ajustes específicos apenas para a declaração de Frequência */
+    /* Ajustes específicos apenas para a declaração de Frequência (tela) */
     body.tipo-frequencia {{
       font-size: 14px;
     }}
@@ -969,20 +1083,20 @@ def gerar_declaracao_escolar(
       margin-bottom: 8px;
     }}
     body.tipo-frequencia table {{
-      font-size: 12px;
+      font-size: 14px;
     }}
     body.tipo-frequencia .footer {{
-      font-size: 12px;
+      font-size: 14px;
     }}
     body.tipo-frequencia .signature p {{
-      font-size: 12px;
+      font-size: 14px;
     }}
 
     @media print {{
       .no-print {{ display: none !important; }}
       body {{
         margin: 0;
-        padding: 1.5cm 1.5cm;
+        padding: 0.5cm 0.5cm;
         font-size: 14px;
         font-family: 'Montserrat', sans-serif;
         color: #000;
@@ -1017,24 +1131,40 @@ def gerar_declaracao_escolar(
         max-width: none !important;
       }}
 
-      /* Override APENAS na declaração de frequência:
-         tira o position: fixed e reduz um pouco as margens/fontes
-         para garantir que assinatura e rodapé apareçam na página. */
+      /* Override APENAS na declaração de frequência */
       body.tipo-frequencia {{
-        padding: 1.2cm 1.5cm;
-        font-size: 12px;
+        padding: 0.3cm 0.3cm;
+        font-size: 14px;
       }}
       body.tipo-frequencia .content {{
-        margin: 0 0 0.6cm 0;
+        margin: 0 0 0.3cm 0;
         padding: 0;
       }}
       body.tipo-frequencia .declaration-bottom {{
         position: static;
-        margin-top: 2.5cm;
+        margin-top: 1.0cm;
       }}
       body.tipo-frequencia .footer,
       body.tipo-frequencia .signature p {{
-        font-size: 11px;
+        font-size: 14px;
+      }}
+
+      /* Transferência com observações */
+      body.transferencia-com-observacoes {{
+        padding: 1.2cm 1.2cm;
+        font-size: 14px;
+      }}
+      body.transferencia-com-observacoes .content {{
+        margin: 0 0 0.6cm 0;
+        padding: 0;
+      }}
+      body.transferencia-com-observacoes .declaration-bottom {{
+        position: static;
+        margin-top: 1.2cm;
+      }}
+      body.transferencia-com-observacoes .footer,
+      body.transferencia-com-observacoes .signature p {{
+        font-size: 14px;
       }}
     }}
 
@@ -1083,7 +1213,7 @@ def gerar_declaracao_escolar(
       </div>
     </div>
     <div class="date">
-      <p>{data_extenso}</p>
+      <p>{data_extenso_str}</p>
     </div>
     <div class="content">
       <h2 style="text-align:center;text-transform:uppercase;color:#283E51;">
@@ -1098,8 +1228,7 @@ def gerar_declaracao_escolar(
         <p>Diretora da Unidade Escolar</p>
       </div>
       <div class="footer">
-        <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390</p>
-        <p>Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
+        <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP - Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
       </div>
     </div>
   </div>
@@ -1112,33 +1241,131 @@ def gerar_declaracao_escolar(
     return base_template
 
 
-from datetime import datetime
+# ==========================================================
+#  NOVA FUNÇÃO – LOTE DE ESCOLARIDADE 5º ANO (FUNDAMENTAL)
+# ==========================================================
 
+def gerar_lote_escolaridade_5ano(file_path, file_path2=None):
+    """
+    Gera os dados para DECLARAÇÕES DE ESCOLARIDADE de todos os alunos de 5º ano
+    (Fundamental) em lote.
+    """
+    effective_path = file_path2 if file_path2 is not None else file_path
+    if not effective_path:
+        raise ValueError(
+            "Caminho do arquivo Excel não informado para o lote de escolaridade 5º ano."
+        )
+
+    planilha = pd.read_excel(effective_path, sheet_name="LISTA CORRIDA")
+    planilha.columns = [c.strip().upper() for c in planilha.columns]
+
+    def format_rm(x):
+        try:
+            return str(int(float(x)))
+        except Exception:
+            return str(x)
+
+    planilha["RM_str"] = planilha["RM"].apply(format_rm)
+
+    registros = []
+
+    for _, row in planilha.iterrows():
+        rm_str = str(row.get("RM_str", "")).strip()
+        if rm_str in ("", "0"):
+            continue
+
+        serie_raw = str(row.get("SÉRIE", "")).strip()
+        if not serie_raw:
+            continue
+
+        if "5º" not in serie_raw and "5°" not in serie_raw:
+            continue
+
+        nome = str(row.get("NOME", "")).strip()
+        ra = str(row.get("RA", "")).strip()
+
+        data_nasc_val = row.get("DATA NASC.")
+        if pd.notna(data_nasc_val):
+            try:
+                data_nasc_dt = pd.to_datetime(data_nasc_val, errors="coerce")
+                data_nasc = (
+                    data_nasc_dt.strftime("%d/%m/%Y")
+                    if pd.notna(data_nasc_dt)
+                    else "Desconhecida"
+                )
+            except Exception:
+                data_nasc = "Desconhecida"
+        else:
+            data_nasc = "Desconhecida"
+
+        horario = str(row.get("HORÁRIO", "")).strip()
+        if not horario:
+            horario = "Desconhecido"
+
+        serie_fmt = serie_raw
+        try:
+            serie_fmt = re.sub(r"(\d+º)\s*([A-Za-z])", r"\1 ano \2", serie_fmt)
+        except Exception:
+            pass
+
+        texto = (
+            f"Declaro, para os devidos fins, que o(a) aluno(a) "
+            f"<strong><u>{nome}</u></strong>, portador(a) do RA "
+            f"<strong><u>{ra}</u></strong>, nascido(a) em "
+            f"<strong><u>{data_nasc}</u></strong>, "
+            f"encontra-se regularmente matriculado(a) na "
+            f"E.M José Padin Mouta, cursando atualmente o(a) "
+            f"<strong><u>{serie_fmt}</u></strong> no horário de aula: "
+            f"<strong><u>{horario}</u></strong>."
+        )
+
+        registros.append(
+            {
+                "nome": nome,
+                "ra": ra,
+                "data_nasc": data_nasc,
+                "serie_fmt": serie_fmt,
+                "horario": horario,
+                "texto": texto,
+            }
+        )
+
+    now = datetime.now()
+    meses = {
+        1: "janeiro",
+        2: "fevereiro",
+        3: "março",
+        4: "abril",
+        5: "maio",
+        6: "junho",
+        7: "julho",
+        8: "agosto",
+        9: "setembro",
+        10: "outubro",
+        11: "novembro",
+        12: "dezembro",
+    }
+    mes_nome = meses[now.month].capitalize()
+    data_extenso_str = f"Praia Grande, {now.day:02d} de {mes_nome} de {now.year}"
+    titulo = "Declaração de Escolaridade"
+
+    return registros, data_extenso_str, titulo
+
+
+# ==========================================================
+#  DECLARAÇÃO PERSONALIZADA (Fundamental / EJA)
+# ==========================================================
 
 def gerar_declaracao_personalizada(dados):
     """
     Gera o HTML de declarações personalizadas (Conclusão, Matrícula cancelada
-    ou Não Comparecimento - NCOM), utilizando o mesmo layout das demais
-    declarações.
-
-    Espera um dicionário `dados` com:
-      - segmento: 'Fundamental' ou 'EJA' (ou campo segmento_personalizado)
-      - nome_aluno
-      - data_nascimento (YYYY-MM-DD ou DD/MM/YYYY)
-      - ra
-      - tipo_declaracao: 'Conclusao', 'MatriculaCancelada', 'NCOM'
-    e campos adicionais conforme o tipo.
+    ou Não Comparecimento - NCOM).
     """
 
-    # Helpers internos
     def _get_str(key, default=""):
         return (dados.get(key) or default).strip()
 
     def _normalizar_semestre(*keys):
-        """
-        Procura o semestre em várias chaves possíveis e devolve o primeiro
-        valor não vazio, já "stripped".
-        """
         for k in keys:
             v = dados.get(k)
             if v is None:
@@ -1152,7 +1379,6 @@ def gerar_declaracao_personalizada(dados):
     ra = _get_str("ra")
     data_nasc_raw = _get_str("data_nascimento")
 
-    # aceita tanto 'segmento' quanto 'segmento_personalizado'
     seg_raw = dados.get("segmento") or dados.get("segmento_personalizado") or "Fundamental"
     seg_norm = str(seg_raw).strip().lower()
     if seg_norm in ("fundamental", "fund", "ef", "ensino fundamental"):
@@ -1160,7 +1386,6 @@ def gerar_declaracao_personalizada(dados):
     else:
         segmento = "EJA"
 
-    # Normaliza data de nascimento para DD/MM/AAAA
     data_nasc = "Desconhecida"
     if data_nasc_raw:
         for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
@@ -1171,7 +1396,6 @@ def gerar_declaracao_personalizada(dados):
             except Exception:
                 continue
 
-    # Rótulo do segmento e preposição correta (do / da)
     if segmento == "Fundamental":
         segmento_label = "Ensino Fundamental"
         prep_segmento = "do"
@@ -1179,28 +1403,22 @@ def gerar_declaracao_personalizada(dados):
         segmento_label = "Educação de Jovens e Adultos (EJA)"
         prep_segmento = "da"
 
-    # Aceita tanto 'tipo_declaracao' quanto 'tipo_declaracao_personalizada'
     tipo_decl_raw = dados.get("tipo_declaracao") or dados.get("tipo_declaracao_personalizada")
     tipo_decl = (tipo_decl_raw or "").strip().lower()
 
     declaracao_text = ""
     titulo = ""
 
-    # ------------------------------------------------------
-    # 1) MONTAGEM DO TEXTO DA DECLARAÇÃO
-    # ------------------------------------------------------
     if tipo_decl in ("conclusao", "conclusão"):
         titulo = "Declaração de Conclusão"
         ano_serie = _get_str("ano_serie_concluida")
         ano_conclusao = _get_str("ano_conclusao")
 
-        # Pode vir 'sim'/'nao', True/False, 'on', etc.
         deve_hist_val_raw = dados.get("deve_historico_unidade")
         deve_hist_str = str(deve_hist_val_raw or "").strip().lower()
         deve_hist_unidade = deve_hist_str in ("sim", "1", "true", "on")
 
         if segmento == "Fundamental":
-            # FUNDAMENTAL – período letivo anual, sem semestre
             declaracao_text = (
                 f"Declaro, para os devidos fins, que o(a) aluno(a) "
                 f"<strong><u>{nome}</u></strong>, portador(a) do RA "
@@ -1211,11 +1429,10 @@ def gerar_declaracao_personalizada(dados):
                 f"<strong><u>{ano_conclusao}</u></strong>, nesta unidade escolar."
             )
         else:
-            # EJA – usa semestre na conclusão
             semestre_conclusao = _normalizar_semestre(
-                "semestre_conclusao",        # radio da tela de conclusão
-                "semestre_conclusao_opcao",  # fallback caso mude o name no HTML
-                "semestre_matricula",        # fallback se reusar semestre da matrícula
+                "semestre_conclusao",
+                "semestre_conclusao_opcao",
+                "semestre_matricula",
                 "semestre_matricula_opcao",
             )
 
@@ -1254,7 +1471,6 @@ def gerar_declaracao_personalizada(dados):
             "semestre_matricula_opcao",
         )
 
-        # Só EJA usa semestre na frase; Fundamental fica só com o ano
         if segmento == "EJA" and semestre_matricula:
             periodo_matricula = (
                 f"no <strong><u>{semestre_matricula}</u></strong> do ano de "
@@ -1295,7 +1511,6 @@ def gerar_declaracao_personalizada(dados):
             "semestre_referencia",
         )
 
-        # Semestre só faz sentido na EJA; Fundamental só ano
         if segmento == "EJA" and semestre_ref:
             periodo_ref = (
                 f"para o <strong><u>{semestre_ref}</u></strong> do ano de "
@@ -1333,12 +1548,8 @@ def gerar_declaracao_personalizada(dados):
             )
 
     else:
-        # Tipo desconhecido
         return None
 
-    # ------------------------------------------------------
-    # 2) DATA POR EXTENSO
-    # ------------------------------------------------------
     now = datetime.now()
     meses = {
         1: "janeiro",
@@ -1355,7 +1566,7 @@ def gerar_declaracao_personalizada(dados):
         12: "dezembro",
     }
     mes = meses[now.month].capitalize()
-    data_extenso = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
+    data_extenso_str = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
 
     additional_css = """
 .print-button {
@@ -1372,9 +1583,6 @@ def gerar_declaracao_personalizada(dados):
 }
 """
 
-    # ------------------------------------------------------
-    # 3) HTML FINAL (MESMO LAYOUT DAS OUTRAS DECLARAÇÕES)
-    # ------------------------------------------------------
     base_template = f"""<!doctype html>
 <html lang="pt-br">
 <head>
@@ -1544,7 +1752,7 @@ def gerar_declaracao_personalizada(dados):
       </div>
     </div>
     <div class="date">
-      <p>{data_extenso}</p>
+      <p>{data_extenso_str}</p>
     </div>
     <div class="content">
       <h2 style="text-align:center;text-transform:uppercase;color:#283E51;">
@@ -1559,8 +1767,7 @@ def gerar_declaracao_personalizada(dados):
         <p>Diretora da Unidade Escolar</p>
       </div>
       <div class="footer">
-        <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390</p>
-        <p>Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
+        <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP - Telefone: 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
       </div>
     </div>
   </div>
@@ -1571,6 +1778,7 @@ def gerar_declaracao_personalizada(dados):
 </html>
 """
     return base_template
+
 
 # ==========================================================
 #  AUTENTICAÇÃO / DASHBOARD
@@ -1583,8 +1791,15 @@ def login_route():
         token = request.form.get("token")
         if token == ACCESS_TOKEN:
             session["logged_in"] = True
-            if "lista_fundamental" not in session or "lista_eja" not in session:
+
+            # ==========================================================
+            # AJUSTE: EJA NÃO É MAIS OBRIGATÓRIA
+            # - Só exige lista_fundamental para seguir para o dashboard
+            # - lista_eja permanece suportada, mas opcional
+            # ==========================================================
+            if "lista_fundamental" not in session:
                 return redirect(url_for("upload_listas"))
+
             return redirect(url_for("dashboard"))
         else:
             error = "Token inválido. Tente novamente."
@@ -1603,31 +1818,37 @@ def logout_route():
 def upload_listas():
     if request.method == "POST":
         fundamental_file = request.files.get("lista_fundamental")
-        eja_file = request.files.get("lista_eja")
+        eja_file = request.files.get("lista_eja")  # agora é opcional
 
         if not fundamental_file or fundamental_file.filename == "":
             flash("Selecione a Lista Piloto - REGULAR - 2025", "error")
             return redirect(url_for("upload_listas"))
 
-        if not eja_file or eja_file.filename == "":
-            flash("Selecione a Lista Piloto - EJA - 1º SEM - 2025", "error")
-            return redirect(url_for("upload_listas"))
-
+        # Salva Fundamental (obrigatório)
         fundamental_filename = secure_filename(
             f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
         )
-        eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_" + eja_file.filename)
-
         fundamental_path = os.path.join(app.config["UPLOAD_FOLDER"], fundamental_filename)
-        eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
-
         fundamental_file.save(fundamental_path)
-        eja_file.save(eja_path)
-
         session["lista_fundamental"] = fundamental_path
-        session["lista_eja"] = eja_path
 
-        flash("Listas carregadas com sucesso.", "success")
+        # Salva EJA (opcional)
+        eja_salva = False
+        if eja_file and eja_file.filename:
+            eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_" + eja_file.filename)
+            eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
+            eja_file.save(eja_path)
+            session["lista_eja"] = eja_path
+            eja_salva = True
+
+        if eja_salva:
+            flash("Listas carregadas com sucesso (Fundamental e EJA).", "success")
+        else:
+            flash(
+                "Lista do Fundamental carregada com sucesso. A lista de EJA é opcional e não foi enviada.",
+                "success",
+            )
+
         return redirect(url_for("dashboard"))
 
     return render_template("upload_listas.html")
@@ -1649,18 +1870,14 @@ def carteirinhas():
     if request.method == "POST":
         file_path = None
 
-        # Se veio um arquivo novo no POST, salva e guarda na sessão
         if "excel_file" in request.files and request.files["excel_file"].filename != "":
             file = request.files["excel_file"]
             filename = secure_filename(file.filename)
             unique_filename = f"carteirinhas_{uuid.uuid4().hex}_{filename}"
             file_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
             file.save(file_path)
-
-            # guarda para reutilizar depois sem precisar reenviar
             session["lista_fundamental"] = file_path
         else:
-            # tenta reaproveitar a última lista usada
             file_path = session.get("lista_fundamental")
 
         if not file_path or not os.path.exists(file_path):
@@ -1671,22 +1888,15 @@ def carteirinhas():
         html_result = gerar_html_carteirinhas(file_path)
         return html_result
 
-    # GET – tela de upload / gerenciamento de fotos
     return render_template("carteirinhas.html")
 
 
-# ==========================================================
 #  DECLARAÇÕES – CONCLUSÃO 5º ANO (LOTE)
 # ==========================================================
 
 @app.route("/declaracao/conclusao_5ano")
 @login_required
 def declaracao_conclusao_5ano():
-    """
-    Gera TODAS as declarações de CONCLUSÃO dos alunos de 5º ano (Fundamental)
-    em um único HTML com quebras de página para impressão/PDF.
-    Usa o template declaracao_conclusao_5ano.html.
-    """
     if session.get("declaracao_tipo") != "Fundamental":
         flash(
             "As declarações em lote de 5º ano estão disponíveis apenas para o Fundamental.",
@@ -1694,11 +1904,8 @@ def declaracao_conclusao_5ano():
         )
         return redirect(url_for("declaracao_tipo"))
 
-    # Prioriza o caminho utilizado na última declaração singular,
-    # mas também aceita a lista_fundamental
     file_path = session.get("declaracao_excel") or session.get("lista_fundamental")
 
-    # Se o servidor “acordou” e o arquivo não existe mais, força o usuário a reenviar a lista
     if not file_path or not os.path.exists(file_path):
         flash(
             "Arquivo Excel do Fundamental não encontrado. "
@@ -1707,7 +1914,6 @@ def declaracao_conclusao_5ano():
         )
         return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
 
-    # Lê a LISTA CORRIDA
     planilha = pd.read_excel(file_path, sheet_name="LISTA CORRIDA")
     planilha.columns = [c.strip().upper() for c in planilha.columns]
 
@@ -1730,7 +1936,6 @@ def declaracao_conclusao_5ano():
         if not serie_raw:
             continue
 
-        # Apenas 5º ano (5ºA, 5º B, 5º ano A, etc.)
         if "5º" not in serie_raw and "5°" not in serie_raw:
             continue
 
@@ -1755,14 +1960,12 @@ def declaracao_conclusao_5ano():
         if not horario:
             horario = "Desconhecido"
 
-        # Formata série para "5º ano A"
         serie_fmt = serie_raw
         try:
             serie_fmt = re.sub(r"(\d+º)\s*([A-Za-z])", r"\1 ano \2", serie_fmt)
         except Exception:
             pass
 
-        # Série subsequente (6º ano)
         series_text = "a série subsequente"
         m = re.search(r"(\d+)º", serie_fmt)
         if m:
@@ -1772,7 +1975,6 @@ def declaracao_conclusao_5ano():
             except Exception:
                 pass
 
-        # Bolsa Família
         valor_bolsa = str(row.get("BOLSA FAMILIA", "")).strip().upper()
 
         declaracao_text = (
@@ -1813,31 +2015,25 @@ def declaracao_conclusao_5ano():
         flash("Nenhum aluno de 5º ano encontrado na lista piloto.", "error")
         return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
 
-    now = datetime.now()
-    meses = {
-        1: "janeiro",
-        2: "fevereiro",
-        3: "março",
-        4: "abril",
-        5: "maio",
-        6: "junho",
-        7: "julho",
-        8: "agosto",
-        9: "setembro",
-        10: "outubro",
-        11: "novembro",
-        12: "dezembro",
-    }
-    mes = meses[now.month].capitalize()
-    data_extenso = f"Praia Grande, {now.day:02d} de {mes} de {now.year}"
+    data_extenso_str = "Praia Grande, 22 de dezembro de 2025"
     titulo = "Declaração de Conclusão"
+
+    registros_duas_vias = []
+    for reg in registros:
+        reg1 = reg.copy()
+        reg1["via"] = 1
+        registros_duas_vias.append(reg1)
+
+        reg2 = reg.copy()
+        reg2["via"] = 2
+        registros_duas_vias.append(reg2)
 
     return render_template(
         "declaracao_conclusao_5ano.html",
-        registros=registros,
-        data_extenso=data_extenso,
+        registros=registros_duas_vias,
+        data_extenso=data_extenso_str,
         titulo=titulo,
-        total=len(registros),
+        total=len(registros_duas_vias),
     )
 
 
@@ -1848,20 +2044,7 @@ def declaracao_conclusao_5ano():
 @app.route("/declaracao/tipo", methods=["GET", "POST"])
 @login_required
 def declaracao_tipo():
-    """
-    Tela única para:
-    - escolher segmento (Fundamental / EJA / Personalizado)
-    - anexar lista piloto (se ainda não houver) – apenas Fundamental/EJA
-    - escolher aluno e tipo de declaração (Fundamental/EJA) OU
-      preencher dados manuais (Personalizada)
-    - gerar a declaração singular
-    """
-
-    # --------------------------------------
-    # POST: GERAR DECLARAÇÃO
-    # --------------------------------------
     if request.method == "POST":
-        # Verifica se é fluxo normal (Fundamental/EJA) ou fluxo personalizado
         modo_declaracao = request.form.get("modo_declaracao")
 
         # -------------------------------
@@ -1901,21 +2084,18 @@ def declaracao_tipo():
                 "tipo_declaracao": tipo_pers,
             }
 
-            # Campos específicos de cada tipo
             if tipo_pers == "Conclusao":
                 ano_serie_concluida = (request.form.get("ano_serie_concluida") or "").strip()
                 ano_conclusao = (request.form.get("ano_conclusao") or "").strip()
                 deve_hist_unidade = request.form.get("deve_historico_unidade")
                 semestre_conclusao = (request.form.get("semestre_conclusao") or "").strip()
 
-                # validação básica
                 campos_invalidos = (
                     not ano_serie_concluida
                     or not ano_conclusao
                     or deve_hist_unidade not in ("Sim", "Não")
                 )
 
-                # para EJA, o semestre é obrigatório
                 if segmento_pers == "EJA" and not semestre_conclusao:
                     campos_invalidos = True
 
@@ -1978,7 +2158,6 @@ def declaracao_tipo():
                     }
                 )
 
-            # Gera a declaração personalizada
             declaracao_html = gerar_declaracao_personalizada(dados_personalizados)
 
             if declaracao_html is None:
@@ -1998,22 +2177,28 @@ def declaracao_tipo():
             flash("Selecione se a declaração é do Fundamental ou EJA antes de gerar.", "error")
             return redirect(url_for("declaracao_tipo"))
 
-        # Campos básicos já lidos aqui para podermos tratar o caso "upload apenas"
         rm = (request.form.get("rm") or "").strip()
         tipo = (request.form.get("tipo") or "").strip()
+
+        tipo_lower = tipo.lower()
+        if tipo_lower in ("transferencia", "transferência"):
+            tipo = "Transferencia"
+        elif tipo_lower in ("conclusao", "conclusão"):
+            tipo = "Conclusão"
+        elif tipo_lower in ("frequencia", "frequência"):
+            tipo = "Frequencia"
+
         deve_historico_str = request.form.get("deve_historico")
 
         unidade_select = (request.form.get("unidade_anterior_select") or "").strip()
         unidade_manual = (request.form.get("unidade_anterior_manual") or "").strip()
         unidade_anterior = unidade_select or unidade_manual
 
-        # Upload ou reaproveita lista da sessão
         file_path = None
         excel_file = request.files.get("excel_file")
         novo_upload = excel_file is not None and excel_file.filename
 
         if novo_upload:
-            # Novo envio de lista piloto (usado inclusive para “recuperar” após hibernação)
             filename = secure_filename(excel_file.filename)
             unique_filename = f"declaracao_{uuid.uuid4().hex}_{filename}"
             file_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_filename)
@@ -2024,13 +2209,11 @@ def declaracao_tipo():
             else:
                 session["lista_eja"] = file_path
         else:
-            # Reaproveita o caminho já salvo na sessão
             if segmento == "Fundamental":
                 file_path = session.get("lista_fundamental")
             else:
                 file_path = session.get("lista_eja")
 
-        # Se ainda assim não houver arquivo válido, não há o que fazer
         if not file_path or not os.path.exists(file_path):
             flash(
                 "Nenhuma lista piloto encontrada para este segmento. Anexe o arquivo em Excel.",
@@ -2038,30 +2221,20 @@ def declaracao_tipo():
             )
             return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        # Atualiza infos de declaração na sessão (usadas em outras rotas, ex: 5º ano)
         session["declaracao_tipo"] = segmento
         session["declaracao_excel"] = file_path
 
-        # --------------------------------------------------
-        # CASO ESPECIAL: usuário acabou de ENVIAR APENAS A LISTA
-        # (sem RM / tipo) – típico após o servidor “acordar”
-        # --------------------------------------------------
         if novo_upload and (not rm or not tipo):
             flash(
-                "Lista piloto carregada com sucesso. "
-                "Agora selecione o aluno e o tipo de declaração.",
+                "Lista piloto carregada com sucesso. Agora selecione o aluno e o tipo de declaração.",
                 "success",
             )
             return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        # --------------------------------------------------
-        # A partir daqui, fluxo normal de geração de declaração
-        # --------------------------------------------------
         if not rm or not tipo:
             flash("Escolha o aluno e o tipo de declaração.", "error")
             return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        # Valida histórico quando for Transferência ou Conclusão
         if tipo in ("Transferencia", "Conclusão"):
             if deve_historico_str not in ("sim", "nao"):
                 flash("Por favor, responda se o aluno deve o histórico escolar.", "error")
@@ -2079,13 +2252,9 @@ def declaracao_tipo():
             deve_historico = False
             unidade_anterior = ""
 
-        # ---------------------------------------------
-        # NOVO BLOCO: TRATAMENTO DE DECLARAÇÃO DE FREQUÊNCIA
-        # ---------------------------------------------
         dados_frequencia = None
 
         if tipo == "Frequencia":
-            # mesma ordem de meses usada no template
             meses = [
                 ("jan", "Janeiro"),
                 ("fev", "Fevereiro"),
@@ -2108,7 +2277,6 @@ def declaracao_tipo():
                 dias_raw = (request.form.get(f"freq_{mes_id}_dias") or "").strip()
                 faltas_raw = (request.form.get(f"freq_{mes_id}_faltas") or "").strip()
 
-                # Se o mês foi deixado totalmente em branco, apenas marca como não preenchido
                 if not dias_raw and not faltas_raw:
                     dados_frequencia["meses"].append(
                         {
@@ -2122,7 +2290,6 @@ def declaracao_tipo():
                     )
                     continue
 
-                # Se preencheu algo, precisa dos dois campos
                 try:
                     dias = float(dias_raw.replace(",", ".")) if dias_raw else None
                     faltas = float(faltas_raw.replace(",", ".")) if faltas_raw else None
@@ -2169,14 +2336,13 @@ def declaracao_tipo():
                 )
                 return redirect(url_for("declaracao_tipo", segmento=segmento))
 
-        # Chamada para geração da declaração
         declaracao_html = gerar_declaracao_escolar(
             file_path=file_path,
             rm=rm,
             tipo=tipo,
             deve_historico=deve_historico,
             unidade_anterior=unidade_anterior,
-            dados_frequencia=dados_frequencia,  # novo parâmetro opcional
+            dados_frequencia=dados_frequencia,
         )
 
         if declaracao_html is None:
@@ -2221,6 +2387,7 @@ def declaracao_tipo():
             ]
 
     elif segmento == "EJA":
+        # EJA permanece suportada, porém agora é opcional no sistema como um todo.
         file_path = session.get("lista_eja")
         if file_path and os.path.exists(file_path):
             tem_lista = True
@@ -2238,10 +2405,13 @@ def declaracao_tipo():
                 {"rm": row["RM_str"], "nome": row["NOME"]}
                 for _, row in alunos_df.iterrows()
             ]
+        else:
+            tem_lista = False
+            alunos = []
 
-    # segmento == "Personalizado": não há lista piloto nem alunos pré-carregados
     dashboard_url = url_for("dashboard")
     conclusao_5ano_url = url_for("declaracao_conclusao_5ano")
+    escolaridade_5ano_url = url_for("declaracao_escolaridade_5ano")
 
     return render_template(
         "declaracao_tipo.html",
@@ -2250,7 +2420,51 @@ def declaracao_tipo():
         alunos=alunos,
         dashboard_url=dashboard_url,
         conclusao_5ano_url=conclusao_5ano_url,
+        escolaridade_5ano_url=escolaridade_5ano_url,
     )
+
+
+@app.route("/declaracao/escolaridade_5ano")
+@login_required
+def declaracao_escolaridade_5ano(file_path_arg=None):
+    if file_path_arg:
+        file_path = file_path_arg
+    else:
+        file_path = session.get("declaracao_excel")
+
+    if session.get("declaracao_tipo") != "Fundamental":
+        flash(
+            "As declarações de escolaridade de 5º ano só podem ser geradas "
+            "com a lista piloto do Ensino Fundamental.",
+            "error",
+        )
+        return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
+
+    if not file_path or not os.path.exists(file_path):
+        flash(
+            "Nenhuma lista piloto do Ensino Fundamental está carregada. "
+            "Anexe a lista piloto novamente para gerar as declarações.",
+            "error",
+        )
+        return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
+
+    registros, data_extenso_str, titulo = gerar_lote_escolaridade_5ano(file_path)
+
+    if not registros:
+        flash(
+            "Nenhum aluno de 5º ano foi encontrado na lista piloto para "
+            "gerar as declarações de escolaridade.",
+            "error",
+        )
+        return redirect(url_for("declaracao_tipo", segmento="Fundamental"))
+
+    return render_template(
+        "declaracao_escolaridade_5ano.html",
+        registros=registros,
+        data_extenso=data_extenso_str,
+        titulo=titulo,
+    )
+
 
 # ==========================================================
 #  UPLOAD DE FOTOS (CARTEIRINHAS)
@@ -2365,7 +2579,6 @@ def upload_inline_foto():
 def quadros():
     return render_template("quadros.html")
 
-
 # ==========================================================
 #  QUADRO – INCLUSÃO
 # ==========================================================
@@ -2409,6 +2622,7 @@ def quadros_inclusao():
                 with open(session["lista_eja"], "rb") as f_eja:
                     df_eja = pd.read_excel(f_eja, sheet_name="LISTA CORRIDA")
             except Exception:
+                # EJA é opcional: se existir arquivo em sessão e falhar, mantém o aviso e retorna
                 flash("Erro ao ler a Lista Piloto EJA.", "error")
                 return redirect(url_for("quadros_inclusao"))
 
@@ -2532,7 +2746,7 @@ def quadros_inclusao():
                     ws.cell(row=current_row, column=15, value=valor_coluna_o)
                     current_row += 1
 
-        # Processa alunos da Lista Piloto EJA
+        # Processa alunos da Lista Piloto EJA (opcional)
         if df_eja is not None:
             if len(df_eja.columns) < 29:
                 flash("O arquivo da Lista Piloto EJA não possui colunas suficientes.", "error")
@@ -2608,6 +2822,7 @@ def quadros_inclusao():
         output = BytesIO()
         wb.save(output)
         output.seek(0)
+
         meses = {
             1: "janeiro",
             2: "fevereiro",
@@ -2624,6 +2839,7 @@ def quadros_inclusao():
         }
         mes = meses[datetime.now().month].capitalize()
         filename = f"Quadro de Inclusão - {mes} - E.M José Padin Mouta.xlsx"
+
         return send_file(
             output,
             as_attachment=True,
@@ -2654,7 +2870,7 @@ def quadro_atendimento_mensal():
             fundamental_file.save(file_path)
             session['lista_fundamental'] = file_path
 
-        # EJA – atualiza arquivo da sessão, se enviado
+        # EJA – atualiza arquivo da sessão, se enviado (OPCIONAL)
         if eja_file and eja_file.filename != '':
             filename = secure_filename(eja_file.filename)
             unique_filename = f"atendimento_eja_{uuid.uuid4().hex}_{filename}"
@@ -2768,61 +2984,78 @@ def quadro_atendimento_mensal():
         set_merged_cell_value(ws_modelo, "C41", ws_total.cell(row=10, column=8).value)  # H10
         set_merged_cell_value(ws_modelo, "C42", ws_total.cell(row=11, column=8).value)  # H11
 
-        # ---- EJA (usa arquivo salvo em sessão) ----
+        # ---- EJA (OPCIONAL: usa arquivo salvo em sessão, se existir) ----
         eja_path = session.get('lista_eja')
+
+        def _preencher_eja_zerado():
+            # Define como 0 os campos do bloco EJA no modelo, para manter o arquivo consistente
+            cells_zero = [
+                "L19", "L20", "L21", "L22",
+                "M19", "M20", "M21", "M22",
+                "L27", "L28", "L29", "L30",
+                "M27", "M28", "M29", "M30",
+                "L35", "L36", "L37",
+                "M35", "M36", "M37",
+                "R32",
+            ]
+            for addr in cells_zero:
+                set_merged_cell_value(ws_modelo, addr, 0)
+            # Mantém o R24 como "-" (já setado acima)
+
         if not eja_path or not os.path.exists(eja_path):
-            flash("Arquivo da Lista Piloto EJA não encontrado.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
+            # Sem EJA: apenas zera o bloco EJA e segue normalmente
+            _preencher_eja_zerado()
+        else:
+            try:
+                with open(eja_path, "rb") as f_eja:
+                    wb_eja = load_workbook(f_eja, data_only=True)
+            except Exception as e:
+                # EJA é opcional: se houver arquivo e falhar leitura, informa e gera sem EJA
+                flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}. Gerando sem EJA.", "warning")
+                _preencher_eja_zerado()
+            else:
+                sheet_name_eja = None
+                for name in wb_eja.sheetnames:
+                    if name.strip().lower() == "total de alunos":
+                        sheet_name_eja = name
+                        break
 
-        try:
-            with open(eja_path, "rb") as f_eja:
-                wb_eja = load_workbook(f_eja, data_only=True)
-        except Exception as e:
-            flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
+                if not sheet_name_eja:
+                    flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA. Gerando sem EJA.", "warning")
+                    _preencher_eja_zerado()
+                else:
+                    ws_total_eja = wb_eja[sheet_name_eja]
 
-        sheet_name_eja = None
-        for name in wb_eja.sheetnames:
-            if name.strip().lower() == "total de alunos":
-                sheet_name_eja = name
-                break
+                    set_merged_cell_value(ws_modelo, "L19", ws_total_eja.cell(row=6, column=5).value)  # E6
+                    set_merged_cell_value(ws_modelo, "L20", ws_total_eja.cell(row=7, column=5).value)  # E7
+                    set_merged_cell_value(ws_modelo, "L21", ws_total_eja.cell(row=8, column=5).value)  # E8
+                    set_merged_cell_value(ws_modelo, "L22", ws_total_eja.cell(row=9, column=5).value)  # E9
 
-        if not sheet_name_eja:
-            flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA.", "error")
-            return redirect(url_for('quadro_atendimento_mensal'))
+                    set_merged_cell_value(ws_modelo, "M19", ws_total_eja.cell(row=6, column=6).value)  # F6
+                    set_merged_cell_value(ws_modelo, "M20", ws_total_eja.cell(row=7, column=6).value)  # F7
+                    set_merged_cell_value(ws_modelo, "M21", ws_total_eja.cell(row=8, column=6).value)  # F8
+                    set_merged_cell_value(ws_modelo, "M22", ws_total_eja.cell(row=9, column=6).value)  # F9
 
-        ws_total_eja = wb_eja[sheet_name_eja]
+                    set_merged_cell_value(ws_modelo, "L27", ws_total_eja.cell(row=11, column=5).value)  # E11
+                    set_merged_cell_value(ws_modelo, "L28", ws_total_eja.cell(row=12, column=5).value)  # E12
+                    set_merged_cell_value(ws_modelo, "L29", ws_total_eja.cell(row=13, column=5).value)  # E13
+                    set_merged_cell_value(ws_modelo, "L30", ws_total_eja.cell(row=14, column=5).value)  # E14
 
-        set_merged_cell_value(ws_modelo, "L19", ws_total_eja.cell(row=6, column=5).value)  # E6
-        set_merged_cell_value(ws_modelo, "L20", ws_total_eja.cell(row=7, column=5).value)  # E7
-        set_merged_cell_value(ws_modelo, "L21", ws_total_eja.cell(row=8, column=5).value)  # E8
-        set_merged_cell_value(ws_modelo, "L22", ws_total_eja.cell(row=9, column=5).value)  # E9
+                    set_merged_cell_value(ws_modelo, "M27", ws_total_eja.cell(row=11, column=6).value)  # F11
+                    set_merged_cell_value(ws_modelo, "M28", ws_total_eja.cell(row=12, column=6).value)  # F12
+                    set_merged_cell_value(ws_modelo, "M29", ws_total_eja.cell(row=13, column=6).value)  # F13
+                    set_merged_cell_value(ws_modelo, "M30", ws_total_eja.cell(row=14, column=6).value)  # F14
 
-        set_merged_cell_value(ws_modelo, "M19", ws_total_eja.cell(row=6, column=6).value)  # F6
-        set_merged_cell_value(ws_modelo, "M20", ws_total_eja.cell(row=7, column=6).value)  # F7
-        set_merged_cell_value(ws_modelo, "M21", ws_total_eja.cell(row=8, column=6).value)  # F8
-        set_merged_cell_value(ws_modelo, "M22", ws_total_eja.cell(row=9, column=6).value)  # F9
+                    set_merged_cell_value(ws_modelo, "L35", ws_total_eja.cell(row=16, column=5).value)  # E16
+                    set_merged_cell_value(ws_modelo, "L36", ws_total_eja.cell(row=17, column=5).value)  # E17
+                    set_merged_cell_value(ws_modelo, "L37", ws_total_eja.cell(row=18, column=5).value)  # E18
 
-        set_merged_cell_value(ws_modelo, "L27", ws_total_eja.cell(row=11, column=5).value)  # E11
-        set_merged_cell_value(ws_modelo, "L28", ws_total_eja.cell(row=12, column=5).value)  # E12
-        set_merged_cell_value(ws_modelo, "L29", ws_total_eja.cell(row=13, column=5).value)  # E13
-        set_merged_cell_value(ws_modelo, "L30", ws_total_eja.cell(row=14, column=5).value)  # E14
+                    set_merged_cell_value(ws_modelo, "M35", ws_total_eja.cell(row=16, column=6).value)  # F16
+                    set_merged_cell_value(ws_modelo, "M36", ws_total_eja.cell(row=17, column=6).value)  # F17
+                    set_merged_cell_value(ws_modelo, "M37", ws_total_eja.cell(row=18, column=6).value)  # F18
 
-        set_merged_cell_value(ws_modelo, "M27", ws_total_eja.cell(row=11, column=6).value)  # F11
-        set_merged_cell_value(ws_modelo, "M28", ws_total_eja.cell(row=12, column=6).value)  # F12
-        set_merged_cell_value(ws_modelo, "M29", ws_total_eja.cell(row=13, column=6).value)  # F13
-        set_merged_cell_value(ws_modelo, "M30", ws_total_eja.cell(row=14, column=6).value)  # F14
-
-        set_merged_cell_value(ws_modelo, "L35", ws_total_eja.cell(row=16, column=5).value)  # E16
-        set_merged_cell_value(ws_modelo, "L36", ws_total_eja.cell(row=17, column=5).value)  # E17
-        set_merged_cell_value(ws_modelo, "L37", ws_total_eja.cell(row=18, column=5).value)  # E18
-
-        set_merged_cell_value(ws_modelo, "M35", ws_total_eja.cell(row=16, column=6).value)  # F16
-        set_merged_cell_value(ws_modelo, "M36", ws_total_eja.cell(row=17, column=6).value)  # F17
-        set_merged_cell_value(ws_modelo, "M37", ws_total_eja.cell(row=18, column=6).value)  # F18
-
-        set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)  # G20
-        set_merged_cell_value(ws_modelo, "R24", "-")
+                    set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)  # G20
+                    set_merged_cell_value(ws_modelo, "R24", "-")
 
         # Gera arquivo em memória
         output = BytesIO()
@@ -2839,6 +3072,7 @@ def quadro_atendimento_mensal():
 
     # GET – renderiza a tela padronizada
     return render_template('quadro_atendimento_mensal.html')
+
 
 # ==========================================================
 #  QUADRO – TRANSFERÊNCIAS
@@ -2982,7 +3216,7 @@ def quadro_transferencias():
                     }
                     transfer_records.append(record)
 
-        # ---- PARTE 2: EJA (TE / MC / MCC) ----
+        # ---- PARTE 2: EJA (TE / MC / MCC) – OPCIONAL ----
         if eja_path and os.path.exists(eja_path):
             try:
                 df_eja = pd.read_excel(eja_path, sheet_name="LISTA CORRIDA")
@@ -3114,6 +3348,7 @@ def quadro_transferencias():
 
     # GET – exibe o formulário estilizado
     return render_template("quadro_transferencias.html")
+
 
 # ==========================================================
 #  QUADRO – QUANTITATIVO MENSAL (Fundamental)
@@ -3321,8 +3556,9 @@ def quadro_quantitativo_mensal():
     # GET: exibe o formulário
     return render_template("quadro_quantitativo_mensal.html")
 
+
 # ==========================================================
-#  QUADRO QUANTITATIVO DE INCLUSÃO – REGULAR + EJA
+#  QUADRO QUANTITATIVO DE INCLUSÃO – REGULAR + EJA (EJA OPCIONAL)
 # ==========================================================
 
 SETORES = ["Financeiro", "Recursos Humanos", "Administrativo", "Marketing", "TI"]
@@ -3339,20 +3575,26 @@ def quantinclusao():
             flash("Selecione o arquivo da Lista Piloto Regular.", "error")
             return redirect(url_for("quantinclusao"))
 
-        if not eja_file or eja_file.filename == "":
-            flash("Selecione o arquivo da Lista Piloto EJA.", "error")
-            return redirect(url_for("quantinclusao"))
-
+        # EJA é OPCIONAL (pode não enviar)
         if not responsavel or responsavel.strip() == "":
             flash("Informe o Responsável pelo preenchimento.", "error")
             return redirect(url_for("quantinclusao"))
 
         reg_filename = secure_filename(f"regular_{uuid.uuid4().hex}_{reg_file.filename}")
-        eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_{eja_file.filename}")
         reg_path = os.path.join(app.config["UPLOAD_FOLDER"], reg_filename)
-        eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
         reg_file.save(reg_path)
-        eja_file.save(eja_path)
+
+        # Se vier EJA, salva e guarda em sessão; se não vier, tenta reaproveitar o último da sessão (opcional)
+        eja_path = None
+        if eja_file and eja_file.filename != "":
+            eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_{eja_file.filename}")
+            eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
+            eja_file.save(eja_path)
+            session["lista_eja"] = eja_path
+        else:
+            last_eja = session.get("lista_eja")
+            if last_eja and os.path.exists(last_eja):
+                eja_path = last_eja
 
         # Regular – Total de Alunos + LISTA CORRIDA
         try:
@@ -3398,33 +3640,10 @@ def quantinclusao():
         count_5A = count_5B = count_5C = count_5D = count_5E = count_5F = count_5G = 0
 
         series_list = [
-            "2ºA",
-            "2ºB",
-            "2ºC",
-            "2ºD",
-            "2ºE",
-            "2ºF",
-            "2ºG",
-            "3ºA",
-            "3ºB",
-            "3ºC",
-            "3ºD",
-            "3ºE",
-            "3ºF",
-            "4ºA",
-            "4ºB",
-            "4ºC",
-            "4ºD",
-            "4ºE",
-            "4ºF",
-            "4ºG",
-            "5ºA",
-            "5ºB",
-            "5ºC",
-            "5ºD",
-            "5ºE",
-            "5ºF",
-            "5ºG",
+            "2ºA", "2ºB", "2ºC", "2ºD", "2ºE", "2ºF", "2ºG",
+            "3ºA", "3ºB", "3ºC", "3ºD", "3ºE", "3ºF",
+            "4ºA", "4ºB", "4ºC", "4ºD", "4ºE", "4ºF", "4ºG",
+            "5ºA", "5ºB", "5ºC", "5ºD", "5ºE", "5ºF", "5ºG",
         ]
         unique_names = {serie: set() for serie in series_list}
 
@@ -3488,37 +3707,16 @@ def quantinclusao():
             elif serie == "5ºG" and is_valid_plano(plano):
                 count_5G += 1
 
-        # EJA – Total de Alunos
-        try:
-            wb_eja = load_workbook(eja_path, data_only=True)
-            ws_total_eja = wb_eja["Total de Alunos"]
-        except Exception as e:
-            flash(f"Erro ao ler o arquivo EJA: {str(e)}", "error")
-            return redirect(url_for("quantinclusao"))
-
+        # EJA – Total de Alunos (OPCIONAL)
         eja_map = {
-            "D53": ws_total_eja["M10"].value,
-            "D57": (ws_total_eja["M11"].value or 0) + (ws_total_eja["M12"].value or 0),
-            "D61": ws_total_eja["M13"].value,
-            "H53": ws_total_eja["M14"].value,
-            "H57": ws_total_eja["M16"].value,
-            "H61": ws_total_eja["M17"].value,
-            "L53": ws_total_eja["M18"].value,
+            "D53": 0,
+            "D57": 0,
+            "D61": 0,
+            "H53": 0,
+            "H57": 0,
+            "H61": 0,
+            "L53": 0,
         }
-
-        try:
-            ws_lista_eja = wb_eja["LISTA CORRIDA"]
-        except Exception as e:
-            flash(f"Erro ao ler a aba LISTA CORRIDA no arquivo EJA: {str(e)}", "error")
-            return redirect(url_for("quantinclusao"))
-
-        series_ef_group1 = {"1ª SÉRIE E.F", "2ª SÉRIE E.F", "3ª SÉRIE E.F", "4ª SÉRIE E.F"}
-        series_ef_group2 = {"5ª SÉRIE E.F", "6ª SÉRIE E.F"}
-        series_ef_group3 = {"7ª SÉRIE E.F"}
-        series_ef_group4 = {"8ª SÉRIE E.F"}
-        series_em_group1 = {"1ª SÉRIE E.M"}
-        series_em_group2 = {"2ª SÉRIE E.M"}
-        series_em_group3 = {"3ª SÉRIE E.M"}
 
         d54_count = 0
         unique_d55 = set()
@@ -3535,44 +3733,74 @@ def quantinclusao():
         l54_count = 0
         unique_l55 = set()
 
-        for row in ws_lista_eja.iter_rows(min_row=2, values_only=True):
-            serie = str(row[0]).strip() if row[0] is not None else ""
-            nome = row[19] if len(row) > 19 else None
+        if eja_path and os.path.exists(eja_path):
+            try:
+                wb_eja = load_workbook(eja_path, data_only=True)
+                ws_total_eja = wb_eja["Total de Alunos"]
+            except Exception as e:
+                flash(f"Erro ao ler o arquivo EJA: {str(e)}. Gerando sem EJA.", "warning")
+            else:
+                eja_map = {
+                    "D53": ws_total_eja["M10"].value,
+                    "D57": (ws_total_eja["M11"].value or 0) + (ws_total_eja["M12"].value or 0),
+                    "D61": ws_total_eja["M13"].value,
+                    "H53": ws_total_eja["M14"].value,
+                    "H57": ws_total_eja["M16"].value,
+                    "H61": ws_total_eja["M17"].value,
+                    "L53": ws_total_eja["M18"].value,
+                }
 
-            if serie in series_ef_group1:
-                if is_valid_plano(nome):
-                    d54_count += 1
-                    unique_d55.add(str(nome).strip())
+                try:
+                    ws_lista_eja = wb_eja["LISTA CORRIDA"]
+                except Exception as e:
+                    flash(f"Erro ao ler a aba LISTA CORRIDA no arquivo EJA: {str(e)}. Gerando sem EJA.", "warning")
+                else:
+                    series_ef_group1 = {"1ª SÉRIE E.F", "2ª SÉRIE E.F", "3ª SÉRIE E.F", "4ª SÉRIE E.F"}
+                    series_ef_group2 = {"5ª SÉRIE E.F", "6ª SÉRIE E.F"}
+                    series_ef_group3 = {"7ª SÉRIE E.F"}
+                    series_ef_group4 = {"8ª SÉRIE E.F"}
+                    series_em_group1 = {"1ª SÉRIE E.M"}
+                    series_em_group2 = {"2ª SÉRIE E.M"}
+                    series_em_group3 = {"3ª SÉRIE E.M"}
 
-            if serie in series_ef_group2:
-                if is_valid_plano(nome):
-                    d58_count += 1
-                    unique_d59.add(str(nome).strip())
+                    for row in ws_lista_eja.iter_rows(min_row=2, values_only=True):
+                        serie = str(row[0]).strip() if row[0] is not None else ""
+                        nome = row[19] if len(row) > 19 else None
 
-            if serie in series_ef_group3:
-                if is_valid_plano(nome):
-                    d62_count += 1
-                    unique_d63.add(str(nome).strip())
+                        if serie in series_ef_group1:
+                            if is_valid_plano(nome):
+                                d54_count += 1
+                                unique_d55.add(str(nome).strip())
 
-            if serie in series_ef_group4:
-                if is_valid_plano(nome):
-                    h54_count += 1
-                    unique_h55.add(str(nome).strip())
+                        if serie in series_ef_group2:
+                            if is_valid_plano(nome):
+                                d58_count += 1
+                                unique_d59.add(str(nome).strip())
 
-            if serie in series_em_group1:
-                if is_valid_plano(nome):
-                    h58_count += 1
-                    unique_h59.add(str(nome).strip())
+                        if serie in series_ef_group3:
+                            if is_valid_plano(nome):
+                                d62_count += 1
+                                unique_d63.add(str(nome).strip())
 
-            if serie in series_em_group2:
-                if is_valid_plano(nome):
-                    h62_count += 1
-                    unique_h63.add(str(nome).strip())
+                        if serie in series_ef_group4:
+                            if is_valid_plano(nome):
+                                h54_count += 1
+                                unique_h55.add(str(nome).strip())
 
-            if serie in series_em_group3:
-                if is_valid_plano(nome):
-                    l54_count += 1
-                    unique_l55.add(str(nome).strip())
+                        if serie in series_em_group1:
+                            if is_valid_plano(nome):
+                                h58_count += 1
+                                unique_h59.add(str(nome).strip())
+
+                        if serie in series_em_group2:
+                            if is_valid_plano(nome):
+                                h62_count += 1
+                                unique_h63.add(str(nome).strip())
+
+                        if serie in series_em_group3:
+                            if is_valid_plano(nome):
+                                l54_count += 1
+                                unique_l55.add(str(nome).strip())
 
         model_path = os.path.join("modelos", "Quadro Quantitativo de Inclusão - Modelo.xlsx")
         try:
@@ -3587,9 +3815,9 @@ def quantinclusao():
         for cell_addr, value in reg_map.items():
             ws_model[cell_addr] = value
 
-        # EJA fixo
+        # EJA fixo (zera se não houver EJA)
         for cell_addr, value in eja_map.items():
-            ws_model[cell_addr] = value
+            ws_model[cell_addr] = value if value is not None else 0
 
         # Contagem simples Regular
         ws_model["D14"] = count_2A
@@ -3658,9 +3886,10 @@ def quantinclusao():
         ws_model["L43"] = len(unique_names["5ºF"])
         ws_model["L47"] = len(unique_names["5ºG"])
 
-        # Dados do EJA (LISTA CORRIDA)
+        # Outros campos já existentes no seu modelo
         ws_model["H41"] = ws_total_reg["O23"].value
 
+        # Dados do EJA (LISTA CORRIDA) – se não houver EJA, permanece 0
         ws_model["D54"] = d54_count
         ws_model["D55"] = len(unique_d55)
         ws_model["D58"] = d58_count
@@ -3711,6 +3940,7 @@ def quantinclusao():
 
     # GET
     return render_template("quantinclusao.html")
+
 
 # ==========================================================
 #  MAIN

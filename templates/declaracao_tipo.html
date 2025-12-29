@@ -1033,8 +1033,11 @@
           </button>
 
           {% if segmento == 'Fundamental' %}
-          <button type="button" id="btn-5ano" class="btn-lote" style="display:none;">
-            <i class="fas fa-layer-group"></i> Gerar declarações de 5º ano
+          <button type="button" id="btn-5ano-conclusao" class="btn-lote" style="display:none;">
+            <i class="fas fa-layer-group"></i> Conclusão - 5º ano (lote)
+          </button>
+          <button type="button" id="btn-5ano-escolaridade" class="btn-lote" style="display:none;">
+            <i class="fas fa-layer-group"></i> Escolaridade - 5º ano (lote)
           </button>
           {% endif %}
 
@@ -1427,6 +1430,17 @@
       var temLista = {{ tem_lista | tojson }};
       var passoAtualPadrao = null;
 
+      // Normaliza o tipo de declaração para uma forma canônica,
+      // independentemente de vir com ou sem acento no value do select.
+      function normalizarTipo(tipo) {
+        if (!tipo) return '';
+        var t = tipo.toString().toLowerCase();
+        if (t === 'transferencia' || t === 'transferência') return 'Transferencia';
+        if (t === 'conclusao'   || t === 'conclusão')   return 'Conclusão';
+        if (t === 'frequencia'  || t === 'frequência')  return 'Frequencia';
+        return tipo;
+      }
+
       function aplicarHighlightPadrao(selector) {
         if (passoAtualPadrao === selector) return;
         $('.step-highlight-field').removeClass('step-highlight-field');
@@ -1533,7 +1547,7 @@
       });
 
       function atualizarSecoesExtras() {
-        var tipo = $('#tipo').val();
+        var tipo = normalizarTipo($('#tipo').val());
 
         if (tipo === 'Transferencia' || tipo === 'Conclusão') {
           $('#frequencia-container').slideUp(150);
@@ -1557,10 +1571,17 @@
         }
 
         {% if segmento == 'Fundamental' %}
+        // Botões de lote 5º ano – Conclusão e Escolaridade
         if (temLista && tipo === 'Conclusão') {
-          $('#btn-5ano').show();
+          $('#btn-5ano-conclusao').show();
         } else {
-          $('#btn-5ano').hide();
+          $('#btn-5ano-conclusao').hide();
+        }
+
+        if (temLista && tipo === 'Escolaridade') {
+          $('#btn-5ano-escolaridade').show();
+        } else {
+          $('#btn-5ano-escolaridade').hide();
         }
         {% endif %}
       }
@@ -1572,7 +1593,7 @@
         }
 
         var rm   = $('#rm').val();
-        var tipo = $('#tipo').val();
+        var tipo = normalizarTipo($('#tipo').val());
         var valido = !!rm && !!tipo;
 
         if (tipo === 'Transferencia' || tipo === 'Conclusão') {
@@ -1588,7 +1609,6 @@
           }
         } else if (tipo === 'Frequencia') {
           var infoFreq = verificarMesesFrequencia();
-          // Pelo menos um mês válido e nenhum erro/linha incompleta
           if (!infoFreq.algumValido || infoFreq.temErro) {
             valido = false;
           }
@@ -1605,7 +1625,7 @@
         var hasForm = $('#form-declaracao').length > 0;
 
         if (!hasForm) {
-          $indicatorText.text('Passo 1 de 5: escolha o segmento (Fundamental ou EJA) nos cartões abaixo.');
+          $indicatorText.text('Passo 1 de 5: escolha o segmento (Fundamental ou EJA) nos cartões acima.');
           $('.segmento-cards').addClass('step-highlight');
           aplicarHighlightPadrao(null);
           return;
@@ -1619,7 +1639,7 @@
         }
 
         var rm   = $('#rm').val();
-        var tipo = $('#tipo').val();
+        var tipo = normalizarTipo($('#tipo').val());
         var deveHist = $('input[name="deve_historico"]:checked').val();
         var unidadeSelect = $('#unidade_anterior').val();
         var unidadeManual = ($('#unidade_anterior_manual').val() || '').trim();
@@ -1742,7 +1762,8 @@
         resetarFrequencias();
 
         {% if segmento == 'Fundamental' %}
-        $('#btn-5ano').hide();
+        $('#btn-5ano-conclusao').hide();
+        $('#btn-5ano-escolaridade').hide();
         {% endif %}
 
         atualizarEstadoBotao();
@@ -1771,11 +1792,18 @@
       atualizarStep();
 
       {% if segmento == 'Fundamental' %}
-      $('#btn-5ano').on('click', function () {
-        if (confirm('Gerar declarações de conclusão para todos os alunos de 5º ano?')) {
-          // Gerando lote de 5º ano
-          mostrarOverlay('Gerando declarações de 5º ano, aguarde...');
+      // Botões de LOTE 5º ano – Conclusão e Escolaridade
+      $('#btn-5ano-conclusao').on('click', function () {
+        if (confirm('Gerar declarações de CONCLUSÃO para todos os alunos de 5º ano?')) {
+          mostrarOverlay('Gerando declarações de conclusão de 5º ano, aguarde...');
           window.location.href = '{{ conclusao_5ano_url }}';
+        }
+      });
+
+      $('#btn-5ano-escolaridade').on('click', function () {
+        if (confirm('Gerar declarações de ESCOLARIDADE para todos os alunos de 5º ano?')) {
+          mostrarOverlay('Gerando declarações de escolaridade de 5º ano, aguarde...');
+          window.location.href = '{{ escolaridade_5ano_url }}';
         }
       });
       {% endif %}
@@ -1800,7 +1828,7 @@
       });
 
       $('#form-declaracao').on('submit', function (e) {
-        var tipo = $('#tipo').val();
+        var tipo = normalizarTipo($('#tipo').val());
 
         // Submissões que vierem do botão "Carregar lista piloto"
         // usam document.getElementById('form-declaracao').submit()

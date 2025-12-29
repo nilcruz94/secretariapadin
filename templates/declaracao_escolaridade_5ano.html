@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>Declarações de Escolaridade - 5º Ano</title>
+
+  <!-- Fonte -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #333;
+    }
+
+    body {
+      background: #fff;
+    }
+
+    /* Cada declaração = 1 página A4 */
+    .declaration-container {
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto;
+      padding: 25mm 25mm 25mm 25mm; /* margens internas da página */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between; /* empurra rodapé para o final */
+      page-break-after: always;
+      page-break-inside: avoid;
+      background: #fff;
+    }
+
+    /* evita página extra em branco no final em alguns navegadores */
+    .declaration-container:last-of-type {
+      page-break-after: auto;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #283E51;
+      padding-bottom: 5px;
+      margin-bottom: 15px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+      text-transform: uppercase;
+      color: #283E51;
+    }
+
+    .header p {
+      margin: 3px 0;
+      font-size: 14px;
+    }
+
+    .date {
+      text-align: right;
+      font-size: 14px;
+      margin-bottom: 25px; /* distância entre a data e o texto */
+    }
+
+    .content {
+      flex: 1;
+      text-align: justify;
+      font-size: 14px;
+      margin-bottom: 10px;
+      padding: 0 10mm;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .content h2 {
+      text-align: center;
+      text-transform: uppercase;
+      color: #283E51;
+      font-size: 18px;
+      margin: 0 0 10px 0;
+    }
+
+    .content p {
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      margin: 0;
+    }
+
+    .declaration-bottom {
+      margin-top: 30px;
+    }
+
+    .signature {
+      text-align: center;
+      margin: 0 0 20px 0;
+      padding: 0;
+    }
+
+    .signature .line {
+      height: 1px;
+      background-color: #333;
+      width: 60%;
+      margin: 0 auto 5px auto;
+    }
+
+    .signature p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .footer {
+      text-align: center;
+      border-top: 2px solid #283E51;
+      padding-top: 5px;
+      margin: 0;
+      font-size: 11px;
+      color: #555;
+    }
+
+    .footer p {
+      margin: 2px 0;
+    }
+
+    .print-button {
+      background-color: #283E51;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .print-button:hover {
+      background-color: #1d2d3a;
+    }
+
+    .warning-icon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      color: red;
+      font-weight: bold;
+      font-size: 18px;
+      line-height: 18px;
+      vertical-align: middle;
+      user-select: none;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left !important;
+      font-size: 14px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .no-print-info {
+      text-align: center;
+      margin: 20px auto;
+      max-width: 800px;
+      font-size: 14px;
+    }
+
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-size: 14px;
+        color: #000;
+      }
+
+      .declaration-container {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra de controle (some na impressão) -->
+  <div class="no-print">
+    <div class="no-print-info">
+      <p>
+        Foram geradas
+        <strong>{{ registros|length }}</strong>
+        declarações de escolaridade para alunos do 5º ano.
+      </p>
+      <button onclick="window.print()" class="print-button">
+        Imprimir todas as declarações
+      </button>
+    </div>
+  </div>
+
+  {% for reg in registros %}
+    <div class="declaration-container">
+      <div>
+        <div class="header">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <img src="{{ url_for('static', filename='logos/escola.png') }}"
+                 alt="Logo da Escola"
+                 style="height: 70px;">
+            <div>
+              <h1>Secretaria de Educação</h1>
+              <p>E.M José Padin Mouta</p>
+              <p>Município da Estância Balneária de Praia Grande</p>
+              <p>Estado de São Paulo</p>
+            </div>
+            <img src="{{ url_for('static', filename='logos/municipio.png') }}"
+                 alt="Logo do Município"
+                 style="height: 70px;">
+          </div>
+        </div>
+
+        <div class="date">
+          <p>{{ data_extenso }}</p>
+        </div>
+
+        <div class="content">
+          <h2>{{ titulo }}</h2>
+          <!-- reg.texto já vem com <strong>, <u>, etc. montados no backend -->
+          <p>{{ reg.texto|safe }}</p>
+        </div>
+      </div>
+
+      <div class="declaration-bottom">
+        <div class="signature">
+          <div class="line"></div>
+          <p>Luciana Rocha Augustinho</p>
+          <p>Diretora da Unidade Escolar</p>
+        </div>
+        <div class="footer">
+          <p>Rua: Bororós, nº 150, Vila Tupi, Praia Grande - SP, CEP: 11703-390</p>
+          <p>Telefone: (13) 3496-5321 | E-mail: em.padin@praiagrande.sp.gov.br</p>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+</body>
+</html>
