@@ -11,7 +11,7 @@
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
     width: 100%;
-    max-width: 780px;
+    max-width: 820px;
     color: #283E51;
   }
 
@@ -42,6 +42,11 @@
     font-size: 0.8rem;
     color: #6b7280;
     margin-top: 4px;
+  }
+
+  .form-group label {
+    font-weight: 600;
+    color: #374a5a;
   }
 
   .dropzone {
@@ -109,6 +114,7 @@
     font-size: 0.8rem;
     color: #4b5563;
     font-style: italic;
+    word-break: break-word;
   }
 
   .dropzone input[type="file"] {
@@ -153,25 +159,24 @@
       <p>
         Gere o Quadro Quantitativo Mensal de transferências <strong>TE</strong> por série
         (2º ao 5º ano), usando a Lista Piloto do Ensino Fundamental e um período de datas.
-        O sistema localiza as ocorrências de TE no intervalo informado e preenche
-        automaticamente o modelo da SEDUC.
+        O sistema localiza as ocorrências de TE no intervalo informado e preenche automaticamente o modelo.
       </p>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-container">
+    <div id="flash-container" class="flash-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
           {% for category, message in messages %}
             {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
             <div class="alert alert-{{ bs_class }} mb-2" role="alert">
               {{ message }}
             </div>
           {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+        {% endif %}
+      {% endwith %}
+    </div>
 
-    <form id="form-quantitativo" method="POST" enctype="multipart/form-data">
+    <form id="form-quantitativo" method="POST" enctype="multipart/form-data" novalidate>
       <div class="form-row">
         <div class="form-group col-md-6">
           <label for="period_start">Data inicial do período</label>
@@ -183,9 +188,10 @@
             required
           >
           <small class="helper-text">
-            Ex.: início da semana de referência das transferências.
+            Ex.: início da semana/período de referência.
           </small>
         </div>
+
         <div class="form-group col-md-6">
           <label for="period_end">Data final do período</label>
           <input
@@ -216,23 +222,39 @@
         </small>
       </div>
 
+      <!-- NOVO: MÊS/ANO -->
+      <div class="form-group">
+        <label for="mes_ano">MÊS/ANO (vai para A8 no modelo)</label>
+        <input
+          type="text"
+          class="form-control"
+          name="mes_ano"
+          id="mes_ano"
+          value="{{ default_mes_ano|default('') }}"
+          placeholder="Ex.: Janeiro/2026 ou 01/2026"
+          required
+        >
+        <small class="helper-text">
+          Informe exatamente como deseja que apareça no quadro (A8).
+        </small>
+      </div>
+
       <div class="form-group mt-3">
         <div class="section-title">Lista Piloto – Ensino Fundamental</div>
+
         <div id="drop-fundamental" class="dropzone">
           <div class="dropzone-icon-circle">
             <i class="fas fa-file-excel"></i>
           </div>
+
           <div class="dropzone-text-block">
-            <p class="dropzone-title">
-              Arraste o arquivo aqui ou clique para selecionar
-            </p>
-            <p class="dropzone-subtitle">
-              Formatos aceitos: .xlsx, .xls, .xlsm
-            </p>
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
             <div class="dropzone-filename" id="fundamental-filename">
               Nenhum arquivo selecionado.
             </div>
           </div>
+
           <input
             type="file"
             id="lista_fundamental"
@@ -240,9 +262,9 @@
             accept=".xlsx,.xls,.xlsm"
           >
         </div>
+
         <div class="helper-text">
-          Se nenhum arquivo for escolhido, o sistema tenta usar a última
-          Lista Piloto FUNDAMENTAL salva na sessão.
+          Se nenhum arquivo for escolhido, o sistema tenta usar a última Lista Piloto FUNDAMENTAL salva na sessão.
         </div>
       </div>
 
@@ -264,6 +286,36 @@
 
 {% block extra_scripts %}
 <script>
+  function renderFlashMessages(messages) {
+    const container = document.getElementById('flash-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    (messages || []).forEach(item => {
+      const div = document.createElement('div');
+      div.className = `alert alert-${item.bsClass || 'info'} mb-2`;
+      div.setAttribute('role', 'alert');
+      div.textContent = item.text || '';
+      container.appendChild(div);
+    });
+  }
+
+  function extractAlertsFromHTML(htmlText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const alerts = Array.from(doc.querySelectorAll('.alert'));
+      if (!alerts.length) return [];
+      return alerts.map(a => {
+        const classList = Array.from(a.classList);
+        const bs = (classList.find(c => c.startsWith('alert-')) || 'alert-info').replace('alert-', '');
+        return { bsClass: bs, text: (a.textContent || '').trim() };
+      }).filter(x => x.text);
+    } catch (e) {
+      return [];
+    }
+  }
+
   function setupDropzone(inputId, dropId, labelId) {
     const input = document.getElementById(inputId);
     const drop = document.getElementById(dropId);
@@ -271,7 +323,6 @@
 
     if (!input || !drop || !label) return;
 
-    // Atualiza o nome ao escolher pelo diálogo
     input.addEventListener('change', function () {
       if (input.files && input.files.length > 0) {
         label.textContent = input.files[0].name;
@@ -280,7 +331,6 @@
       }
     });
 
-    // Efeito visual de arrastar
     ['dragenter', 'dragover'].forEach(evtName => {
       drop.addEventListener(evtName, function (e) {
         e.preventDefault();
@@ -302,7 +352,7 @@
       if (!dt || !dt.files || !dt.files.length) return;
 
       const file = dt.files[0];
-      const name = file.name.toLowerCase();
+      const name = (file.name || '').toLowerCase();
       const allowed = ['.xlsx', '.xls', '.xlsm'];
       const isValid = allowed.some(ext => name.endsWith(ext));
 
@@ -311,16 +361,16 @@
         return;
       }
 
-      input.files = dt.files;
+      // Compatibilidade: DataTransfer para atribuir ao input
+      const newDt = new DataTransfer();
+      newDt.items.add(file);
+      input.files = newDt.files;
+
       label.textContent = file.name;
     });
   }
 
-  let quantitativoDownloading = false;
-
-  function showQuantitativoLoading() {
-    quantitativoDownloading = true;
-
+  function showLoading() {
     const existing = document.getElementById('loading-overlay');
     if (existing) existing.remove();
 
@@ -348,48 +398,62 @@
     document.body.appendChild(overlay);
   }
 
-  function hideQuantitativoLoading() {
-    quantitativoDownloading = false;
+  function hideLoading() {
     const existing = document.getElementById('loading-overlay');
     if (existing) existing.remove();
+  }
+
+  function validateForm(form) {
+    // validação simples (HTML5) + UX
+    const requiredIds = ['period_start', 'period_end', 'responsavel', 'mes_ano'];
+    const missing = requiredIds.filter(id => {
+      const el = document.getElementById(id);
+      return !el || !String(el.value || '').trim();
+    });
+
+    if (missing.length) {
+      renderFlashMessages([{
+        bsClass: 'warning',
+        text: 'Preencha todos os campos obrigatórios antes de gerar.'
+      }]);
+      return false;
+    }
+    return true;
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     setupDropzone('lista_fundamental', 'drop-fundamental', 'fundamental-filename');
 
     const form = document.getElementById('form-quantitativo');
-    if (form) {
-      form.addEventListener('submit', async function (e) {
-        e.preventDefault(); // impede o submit tradicional
-        showQuantitativoLoading();
+    if (!form) return;
 
-        const formData = new FormData(form);
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
 
-        try {
-          const response = await fetch(form.action || window.location.href, {
-            method: 'POST',
-            body: formData
-          });
+      renderFlashMessages([]); // limpa flashes antigos
+      if (!validateForm(form)) return;
 
-          const contentType = response.headers.get('Content-Type') || '';
+      showLoading();
 
-          if (!response.ok ||
-              !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-            hideQuantitativoLoading();
-            alert('Erro ao gerar o Quadro Quantitativo Mensal. Verifique os dados e tente novamente.');
-            return;
-          }
+      const formData = new FormData(form);
 
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          body: formData
+        });
+
+        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+
+        // sucesso: excel
+        if (response.ok && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
           const blob = await response.blob();
 
-          // Nome do arquivo vindo do header
           let filename = 'Quadro_Quantitativo_Fundamental.xlsx';
           const disposition = response.headers.get('Content-Disposition');
           if (disposition) {
             const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-            if (filenameMatch && filenameMatch[1]) {
-              filename = filenameMatch[1].replace(/['"]/g, '');
-            }
+            if (filenameMatch && filenameMatch[1]) filename = filenameMatch[1].replace(/['"]/g, '');
           }
 
           const url = window.URL.createObjectURL(blob);
@@ -400,14 +464,31 @@
           a.click();
           a.remove();
           window.URL.revokeObjectURL(url);
-        } catch (err) {
-          console.error(err);
-          alert('Erro de rede ao gerar o Quadro Quantitativo Mensal.');
-        } finally {
-          hideQuantitativoLoading();
+          return;
         }
-      });
-    }
+
+        // erro: geralmente vem HTML com flash
+        const text = await response.text();
+        const extracted = extractAlertsFromHTML(text);
+
+        if (extracted.length) {
+          renderFlashMessages(extracted);
+        } else {
+          renderFlashMessages([{
+            bsClass: 'danger',
+            text: 'Erro ao gerar o Quadro Quantitativo Mensal. Verifique os dados e tente novamente.'
+          }]);
+        }
+      } catch (err) {
+        console.error(err);
+        renderFlashMessages([{
+          bsClass: 'danger',
+          text: 'Erro de rede ao gerar o Quadro Quantitativo Mensal.'
+        }]);
+      } finally {
+        hideLoading();
+      }
+    });
   });
 </script>
 {% endblock %}

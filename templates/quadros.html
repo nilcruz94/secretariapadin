@@ -11,20 +11,28 @@
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
     width: 100%;
-    max-width: 960px;
+    max-width: 980px;
     color: #283E51;
   }
 
+  .quadros-header {
+    margin-bottom: 18px;
+  }
+
   .quadros-header h2 {
-    font-size: 1.4rem;
-    font-weight: 600;
-    margin-bottom: 4px;
+    font-size: 1.45rem;
+    font-weight: 800;
+    margin: 0 0 10px;
+    color: #1f3344;
+    letter-spacing: -0.2px;
   }
 
   .quadros-header p {
-    font-size: 0.9rem;
+    margin: 0;
+    font-size: 0.92rem;
     color: #5d6c7a;
-    margin-bottom: 18px;
+    line-height: 1.35;
+    max-width: 78ch;
   }
 
   .quadros-grid {
@@ -37,31 +45,27 @@
     display: flex;
     align-items: center;
     padding: 16px 18px;
-    border-radius: 12px;
-    border: 1px solid #e0e6ed;
+    border-radius: 14px;
+    border: 1px solid #e6edf5;
     background: #ffffff;
     box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
     text-decoration: none;
     color: inherit;
     cursor: pointer;
-    transition:
-      transform 0.18s ease,
-      box-shadow 0.18s ease,
-      border-color 0.18s ease,
-      background 0.18s ease;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
   }
 
   .quadros-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 25px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
     border-color: #4B79A1;
     background: #f9fbff;
     text-decoration: none;
   }
 
   .quadros-icon {
-    width: 46px;
-    height: 46px;
+    width: 48px;
+    height: 48px;
     border-radius: 999px;
     background: linear-gradient(135deg, #283E51, #4B79A1);
     display: flex;
@@ -73,25 +77,52 @@
 
   .quadros-icon i {
     color: #ffffff;
-    font-size: 1.4rem;
+    font-size: 1.35rem;
+  }
+
+  .quadros-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .quadros-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 
   .quadros-content-title {
     margin: 0;
     font-size: 1rem;
-    font-weight: 600;
-    color: #283E51;
+    font-weight: 800;
+    color: #1f3344;
+    line-height: 1.2;
+  }
+
+  .quadros-deadline {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #375165;
+    background: #eef6ff;
+    border: 1px solid #cfe6ff;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
   }
 
   .quadros-content-text {
-    margin: 2px 0 0;
-    font-size: 0.85rem;
+    margin: 6px 0 0;
+    font-size: 0.86rem;
     color: #6b7280;
+    line-height: 1.35;
   }
 
   .back-dashboard {
     margin-top: 20px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
   }
 
   .back-dashboard .btn-back {
@@ -104,9 +135,9 @@
   }
 
   @media (max-width: 768px) {
-    .quadros-wrapper {
-      padding: 24px 18px 20px;
-    }
+    .quadros-wrapper { padding: 24px 18px 20px; }
+    .quadros-topline { align-items: flex-start; }
+    .quadros-deadline { width: 100%; text-align: center; }
   }
 {% endblock %}
 
@@ -115,76 +146,79 @@
     <div class="quadros-header">
       <h2>Quadros</h2>
       <p>
-        Selecione o tipo de quadro que deseja gerar. Cada opção abre uma tela
-        específica com os filtros e formatos adequados.
+        Selecione abaixo o quadro que deseja gerar. Na próxima tela, anexe a lista e informe o responsável.
       </p>
     </div>
 
     <div class="quadros-grid">
-      {# Mantido como comentário para uso futuro, igual ao código antigo
-      <a href="{{ url_for('quadros_inclusao') }}" class="quadros-card">
-        <div class="quadros-icon">
-          <i class="fas fa-user-plus"></i>
-        </div>
-        <div>
-          <p class="quadros-content-title">Inclusão</p>
-          <p class="quadros-content-text">
-            Gerar quadro de inclusão.
-          </p>
-        </div>
-      </a>
-      #}
-
-      <!-- Quantitativo de Inclusão – foco em alunos PAEE / deficiência -->
+      <!-- Quantitativo de Inclusão -->
       <a href="{{ url_for('quantinclusao') }}" class="quadros-card">
         <div class="quadros-icon">
           <i class="fas fa-universal-access"></i>
         </div>
-        <div>
-          <p class="quadros-content-title">Quantitativo de Inclusão</p>
+
+        <div class="quadros-main">
+          <div class="quadros-topline">
+            <p class="quadros-content-title">Quantitativo de Inclusão</p>
+            <span class="quadros-deadline">Envio: dia 20 (ou próximo dia útil)</span>
+          </div>
+
           <p class="quadros-content-text">
-            Quantidade de estudantes público-alvo da educação especial
-            (PAEE/inclusão) por turma e segmento.
+            Consolida, por turma, os totais de inclusão e os indicadores de Plano de Ação conforme a lista piloto.
           </p>
         </div>
       </a>
 
-      <!-- Atendimento Mensal – quantidade de crianças atendidas no mês -->
+      <!-- Atendimento Mensal -->
       <a href="{{ url_for('quadro_atendimento_mensal') }}" class="quadros-card">
         <div class="quadros-icon">
           <i class="fas fa-users"></i>
         </div>
-        <div>
-          <p class="quadros-content-title">Atendimento Mensal</p>
+
+        <div class="quadros-main">
+          <div class="quadros-topline">
+            <p class="quadros-content-title">Atendimento Mensal</p>
+            <span class="quadros-deadline">Envio: último dia do mês</span>
+          </div>
+
           <p class="quadros-content-text">
-            Quantitativo de alunos atendidos no mês, considerando a rotina de
-            atendimento da unidade.
+            Preenche o quadro mensal de atendimento a partir da lista piloto do Ensino Fundamental.
           </p>
         </div>
       </a>
 
-      <!-- Transferências – ícone permanece o mesmo -->
+      <!-- Informativo Semanal -->
       <a href="{{ url_for('quadro_transferencias') }}" class="quadros-card">
         <div class="quadros-icon">
           <i class="fas fa-exchange-alt"></i>
         </div>
-        <div>
-          <p class="quadros-content-title">Transferências</p>
+
+        <div class="quadros-main">
+          <div class="quadros-topline">
+            <p class="quadros-content-title">Informativo Semanal</p>
+            <span class="quadros-deadline">Envio: fechamento da semana</span>
+          </div>
+
           <p class="quadros-content-text">
-            Relatório de transferências de alunos entre unidades e redes.
+            Gera o quadro informativo semanal com base nos registros do período selecionado.
           </p>
         </div>
       </a>
 
-      <!-- Quantitativo Mensal – ícone de gráfico mantém a ideia de resumo numérico -->
+      <!-- Quantitativo Mensal de Transferências -->
       <a href="{{ url_for('quadro_quantitativo_mensal') }}" class="quadros-card">
         <div class="quadros-icon">
           <i class="fas fa-chart-bar"></i>
         </div>
-        <div>
-          <p class="quadros-content-title">Quantitativo Mensal</p>
+
+        <div class="quadros-main">
+          <div class="quadros-topline">
+            <p class="quadros-content-title">Quantitativo Mensal de Transferências Expedidas</p>
+            <span class="quadros-deadline">Envio: último dia do mês</span>
+          </div>
+
           <p class="quadros-content-text">
-            Consolidado mensal com os principais números da unidade escolar.
+            Totaliza as transferências expedidas no mês e preenche o modelo conforme o padrão do quadro.
           </p>
         </div>
       </a>

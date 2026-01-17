@@ -7,40 +7,131 @@
     position: relative;
     z-index: 1;
     background: rgba(255, 255, 255, 0.98);
-    padding: 32px 28px 24px;
+    padding: 28px 26px 22px;
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
     width: 100%;
-    max-width: 720px;
+    max-width: 780px;
     color: #283E51;
   }
 
   .atendimento-header h2 {
     font-size: 1.4rem;
-    font-weight: 600;
-    margin-bottom: 4px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    color: #1f3344;
+    letter-spacing: -0.2px;
+    text-align: left;
   }
 
   .atendimento-header p {
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     color: #5d6c7a;
-    margin-bottom: 18px;
+    margin-bottom: 10px;
   }
 
-  .flash-container {
-    margin-bottom: 14px;
+  .flash-container { margin-bottom: 14px; }
+
+  /* ------------------------------------ */
+  /* How it works (compacto e centralizado) */
+  /* ------------------------------------ */
+  .howitworks-mini {
+    margin-top: 10px;
+    border: 1px solid #e6edf5;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #fbfcfe 0%, #f6f8fc 100%);
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
   }
 
+  .howitworks-mini .icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #283E51, #4B79A1);
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  .howitworks-mini .text {
+    font-size: 0.88rem;
+    color: #51606f;
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  .howitworks-mini .text strong { color: #1f3344; }
+
+  /* ------------------------------------ */
+  /* Seções */
+  /* ------------------------------------ */
   .section-title {
     font-size: 0.9rem;
-    font-weight: 600;
+    font-weight: 800;
+    color: #283E51;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* ------------------------------------ */
+  /* Form */
+  /* ------------------------------------ */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+    margin-bottom: 12px;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+
+  .form-label {
+    font-size: 0.82rem;
+    font-weight: 800;
     color: #374a5a;
     margin-bottom: 6px;
   }
 
-  .upload-group {
-    margin-bottom: 18px;
+  .helper-text {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 6px;
+    line-height: 1.25;
   }
+
+  .field-msg {
+    margin-top: 6px;
+    font-size: 0.8rem;
+    display: none;
+  }
+  .field-msg.error { color: #b91c1c; display: block; }
+  .field-msg.ok { color: #166534; display: block; }
+
+  .is-invalid-input {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 0.15rem rgba(239, 68, 68, 0.18) !important;
+  }
+  .is-valid-input {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 0.15rem rgba(34, 197, 94, 0.16) !important;
+  }
+
+  /* ------------------------------------ */
+  /* Dropzone */
+  /* ------------------------------------ */
+  .upload-group { margin-bottom: 18px; }
 
   .dropzone {
     position: relative;
@@ -52,10 +143,7 @@
     align-items: center;
     gap: 14px;
     cursor: pointer;
-    transition:
-      border-color 0.18s ease,
-      background 0.18s ease,
-      box-shadow 0.18s ease;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   }
 
   .dropzone:hover {
@@ -80,19 +168,14 @@
     flex-shrink: 0;
   }
 
-  .dropzone-icon-circle i {
-    color: #ffffff;
-    font-size: 1.3rem;
-  }
+  .dropzone-icon-circle i { color: #ffffff; font-size: 1.3rem; }
 
-  .dropzone-text-block {
-    flex: 1;
-  }
+  .dropzone-text-block { flex: 1; }
 
   .dropzone-title {
     margin: 0;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 800;
     color: #283E51;
   }
 
@@ -116,18 +199,20 @@
     cursor: pointer;
   }
 
-  .helper-text {
-    font-size: 0.8rem;
-    color: #6b7280;
-    margin-top: 4px;
-  }
-
+  /* ------------------------------------ */
+  /* Buttons / footer */
+  /* ------------------------------------ */
   .btn-generate {
-    margin-top: 16px;
+    margin-top: 12px;
     border-radius: 999px;
     font-size: 0.95rem;
     padding: 10px 18px;
-    font-weight: 600;
+    font-weight: 800;
+  }
+
+  .btn-generate:disabled {
+    opacity: 0.78;
+    cursor: not-allowed;
   }
 
   .back-links {
@@ -136,45 +221,103 @@
     justify-content: space-between;
     gap: 10px;
     flex-wrap: wrap;
+    align-items: center;
   }
 
-  .back-links a {
-    font-size: 0.85rem;
-  }
+  .back-links a { font-size: 0.85rem; }
 
   @media (max-width: 768px) {
-    .atendimento-wrapper {
-      padding: 24px 18px 20px;
-    }
+    .atendimento-wrapper { padding: 22px 16px 18px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .atendimento-header h2 { text-align: left; }
   }
 {% endblock %}
 
 {% block content %}
+  {% set enable_eja = enable_eja|default(false) %}
+
   <div class="atendimento-wrapper">
     <div class="atendimento-header">
       <h2>Quadro de Atendimento Mensal</h2>
-      <p>
-        Gere o quadro mensal de atendimento a partir das Listas Piloto do
-        Ensino Fundamental e da EJA. Na primeira utilização é necessário
-        enviar ambas as listas. Depois, o sistema reaproveita os arquivos
-        salvos, e o envio passa a ser apenas para atualização.
-      </p>
+      <p>Gere o quadro mensal de atendimento a partir da Lista Piloto do Ensino Fundamental.</p>
+
+      <div class="howitworks-mini" aria-label="Como funciona">
+        <div class="icon"><i class="fas fa-info"></i></div>
+        <p class="text">
+          Preencha <strong>Responsável</strong>, <strong>RF</strong> e <strong>Mês</strong>, envie a lista do <strong>Fundamental</strong> e clique em <strong>Gerar</strong>.
+        </p>
+      </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-container">
+    <div id="flash-container" class="flash-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
           {% for category, message in messages %}
             {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
             <div class="alert alert-{{ bs_class }} mb-2" role="alert">
               {{ message }}
             </div>
           {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+        {% endif %}
+      {% endwith %}
+    </div>
 
     <form id="form-atendimento" method="POST" enctype="multipart/form-data">
+      <div class="section-title">Cabeçalho</div>
+
+      <div class="form-grid">
+        <div class="full">
+          <div class="form-label">Nome do responsável</div>
+          <input
+            type="text"
+            class="form-control"
+            name="responsavel"
+            id="responsavel"
+            placeholder="Ex.: Rafael Fernando da Silva"
+            autocomplete="name"
+            spellcheck="false"
+          />
+          <div class="helper-text">Ao sair do campo, o nome é ajustado automaticamente.</div>
+          <div class="field-msg error" id="msg-responsavel"></div>
+        </div>
+
+        <div>
+          <div class="form-label">RF do responsável</div>
+          <input
+            type="text"
+            class="form-control"
+            name="rf"
+            id="rf"
+            placeholder="Ex.: 46034"
+            inputmode="numeric"
+            autocomplete="off"
+            maxlength="5"
+            spellcheck="false"
+          />
+          <div class="helper-text">Somente números. Exatamente 5 dígitos.</div>
+          <div class="field-msg error" id="msg-rf"></div>
+          <div class="field-msg ok" id="ok-rf"></div>
+        </div>
+
+        <div>
+          <div class="form-label">Mês de referência</div>
+          <input
+            type="text"
+            class="form-control"
+            name="mes_ref"
+            id="mes_ref"
+            placeholder="Ex.: 01/2026 (ou 012026, 0226, 01)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="helper-text">
+            Aceita: <strong>MM/AAAA</strong>, <strong>MM</strong>, <strong>AAAA-MM</strong>, <strong>MMYYYY</strong> (012026) ou <strong>MMYY</strong> (0226).
+          </div>
+          <div class="field-msg error" id="msg-mesref"></div>
+          <div class="field-msg ok" id="ok-mesref"></div>
+        </div>
+      </div>
+
       <div class="upload-group">
         <div class="section-title">Lista Piloto – Ensino Fundamental</div>
         <div id="drop-fundamental" class="dropzone">
@@ -184,9 +327,7 @@
           <div class="dropzone-text-block">
             <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
             <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
-            <div class="dropzone-filename" id="fundamental-filename">
-              Nenhum arquivo selecionado.
-            </div>
+            <div class="dropzone-filename" id="fundamental-filename">Nenhum arquivo selecionado.</div>
           </div>
           <input
             type="file"
@@ -196,38 +337,33 @@
           >
         </div>
         <div class="helper-text">
-          Se você não selecionar nada, será utilizada a última Lista Piloto
-          FUNDAMENTAL salva no sistema (se existir).
+          Se você não selecionar nada, será utilizada a última Lista Piloto FUNDAMENTAL salva no sistema (se existir).
         </div>
       </div>
 
-      <div class="upload-group">
-        <div class="section-title">Lista Piloto – EJA</div>
-        <div id="drop-eja" class="dropzone">
-          <div class="dropzone-icon-circle">
-            <i class="fas fa-file-excel"></i>
-          </div>
-          <div class="dropzone-text-block">
-            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
-            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
-            <div class="dropzone-filename" id="eja-filename">
-              Nenhum arquivo selecionado.
+      {% if enable_eja %}
+        <div class="upload-group">
+          <div class="section-title">Lista Piloto – EJA</div>
+          <div id="drop-eja" class="dropzone">
+            <div class="dropzone-icon-circle">
+              <i class="fas fa-file-excel"></i>
             </div>
+            <div class="dropzone-text-block">
+              <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+              <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+              <div class="dropzone-filename" id="eja-filename">Nenhum arquivo selecionado.</div>
+            </div>
+            <input
+              type="file"
+              id="lista_eja"
+              name="lista_eja"
+              accept=".xlsx,.xls,.xlsm"
+            >
           </div>
-          <input
-            type="file"
-            id="lista_eja"
-            name="lista_eja"
-            accept=".xlsx,.xls,.xlsm"
-          >
         </div>
-        <div class="helper-text">
-          Também é necessário ter uma Lista Piloto EJA salva em sessão.
-          Se não houver arquivo anterior, envie a planilha neste campo.
-        </div>
-      </div>
+      {% endif %}
 
-      <button type="submit" class="btn btn-primary btn-block btn-generate">
+      <button type="submit" class="btn btn-primary btn-block btn-generate" id="btn-gerar-atendimento">
         Gerar Quadro de Atendimento Mensal
       </button>
 
@@ -235,9 +371,7 @@
         <a href="{{ url_for('quadros') }}" class="btn btn-light btn-sm">
           <i class="fas fa-arrow-left"></i> Voltar para Quadros
         </a>
-        <span class="helper-text">
-          O arquivo será baixado automaticamente após a geração.
-        </span>
+        <span class="helper-text">O arquivo será baixado automaticamente após a geração.</span>
       </div>
     </form>
   </div>
@@ -252,28 +386,21 @@
 
     if (!input || !drop || !label) return;
 
-    // Atualiza nome ao escolher pelo diálogo
     input.addEventListener('change', function () {
-      if (input.files && input.files.length > 0) {
-        label.textContent = input.files[0].name;
-      } else {
-        label.textContent = 'Nenhum arquivo selecionado.';
-      }
+      if (input.files && input.files.length > 0) label.textContent = input.files[0].name;
+      else label.textContent = 'Nenhum arquivo selecionado.';
     });
 
-    // Efeitos de drag & drop
     ['dragenter', 'dragover'].forEach(evtName => {
       drop.addEventListener(evtName, function (e) {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         drop.classList.add('dragover');
       });
     });
 
     ['dragleave', 'drop'].forEach(evtName => {
       drop.addEventListener(evtName, function (e) {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         drop.classList.remove('dragover');
       });
     });
@@ -283,7 +410,7 @@
       if (!dt || !dt.files || !dt.files.length) return;
 
       const file = dt.files[0];
-      const name = file.name.toLowerCase();
+      const name = (file.name || '').toLowerCase();
       const allowed = ['.xlsx', '.xls', '.xlsm'];
       const isValid = allowed.some(ext => name.endsWith(ext));
 
@@ -292,16 +419,45 @@
         return;
       }
 
-      input.files = dt.files;
+      const newDt = new DataTransfer();
+      newDt.items.add(file);
+      input.files = newDt.files;
       label.textContent = file.name;
     });
   }
 
-  let atendimentoDownloading = false;
+  function renderFlashMessages(messages) {
+    const container = document.getElementById('flash-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    (messages || []).forEach(item => {
+      const div = document.createElement('div');
+      div.className = `alert alert-${item.bsClass} mb-2`;
+      div.setAttribute('role', 'alert');
+      div.textContent = item.text;
+      container.appendChild(div);
+    });
+  }
+
+  function extractAlertsFromHTML(htmlText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const alerts = Array.from(doc.querySelectorAll('.alert'));
+      if (!alerts.length) return [];
+
+      return alerts.map(a => {
+        const classList = Array.from(a.classList);
+        const bs = (classList.find(c => c.startsWith('alert-')) || 'alert-info').replace('alert-', '');
+        return { bsClass: bs, text: (a.textContent || '').trim() };
+      }).filter(x => x.text);
+    } catch (e) {
+      return [];
+    }
+  }
 
   function showAtendimentoLoading() {
-    atendimentoDownloading = true;
-
     const existing = document.getElementById('loading-overlay');
     if (existing) existing.remove();
 
@@ -325,26 +481,224 @@
         </p>
       </div>
     `;
-
     document.body.appendChild(overlay);
   }
 
   function hideAtendimentoLoading() {
-    atendimentoDownloading = false;
     const existing = document.getElementById('loading-overlay');
     if (existing) existing.remove();
+  }
+
+  /* ==========================================================
+     Normalização e validação
+     - Nome: normaliza no blur
+     - RF: só números e 5 dígitos
+     - Mês: MM/AAAA, MM, AAAA-MM, MMYYYY, MMYY
+     ========================================================== */
+
+  function collapseSpaces(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
+  function onlyDigits(s) { return (s || '').replace(/\D+/g, ''); }
+
+  function titleCaseName(input) {
+    const lowerWords = new Set(['de','da','do','das','dos','e']);
+    const parts = collapseSpaces(input).toLowerCase().split(' ').filter(Boolean);
+    return parts.map((w, idx) => {
+      if (idx > 0 && lowerWords.has(w)) return w;
+      return w.split('-').map(p => p ? (p[0].toUpperCase() + p.slice(1)) : p).join('-');
+    }).join(' ');
+  }
+
+  function setInputState(inputEl, errId, okId, state, msg) {
+    const errEl = errId ? document.getElementById(errId) : null;
+    const okEl = okId ? document.getElementById(okId) : null;
+
+    inputEl.classList.remove('is-invalid-input', 'is-valid-input');
+    if (errEl) errEl.style.display = 'none';
+    if (okEl) okEl.style.display = 'none';
+
+    if (state === 'error') {
+      inputEl.classList.add('is-invalid-input');
+      if (errEl) {
+        errEl.textContent = msg || 'Valor inválido.';
+        errEl.className = 'field-msg error';
+        errEl.style.display = 'block';
+      }
+    } else if (state === 'ok') {
+      inputEl.classList.add('is-valid-input');
+      if (okEl) {
+        okEl.textContent = msg || 'Ok.';
+        okEl.className = 'field-msg ok';
+        okEl.style.display = 'block';
+      }
+    }
+  }
+
+  function validateRFValue(v) {
+    const d = onlyDigits(v);
+    if (!d) return { ok: true, empty: true, cleaned: '' };
+    if (d.length !== 5) return { ok: false, empty: false, cleaned: d, msg: 'RF deve ter exatamente 5 dígitos.' };
+    return { ok: true, empty: false, cleaned: d };
+  }
+
+  function validateMesValue(raw, commitYear) {
+    const v0 = collapseSpaces(raw);
+    if (!v0) return { ok: true, empty: true, normalized: '' };
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const v = v0.replace(/\s+/g, '');
+
+    // AAAA-MM
+    const a = v.match(/^(\d{4})-(\d{1,2})$/);
+    if (a) {
+      const year = parseInt(a[1], 10);
+      const month = parseInt(a[2], 10);
+      if (month < 1 || month > 12) return { ok: false, empty: false, msg: 'Mês inválido. Use 01 a 12.' };
+      return { ok: true, empty: false, normalized: String(month).padStart(2, '0') + '/' + year };
+    }
+
+    // MM/AAAA ou MM/AA
+    const b = v.match(/^(\d{1,2})\/(\d{2,4})$/);
+    if (b) {
+      const month = parseInt(b[1], 10);
+      let year = parseInt(b[2], 10);
+      if (b[2].length === 2) year = 2000 + year;
+      if (month < 1 || month > 12) return { ok: false, empty: false, msg: 'Mês inválido. Use 01 a 12.' };
+      return { ok: true, empty: false, normalized: String(month).padStart(2, '0') + '/' + year };
+    }
+
+    // MMYYYY (012026)
+    const c = v.match(/^(\d{2})(\d{4})$/);
+    if (c) {
+      const month = parseInt(c[1], 10);
+      const year = parseInt(c[2], 10);
+      if (month < 1 || month > 12) return { ok: false, empty: false, msg: 'Mês inválido. Use 01 a 12.' };
+      return { ok: true, empty: false, normalized: String(month).padStart(2, '0') + '/' + year };
+    }
+
+    // MMYY (0226) -> 02/2026
+    const d = v.match(/^(\d{2})(\d{2})$/);
+    if (d) {
+      const month = parseInt(d[1], 10);
+      const year = 2000 + parseInt(d[2], 10);
+      if (month < 1 || month > 12) return { ok: false, empty: false, msg: 'Mês inválido. Use 01 a 12.' };
+      return { ok: true, empty: false, normalized: String(month).padStart(2, '0') + '/' + year };
+    }
+
+    // MM
+    const e = v.match(/^(\d{1,2})$/);
+    if (e) {
+      const month = parseInt(e[1], 10);
+      if (month < 1 || month > 12) return { ok: false, empty: false, msg: 'Mês inválido. Use 01 a 12.' };
+      const mm = String(month).padStart(2, '0');
+      return { ok: true, empty: false, normalized: commitYear ? `${mm}/${currentYear}` : mm, inferred: true };
+    }
+
+    return { ok: false, empty: false, msg: 'Formato inválido. Use 01/2026, 012026, 0226, 01 ou 2026-01.' };
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     setupDropzone('lista_fundamental', 'drop-fundamental', 'fundamental-filename');
     setupDropzone('lista_eja', 'drop-eja', 'eja-filename');
 
+    const respEl = document.getElementById('responsavel');
+    const rfEl = document.getElementById('rf');
+    const mesEl = document.getElementById('mes_ref');
+
+    if (respEl) {
+      respEl.addEventListener('blur', function () {
+        const cleaned = collapseSpaces(respEl.value);
+        const msgEl = document.getElementById('msg-responsavel');
+
+        if (!cleaned) {
+          respEl.classList.remove('is-invalid-input', 'is-valid-input');
+          if (msgEl) msgEl.style.display = 'none';
+          return;
+        }
+
+        const norm = titleCaseName(cleaned);
+        respEl.value = norm;
+
+        if (norm.length < 5) {
+          setInputState(respEl, 'msg-responsavel', null, 'error', 'Nome muito curto. Verifique se está correto.');
+          return;
+        }
+
+        respEl.classList.remove('is-invalid-input');
+        respEl.classList.add('is-valid-input');
+        if (msgEl) msgEl.style.display = 'none';
+      });
+    }
+
+    if (rfEl) {
+      rfEl.addEventListener('input', function () {
+        let v = onlyDigits(rfEl.value);
+        if (v.length > 5) v = v.slice(0, 5);
+        rfEl.value = v;
+
+        const st = validateRFValue(v);
+        if (st.empty) setInputState(rfEl, 'msg-rf', 'ok-rf', 'neutral');
+        else if (!st.ok) setInputState(rfEl, 'msg-rf', 'ok-rf', 'error', st.msg);
+        else setInputState(rfEl, 'msg-rf', 'ok-rf', 'ok', 'RF válido.');
+      });
+
+      rfEl.addEventListener('blur', function () {
+        const st = validateRFValue(rfEl.value);
+        if (!st.empty && !st.ok) setInputState(rfEl, 'msg-rf', 'ok-rf', 'error', st.msg);
+      });
+    }
+
+    if (mesEl) {
+      mesEl.addEventListener('input', function () {
+        const st = validateMesValue(mesEl.value, false);
+        if (st.empty) {
+          setInputState(mesEl, 'msg-mesref', 'ok-mesref', 'neutral');
+          return;
+        }
+        if (!st.ok) {
+          setInputState(mesEl, 'msg-mesref', 'ok-mesref', 'error', st.msg);
+          return;
+        }
+        setInputState(mesEl, 'msg-mesref', 'ok-mesref', 'ok', st.inferred ? 'Mês válido. Ano será completado ao sair.' : 'Mês válido.');
+      });
+
+      mesEl.addEventListener('blur', function () {
+        const st = validateMesValue(mesEl.value, true);
+        if (st.empty) {
+          setInputState(mesEl, 'msg-mesref', 'ok-mesref', 'neutral');
+          return;
+        }
+        if (!st.ok) {
+          setInputState(mesEl, 'msg-mesref', 'ok-mesref', 'error', st.msg);
+          return;
+        }
+        mesEl.value = st.normalized;
+        setInputState(mesEl, 'msg-mesref', 'ok-mesref', 'ok', st.inferred ? 'Ano preenchido automaticamente.' : 'Mês de referência válido.');
+      });
+    }
+
     const form = document.getElementById('form-atendimento');
     if (form) {
       form.addEventListener('submit', async function (e) {
-        e.preventDefault(); // impede o submit tradicional
-        showAtendimentoLoading();
+        e.preventDefault();
+        renderFlashMessages([]);
 
+        const rfSt = validateRFValue(rfEl ? rfEl.value : '');
+        const mesSt = validateMesValue(mesEl ? mesEl.value : '', true);
+
+        if (!rfSt.empty && !rfSt.ok) {
+          renderFlashMessages([{ bsClass: 'danger', text: 'RF inválido. Deve ter exatamente 5 dígitos.' }]);
+          return;
+        }
+
+        if (!mesSt.empty && !mesSt.ok) {
+          renderFlashMessages([{ bsClass: 'danger', text: 'Mês inválido. Use 01/2026, 012026, 0226, 01 ou 2026-01.' }]);
+          return;
+        }
+
+        if (mesEl && !mesSt.empty && mesSt.ok) mesEl.value = mesSt.normalized;
+
+        showAtendimentoLoading();
         const formData = new FormData(form);
 
         try {
@@ -353,38 +707,38 @@
             body: formData
           });
 
-          const contentType = response.headers.get('Content-Type') || '';
+          const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
-          if (!response.ok ||
-              !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-            hideAtendimentoLoading();
-            alert('Erro ao gerar o Quadro de Atendimento. Verifique os dados e tente novamente.');
+          if (response.ok && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+            const blob = await response.blob();
+
+            let filename = 'Quadro_de_Atendimento_Mensal.xlsx';
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition) {
+              const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+              if (filenameMatch && filenameMatch[1]) filename = filenameMatch[1].replace(/['"]/g, '');
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
             return;
           }
 
-          const blob = await response.blob();
+          const text = await response.text();
+          const extracted = extractAlertsFromHTML(text);
 
-          // Tenta recuperar o nome do arquivo do header
-          let filename = 'Quadro_de_Atendimento_Mensal.xlsx';
-          const disposition = response.headers.get('Content-Disposition');
-          if (disposition) {
-            const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-            if (filenameMatch && filenameMatch[1]) {
-              filename = filenameMatch[1].replace(/['"]/g, '');
-            }
-          }
+          if (extracted.length) renderFlashMessages(extracted);
+          else renderFlashMessages([{ bsClass: 'warning', text: 'Não foi possível gerar o Quadro de Atendimento. Verifique os dados e tente novamente.' }]);
 
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
         } catch (err) {
           console.error(err);
-          alert('Erro de rede ao gerar o Quadro de Atendimento.');
+          renderFlashMessages([{ bsClass: 'danger', text: 'Erro de rede ao gerar o Quadro de Atendimento.' }]);
         } finally {
           hideAtendimentoLoading();
         }

@@ -42,6 +42,8 @@ ACCESS_TOKEN = "minha_senha"  # Token de acesso
 
 app.config["UPLOAD_FOLDER"] = "uploads"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif"}
+app.config["HOLIDAYS_JSON_PATH"] = os.path.join(os.path.dirname(__file__), "modelos", "feriados_nacionais.json")
+
 
 # Cria os diretórios necessários, se não existirem
 os.makedirs("static/fotos", exist_ok=True)
@@ -2571,320 +2573,484 @@ def upload_inline_foto():
 
 
 # ==========================================================
-#  QUADROS – MENU PRINCIPAL
+#  QUADROS – HELPERS COMUNS + EJA (LIGA/DESLIGA)
+#  (FIX RÁPIDO E SEGURO: sem colisão de nomes, sem sobrescrita de helpers)
 # ==========================================================
 
+import os
+import re
+import uuid
+import copy
+import string
+import unicodedata
+from contextlib import contextmanager
+from datetime import datetime
+from io import BytesIO
+from typing import Optional, Iterable, Tuple, Dict
+
+import pandas as pd
+from flask import (
+    request,
+    redirect,
+    url_for,
+    render_template,
+    flash,
+    session,
+    current_app,
+    send_file,
+)
+from werkzeug.utils import secure_filename
+from openpyxl import load_workbook
+from openpyxl.cell import MergedCell
+
+# ----------------------------------------------------------
+# EJA: liga/desliga (FIX)
+# ----------------------------------------------------------
+def _is_eja_enabled() -> bool:
+    """
+    Desativada por padrão:
+      - Ative via variável de ambiente: ENABLE_EJA=1
+      - Ou via config: app.config["ENABLE_EJA"] = True
+
+    FIX: remove duplicidade/override incorreto.
+    """
+    def _to_bool(v) -> bool:
+        if v is None:
+            return False
+        if isinstance(v, bool):
+            return v
+        s = str(v).strip().lower()
+        return s in ("1", "true", "t", "yes", "y", "on")
+
+    # 1) prioridade para config do Flask
+    cfg = None
+    try:
+        cfg = current_app.config.get("ENABLE_EJA", None)
+    except Exception:
+        cfg = None
+
+    if cfg is not None:
+        return _to_bool(cfg)
+
+    # 2) fallback: env var
+    return _to_bool(os.getenv("ENABLE_EJA", "0"))
+
+
+def _save_upload_to_session(file_storage, session_key: str, prefix: str) -> str:
+    """
+    Salva arquivo enviado em UPLOAD_FOLDER e grava em session[session_key].
+    Retorna o path salvo.
+    """
+    filename = secure_filename(file_storage.filename)
+    unique_filename = f"{prefix}_{uuid.uuid4().hex}_{filename}"
+
+    upload_folder = None
+    try:
+        upload_folder = current_app.config.get("UPLOAD_FOLDER")
+    except Exception:
+        upload_folder = None
+
+    if not upload_folder:
+        # mantém compatibilidade com seu app.py original (que define app.config["UPLOAD_FOLDER"])
+        upload_folder = "uploads"
+
+    file_path = os.path.join(upload_folder, unique_filename)
+    file_storage.save(file_path)
+    session[session_key] = file_path
+    return file_path
+
+
+def _find_sheet_case_insensitive(wb, target_name: str):
+    """
+    Busca uma aba ignorando maiúsculas/minúsculas e espaços.
+    Retorna o nome real encontrado ou None.
+    """
+    target = (target_name or "").strip().lower()
+    for name in wb.sheetnames:
+        if (name or "").strip().lower() == target:
+            return name
+    return None
+
+
+# ----------------------------------------------------------
+# Helper comum: escrita segura em célula mesclada
+# ----------------------------------------------------------
+def set_merged_cell_value(ws, cell_coord: str, value):
+    """
+    Atualiza o valor de uma célula (inclusive se estiver mesclada),
+    preservando a mesclagem.
+    """
+    cell = ws[cell_coord]
+    if isinstance(cell, MergedCell):
+        for merged_range in ws.merged_cells.ranges:
+            if cell_coord in merged_range:
+                range_str = str(merged_range)
+                ws.unmerge_cells(range_str)
+                min_col, min_row, _, _ = merged_range.bounds
+                top_left = ws.cell(row=min_row, column=min_col)
+                top_left.value = value
+                ws.merge_cells(range_str)
+                return
+    ws[cell_coord].value = value
+
+
+# ----------------------------------------------------------
+# Helpers comuns: normalização de cabeçalho e strings
+# ----------------------------------------------------------
+def _safe_str(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float) and pd.isna(v):
+        return ""
+    return str(v).strip()
+
+
+def _norm_header_compact(text: str) -> str:
+    """
+    Normaliza cabeçalho: remove acentos e tudo que não for A-Z0-9.
+    Fica robusto para variações: 'LOCAL TE', 'LOCAL_TE', 'local te', etc.
+    """
+    if text is None:
+        return ""
+    s = str(text).strip()
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = s.upper()
+    s = re.sub(r"[^A-Z0-9]+", "", s)
+    return s
+
+
+def _build_colmap(df: pd.DataFrame) -> dict:
+    """Mapeia cabeçalho normalizado -> nome real da coluna (primeira ocorrência)."""
+    m = {}
+    for col in df.columns:
+        k = _norm_header_compact(col)
+        if k and k not in m:
+            m[k] = col
+    return m
+
+
+def _pick_col(colmap: dict, *candidates: str):
+    """Retorna o nome real da coluna a partir de candidatos (por normalização compacta)."""
+    for cand in candidates:
+        k = _norm_header_compact(cand)
+        if k in colmap:
+            return colmap[k]
+    return None
+
+
+def _find_df_col(df: pd.DataFrame, candidates: Iterable[str]) -> Optional[str]:
+    """
+    Encontra uma coluna do DataFrame por lista de candidatos (nome),
+    comparando com normalização compacta.
+    """
+    if df is None or df.empty:
+        return None
+    colmap = _build_colmap(df)
+    return _pick_col(colmap, *list(candidates))
+
+
+def _is_missing_value(val) -> bool:
+    """Considera vazio/0/-/nan como ausente."""
+    s = _safe_str(val)
+    if not s:
+        return True
+    return s.lower() in {"0", "-", "nan", "none", "null"}
+
+
+@contextmanager
+def _temp_unprotect_sheet(ws):
+    """Desabilita proteção da planilha temporariamente para escrita e restaura depois."""
+    original = copy.copy(ws.protection)
+    try:
+        ws.protection.sheet = False
+        yield
+    finally:
+        ws.protection = original
+
+
+# ==========================================================
+#  QUADROS – MENU PRINCIPAL
+# ==========================================================
 @app.route("/quadros")
 @login_required
 def quadros():
     return render_template("quadros.html")
 
-# ==========================================================
-#  QUADRO – INCLUSÃO
-# ==========================================================
 
+# ==========================================================
+#  QUADRO – INCLUSÃO (DESATIVADO / ARQUIVADO)
+# ==========================================================
 @app.route("/quadros/inclusao", methods=["GET", "POST"])
 @login_required
 def quadros_inclusao():
-    if request.method == "POST":
-        # Atualiza as listas na sessão (Regular e EJA)
-        fundamental_file = request.files.get("lista_fundamental")
-        eja_file = request.files.get("lista_eja")
+    flash("Quadro de Inclusão foi migrado para Drive e está desativado no sistema no momento.", "info")
+    return redirect(url_for("quadros"))
 
-        if fundamental_file and fundamental_file.filename != "":
-            fundamental_filename = secure_filename(
-                f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
-            )
-            fundamental_path = os.path.join(app.config["UPLOAD_FOLDER"], fundamental_filename)
-            fundamental_file.save(fundamental_path)
-            session["lista_fundamental"] = fundamental_path
 
-        if eja_file and eja_file.filename != "":
-            eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_" + eja_file.filename)
-            eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
-            eja_file.save(eja_path)
-            session["lista_eja"] = eja_path
+# ==========================================================
+#  QUADRO – ATENDIMENTO MENSAL (CORRIGIDO / FUTURE-PROOF)
+# ==========================================================
 
-        # Carrega as listas piloto
-        df_fundamental = None
-        df_eja = None
+TURMAS_MAX = list(string.ascii_uppercase[:14])  # A..N
 
-        if session.get("lista_fundamental"):
-            try:
-                with open(session["lista_fundamental"], "rb") as f_fund:
-                    df_fundamental = pd.read_excel(f_fund, sheet_name="LISTA CORRIDA")
-            except Exception:
-                flash("Erro ao ler a Lista Piloto Fundamental.", "error")
-                return redirect(url_for("quadros_inclusao"))
+ATENDIMENTO_CONFIG = {
+    "MODEL_BLOCKS": {
+        # 1º ano SEMPRE zerado: Masc + Fem + Total
+        "1º": {"start_row": 19, "masc_col": "B", "fem_col": "C", "total_col": "D"},
+        "2º": {"start_row": 37, "masc_col": "B", "fem_col": "C", "total_col": "D"},
+        "3º": {"start_row": 55, "masc_col": "B", "fem_col": "C", "total_col": "D"},
+        "4º": {"start_row": 73, "masc_col": "B", "fem_col": "C", "total_col": "D"},
+        "5º": {"start_row": 91, "masc_col": "B", "fem_col": "C", "total_col": "D"},
+    },
 
-        if session.get("lista_eja"):
-            try:
-                with open(session["lista_eja"], "rb") as f_eja:
-                    df_eja = pd.read_excel(f_eja, sheet_name="LISTA CORRIDA")
-            except Exception:
-                # EJA é opcional: se existir arquivo em sessão e falhar, mantém o aviso e retorna
-                flash("Erro ao ler a Lista Piloto EJA.", "error")
-                return redirect(url_for("quadros_inclusao"))
+    # Aba "Total de Alunos" (layout padrão 2026)
+    "PILOTO_COLS_DEFAULT": {
+        "serie_col": 3,    # C
+        "turma_col": 4,    # D
+        "ma_masc_col": 7,  # G
+        "ma_fem_col": 8,   # H
+        "ma_total_col": 9  # I
+    },
 
-        if df_fundamental is None and df_eja is None:
-            flash("Nenhuma lista piloto disponível.", "error")
-            return redirect(url_for("quadros_inclusao"))
+    # Fallback por blocos (Prioridade 2)
+    "FALLBACK_START": {
+        "2º": {"row": 6,  "masc_col": 7, "fem_col": 8},
+        "3º": {"row": 14, "masc_col": 7, "fem_col": 8},
+        "4º": {"row": 21, "masc_col": 7, "fem_col": 8},
+        "5º": {"row": 29, "masc_col": 7, "fem_col": 8},
+    },
 
-        # Abre o modelo
-        model_path = os.path.join("modelos", "Quadro de Alunos com Deficiência - Modelo.xlsx")
-        if not os.path.exists(model_path):
-            flash("Modelo de Inclusão não encontrado.", "error")
-            return redirect(url_for("quadros_inclusao"))
+    "TOTALS": {
+        "manha_total_cell": (38, 9),  # I38
+        "tarde_total_cell": (40, 9),  # I40
+        "modelo_manha_addr": "R20",
+        "modelo_tarde_addr": "R28",
+    },
 
+    "ENABLE_DEBUG_LOG": True,
+}
+
+
+def _safe_int(val, default=0):
+    if val is None or val == "":
+        return default
+    if isinstance(val, bool):
+        return int(val)
+    if isinstance(val, (int, float)):
         try:
-            with open(model_path, "rb") as f:
-                wb = load_workbook(f, data_only=False)
-        except Exception as e:
-            flash(f"Erro ao ler o modelo de inclusão: {str(e)}", "error")
-            return redirect(url_for("quadros_inclusao"))
-
-        ws = wb.active
-        set_merged_cell_value(ws, "C2", "E.M. José Padin Mouta")
-        set_merged_cell_value(ws, "C3", "Luciana Rocha Augustinho")
-        set_merged_cell_value(ws, "H3", "Ana Carolina Valencio da Silva Rodrigues")
-        set_merged_cell_value(ws, "K3", "Ana Paula Rodrigues de Assis Santos")
-        set_merged_cell_value(ws, "C4", "Rafael Marques Lima")
-        set_merged_cell_value(ws, "H4", "Rita de Cassia de Andrade")
-        set_merged_cell_value(ws, "K4", "Ana Paula Rodrigues de Assis Santos")
-        set_merged_cell_value(ws, "P4", datetime.now().strftime("%d/%m/%Y"))
-
-        start_row = 7
-        current_row = start_row
-
-        # Processa alunos da Lista Piloto Regular (Fundamental)
-        if df_fundamental is not None:
-            if len(df_fundamental.columns) < 25:
-                flash("O arquivo da Lista Piloto Fundamental não possui colunas suficientes.", "error")
-                return redirect(url_for("quadros_inclusao"))
-
-            inclusion_col_fund = df_fundamental.columns[13]
-            for _, row in df_fundamental.iterrows():
-                if not str(row["RM"]).strip() or str(row["RM"]).strip() == "0":
-                    continue
-
-                if str(row[inclusion_col_fund]).strip().lower() == "sim":
-                    # Coluna X (índice 23)
-                    valor_coluna_x = row[df_fundamental.columns[23]]
-
-                    col_a_val = str(row[df_fundamental.columns[0]]).strip()
-                    match = re.match(r"(\d+º).*?([A-Za-z])$", col_a_val)
-                    if match:
-                        turma = match.group(2)
-                    else:
-                        turma = ""
-
-                    horario = str(row[df_fundamental.columns[10]]).strip()
-                    if "08h" in horario and "12h" in horario:
-                        periodo = "MANHÃ"
-                    elif horario == "13h30 às 17h30":
-                        periodo = "TARDE"
-                    elif horario == "19h00 às 23h00":
-                        periodo = "NOITE"
-                    else:
-                        periodo = ""
-
-                    nome_aluno = str(row[df_fundamental.columns[3]]).strip()
-                    data_nasc = row[df_fundamental.columns[5]]
-                    if pd.notna(data_nasc):
-                        try:
-                            data_nasc = pd.to_datetime(data_nasc, errors="coerce")
-                            if pd.notna(data_nasc):
-                                data_nasc = data_nasc.strftime("%d/%m/%Y")
-                            else:
-                                data_nasc = "Desconhecida"
-                        except Exception:
-                            data_nasc = "Desconhecida"
-                    else:
-                        data_nasc = "Desconhecida"
-
-                    professor = str(row[df_fundamental.columns[14]]).strip()
-                    plano = str(row[df_fundamental.columns[15]]).strip()
-                    aee = (
-                        str(row[df_fundamental.columns[16]]).strip()
-                        if len(df_fundamental.columns) > 16
-                        else ""
-                    )
-                    deficiencia = (
-                        str(row[df_fundamental.columns[17]]).strip()
-                        if len(df_fundamental.columns) > 17
-                        else ""
-                    )
-                    observacoes = (
-                        str(row[df_fundamental.columns[18]]).strip()
-                        if len(df_fundamental.columns) > 18
-                        else ""
-                    )
-                    cadeira = (
-                        str(row[df_fundamental.columns[19]]).strip()
-                        if len(df_fundamental.columns) > 19
-                        else ""
-                    )
-
-                    # Coluna N: coluna U (índice 20)
-                    valor_coluna_n = row[df_fundamental.columns[20]]
-                    # Coluna O: coluna Y (índice 24)
-                    valor_coluna_o = row[df_fundamental.columns[24]]
-
-                    ws.cell(row=current_row, column=2, value=valor_coluna_x)
-                    ws.cell(row=current_row, column=3, value=turma)
-                    ws.cell(row=current_row, column=4, value=periodo)
-                    ws.cell(row=current_row, column=5, value=horario)
-                    ws.cell(row=current_row, column=6, value=nome_aluno)
-                    ws.cell(row=current_row, column=7, value=data_nasc)
-                    ws.cell(row=current_row, column=8, value=professor)
-                    ws.cell(row=current_row, column=9, value=plano)
-                    ws.cell(row=current_row, column=10, value=aee)
-                    ws.cell(row=current_row, column=11, value=deficiencia)
-                    ws.cell(row=current_row, column=12, value=observacoes)
-                    ws.cell(row=current_row, column=13, value=cadeira)
-                    ws.cell(row=current_row, column=14, value=valor_coluna_n)
-                    ws.cell(row=current_row, column=15, value=valor_coluna_o)
-                    current_row += 1
-
-        # Processa alunos da Lista Piloto EJA (opcional)
-        if df_eja is not None:
-            if len(df_eja.columns) < 29:
-                flash("O arquivo da Lista Piloto EJA não possui colunas suficientes.", "error")
-                return redirect(url_for("quadros_inclusao"))
-
-            inclusion_col_eja = df_eja.columns[17]
-            for _, row in df_eja.iterrows():
-                if not str(row["RM"]).strip() or str(row["RM"]).strip() == "0":
-                    continue
-
-                if str(row[inclusion_col_eja]).strip().lower() == "sim":
-                    # Coluna AB (índice 27) – nível/ano
-                    valor_coluna_ab = row[df_eja.columns[27]]
-
-                    turma = "A"
-                    periodo = "NOITE"
-                    horario = str(row[df_eja.columns[15]]).strip()
-                    nome_aluno = str(row[df_eja.columns[3]]).strip()
-                    data_nasc = row[df_eja.columns[6]]
-                    if pd.notna(data_nasc):
-                        try:
-                            data_nasc = pd.to_datetime(data_nasc, errors="coerce")
-                            if pd.notna(data_nasc):
-                                data_nasc = data_nasc.strftime("%d/%m/%Y")
-                            else:
-                                data_nasc = "Desconhecida"
-                        except Exception:
-                            data_nasc = "Desconhecida"
-                    else:
-                        data_nasc = "Desconhecida"
-
-                    professor = str(row[df_eja.columns[18]]).strip()
-                    plano = str(row[df_eja.columns[19]]).strip()
-                    aee = (
-                        str(row[df_eja.columns[20]]).strip()
-                        if len(df_eja.columns) > 20
-                        else ""
-                    )
-                    deficiencia = (
-                        str(row[df_eja.columns[21]]).strip()
-                        if len(df_eja.columns) > 21
-                        else ""
-                    )
-                    observacoes = (
-                        str(row[df_eja.columns[22]]).strip()
-                        if len(df_eja.columns) > 22
-                        else ""
-                    )
-                    # Coluna M: coluna X (índice 23)
-                    cadeira = row[df_eja.columns[23]]
-
-                    # Coluna N: coluna Y (índice 24)
-                    valor_coluna_n = row[df_eja.columns[24]]
-                    # Coluna O: coluna AC (índice 28)
-                    valor_coluna_o = row[df_eja.columns[28]]
-
-                    ws.cell(row=current_row, column=2, value=valor_coluna_ab)
-                    ws.cell(row=current_row, column=3, value=turma)
-                    ws.cell(row=current_row, column=4, value=periodo)
-                    ws.cell(row=current_row, column=5, value=horario)
-                    ws.cell(row=current_row, column=6, value=nome_aluno)
-                    ws.cell(row=current_row, column=7, value=data_nasc)
-                    ws.cell(row=current_row, column=8, value=professor)
-                    ws.cell(row=current_row, column=9, value=plano)
-                    ws.cell(row=current_row, column=10, value=aee)
-                    ws.cell(row=current_row, column=11, value=deficiencia)
-                    ws.cell(row=current_row, column=12, value=observacoes)
-                    ws.cell(row=current_row, column=13, value=cadeira)
-                    ws.cell(row=current_row, column=14, value=valor_coluna_n)
-                    ws.cell(row=current_row, column=15, value=valor_coluna_o)
-                    current_row += 1
-
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-
-        meses = {
-            1: "janeiro",
-            2: "fevereiro",
-            3: "março",
-            4: "abril",
-            5: "maio",
-            6: "junho",
-            7: "julho",
-            8: "agosto",
-            9: "setembro",
-            10: "outubro",
-            11: "novembro",
-            12: "dezembro",
-        }
-        mes = meses[datetime.now().month].capitalize()
-        filename = f"Quadro de Inclusão - {mes} - E.M José Padin Mouta.xlsx"
-
-        return send_file(
-            output,
-            as_attachment=True,
-            download_name=filename,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-    # GET – simplesmente renderiza a página de upload
-    return render_template("quadros_inclusao.html")
+            return int(val)
+        except Exception:
+            return default
+    try:
+        s = str(val).strip()
+        s = s.replace(".", "").replace(",", ".")
+        return int(float(s))
+    except Exception:
+        return default
 
 
-# ==========================================================
-#  QUADRO – ATENDIMENTO MENSAL
-# ==========================================================
+def _norm_serie(val):
+    if val is None:
+        return None
+    s = str(val).strip()
+    m = re.search(r"(\d)\s*[ºo°]?", s, flags=re.IGNORECASE)
+    if not m:
+        return None
+    n = m.group(1)
+    if n in {"1", "2", "3", "4", "5"}:
+        return f"{n}º"
+    return None
+
+
+def _extract_turma_letter(val):
+    if val is None:
+        return None
+    s = str(val).strip().upper()
+    m = re.search(r"\b([A-N])\b", s)
+    if m:
+        return m.group(1)
+    m2 = re.search(r"([A-N])", s)
+    return m2.group(1) if m2 else None
+
+
+def _condense_letters(letters):
+    if not letters:
+        return "-"
+    idxs = sorted({TURMAS_MAX.index(x) for x in letters if x in TURMAS_MAX})
+    out = []
+    i = 0
+    while i < len(idxs):
+        start = idxs[i]
+        j = i
+        while j + 1 < len(idxs) and idxs[j + 1] == idxs[j] + 1:
+            j += 1
+        if j == i:
+            out.append(TURMAS_MAX[start])
+        else:
+            out.append(f"{TURMAS_MAX[start]}-{TURMAS_MAX[idxs[j]]}")
+        i = j + 1
+    return ", ".join(out)
+
+
+def _detect_ma_columns(ws_total):
+    cfg = ATENDIMENTO_CONFIG["PILOTO_COLS_DEFAULT"].copy()
+    try:
+        for r in range(1, 20):
+            for c in range(1, 30):
+                v = ws_total.cell(row=r, column=c).value
+                if v and "MATRICULAS" in str(v).upper():
+                    ma_col = c
+                    cfg["ma_masc_col"] = ma_col
+                    cfg["ma_fem_col"] = ma_col + 1
+                    cfg["ma_total_col"] = ma_col + 2
+                    return cfg
+    except Exception:
+        pass
+    return cfg
+
+
+def _extract_by_cols(ws_total, serie_label, debug_log):
+    cols = _detect_ma_columns(ws_total)
+    sc = cols["serie_col"]
+    tc = cols["turma_col"]
+    mc = cols["ma_masc_col"]
+    fc = cols["ma_fem_col"]
+
+    found = {}
+    duplicates = []
+
+    max_row = ws_total.max_row or 0
+    limit = min(max_row, 300)
+
+    for r in range(1, limit + 1):
+        serie = _norm_serie(ws_total.cell(row=r, column=sc).value)
+        if serie != serie_label:
+            continue
+
+        turma = _extract_turma_letter(ws_total.cell(row=r, column=tc).value)
+        if not turma:
+            continue
+
+        masc = _safe_int(ws_total.cell(row=r, column=mc).value, 0)
+        fem = _safe_int(ws_total.cell(row=r, column=fc).value, 0)
+
+        if turma in found:
+            duplicates.append(turma)
+            found[turma] = (found[turma][0] + masc, found[turma][1] + fem)
+        else:
+            found[turma] = (masc, fem)
+
+    if duplicates:
+        debug_log.append(f"[{serie_label}] AVISO: turmas duplicadas (somadas): {sorted(set(duplicates))}")
+
+    return found
+
+
+def _extract_by_fallback_block(ws_total, serie_label, debug_log):
+    fb = ATENDIMENTO_CONFIG["FALLBACK_START"].get(serie_label)
+    if not fb:
+        return {}
+
+    serie_col = ATENDIMENTO_CONFIG["PILOTO_COLS_DEFAULT"]["serie_col"]  # C
+    turma_col = ATENDIMENTO_CONFIG["PILOTO_COLS_DEFAULT"]["turma_col"]  # D
+
+    row = fb["row"]
+    mc = fb["masc_col"]
+    fc = fb["fem_col"]
+
+    found = {}
+    for _ in range(len(TURMAS_MAX)):
+        serie_here = _norm_serie(ws_total.cell(row=row, column=serie_col).value)
+        if serie_here != serie_label:
+            break
+
+        turma = _extract_turma_letter(ws_total.cell(row=row, column=turma_col).value)
+        if not turma:
+            break
+
+        masc = _safe_int(ws_total.cell(row=row, column=mc).value, 0)
+        fem = _safe_int(ws_total.cell(row=row, column=fc).value, 0)
+        found[turma] = (masc, fem)
+
+        row += 1
+
+    debug_log.append(f"[{serie_label}] fallback usado: capturadas {len(found)} turmas (parada por mudança de série na col C).")
+    return found
+
+
+def _write_block(ws_modelo, serie_label, turma_data, debug_log):
+    block = ATENDIMENTO_CONFIG["MODEL_BLOCKS"][serie_label]
+    start = block["start_row"]
+    masc_col = block["masc_col"]
+    fem_col = block["fem_col"]
+    total_col = block["total_col"]
+
+    found_letters = [t for t in TURMAS_MAX if t in turma_data]
+    missing_letters = [t for t in TURMAS_MAX if t not in turma_data]
+
+    for i, turma in enumerate(TURMAS_MAX):
+        r = start + i
+
+        masc = turma_data.get(turma, (0, 0))[0]
+        fem = turma_data.get(turma, (0, 0))[1]
+
+        set_merged_cell_value(ws_modelo, f"{masc_col}{r}", masc)
+
+        if fem_col:
+            set_merged_cell_value(ws_modelo, f"{fem_col}{r}", fem)
+
+        if total_col and fem_col:
+            # Força fórmula para evitar valor residual no template
+            set_merged_cell_value(ws_modelo, f"{total_col}{r}", f"={masc_col}{r}+{fem_col}{r}")
+
+    debug_log.append(f"[{serie_label}] preenchido: {_condense_letters(found_letters)}; zerado: {_condense_letters(missing_letters)}")
+
+
+def _read_total(ws_total, row, col, debug_log, label):
+    v = ws_total.cell(row=row, column=col).value
+    out = _safe_int(v, 0)
+    debug_log.append(f"[TOTAL] {label}: lido {out} de ({row},{col}).")
+    return out
+
 
 @app.route('/quadros/atendimento_mensal', methods=['GET', 'POST'])
 @login_required
 def quadro_atendimento_mensal():
     if request.method == 'POST':
+        debug_log = []
+        enable_eja = _is_eja_enabled()
+
+        responsavel = (request.form.get("responsavel") or "").strip()
+        rf = (request.form.get("rf") or "").strip()
+
+        mes_ref_raw = (request.form.get("mes_ref") or "").strip()
+        mes_ref = None
+        if mes_ref_raw:
+            m = re.match(r"^\s*(\d{4})-(\d{2})\s*$", mes_ref_raw)  # YYYY-MM
+            if m:
+                mes_ref = f"{m.group(2)}/{m.group(1)}"
+            else:
+                m2 = re.match(r"^\s*(\d{2})/(\d{4})\s*$", mes_ref_raw)  # MM/YYYY
+                if m2:
+                    mes_ref = f"{m2.group(1)}/{m2.group(2)}"
+        if not mes_ref:
+            mes_ref = datetime.now().strftime("%m/%Y")
+
         fundamental_file = request.files.get('lista_fundamental')
         eja_file = request.files.get('lista_eja')
 
-        # FUNDAMENTAL – atualiza arquivo da sessão, se enviado
         if fundamental_file and fundamental_file.filename != '':
-            filename = secure_filename(fundamental_file.filename)
-            unique_filename = f"atendimento_{uuid.uuid4().hex}_{filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            fundamental_file.save(file_path)
-            session['lista_fundamental'] = file_path
+            _save_upload_to_session(fundamental_file, 'lista_fundamental', prefix='atendimento')
 
-        # EJA – atualiza arquivo da sessão, se enviado (OPCIONAL)
-        if eja_file and eja_file.filename != '':
-            filename = secure_filename(eja_file.filename)
-            unique_filename = f"atendimento_eja_{uuid.uuid4().hex}_{filename}"
-            file_path_eja = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            eja_file.save(file_path_eja)
-            session['lista_eja'] = file_path_eja
+        if enable_eja and eja_file and eja_file.filename != '':
+            _save_upload_to_session(eja_file, 'lista_eja', prefix='atendimento_eja')
 
-        # Usa a última lista FUNDAMENTAL salva em sessão, se existir
         file_path = session.get('lista_fundamental')
         if not file_path or not os.path.exists(file_path):
             flash("Nenhum arquivo da Lista Piloto FUNDAMENTAL disponível.", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
-        # Carrega modelo
         model_path = os.path.join("modelos", "Quadro de Atendimento Mensal - Modelo.xlsx")
         if not os.path.exists(model_path):
             flash("Modelo Atendimento Mensal não encontrado.", "error")
@@ -2897,98 +3063,49 @@ def quadro_atendimento_mensal():
             flash(f"Erro ao ler o modelo de atendimento mensal: {str(e)}", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
-        # Se o modelo tiver mais de uma planilha, pega a segunda, senão a primeira
-        if len(wb_modelo.worksheets) > 1:
-            ws_modelo = wb_modelo.worksheets[1]
-        else:
-            ws_modelo = wb_modelo.active
+        ws_modelo = wb_modelo.worksheets[1] if len(wb_modelo.worksheets) > 1 else wb_modelo.active
 
-        # Cabeçalho fixo
         set_merged_cell_value(ws_modelo, "B5", "E.M José Padin Mouta")
-        set_merged_cell_value(ws_modelo, "C6", "Rafael Fernando da Silva")
-        set_merged_cell_value(ws_modelo, "B7", "46034")
+        set_merged_cell_value(ws_modelo, "C6", responsavel or "-")
+        set_merged_cell_value(ws_modelo, "B7", rf or "-")
+        set_merged_cell_value(ws_modelo, "A13", mes_ref)
+        debug_log.append(f"[HEADER] responsavel='{responsavel or '-'}' rf='{rf or '-'}' mes_ref='{mes_ref}'")
 
-        current_month = datetime.now().strftime("%m")
-        # Mantido /2025 conforme seu código original
-        set_merged_cell_value(ws_modelo, "A13", f"{current_month}/2025")
-
-        # Lê lista piloto FUNDAMENTAL
         try:
-            with open(file_path, "rb") as lista_file:
-                wb_lista = load_workbook(lista_file, data_only=True)
+            wb_lista = load_workbook(file_path, data_only=True, read_only=True)
         except Exception:
             flash("Erro ao ler o arquivo da Lista Piloto FUNDAMENTAL.", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
-        sheet_name = None
-        for name in wb_lista.sheetnames:
-            if name.strip().lower() == "total de alunos":
-                sheet_name = name
-                break
-
+        sheet_name = _find_sheet_case_insensitive(wb_lista, "Total de Alunos")
         if not sheet_name:
             flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto FUNDAMENTAL.", "error")
             return redirect(url_for('quadro_atendimento_mensal'))
 
         ws_total = wb_lista[sheet_name]
 
-        # Preenche blocos do modelo com dados da lista piloto FUNDAMENTAL
-        for r, source_row in zip(range(55, 57), range(13, 15)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
+        # 1º ano: SEMPRE ZERADO (Masc + Fem + Total)
+        _write_block(ws_modelo, "1º", {}, debug_log)
 
-        for r, source_row in zip(range(57, 61), range(15, 19)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
+        # séries 2º..5º
+        for serie_label in ["2º", "3º", "4º", "5º"]:
+            data = _extract_by_cols(ws_total, serie_label, debug_log)
+            if not data:
+                debug_log.append(f"[{serie_label}] prioridade 1 (C/D) não encontrou turmas; tentando fallback...")
+                data = _extract_by_fallback_block(ws_total, serie_label, debug_log)
+            _write_block(ws_modelo, serie_label, data, debug_log)
 
-        for r, source_row in zip(range(73, 80), range(20, 27)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
+        # totais manhã / tarde
+        tcfg = ATENDIMENTO_CONFIG["TOTALS"]
+        manha = _read_total(ws_total, *tcfg["manha_total_cell"], debug_log=debug_log, label="Manhã")
+        tarde = _read_total(ws_total, *tcfg["tarde_total_cell"], debug_log=debug_log, label="Tarde")
 
-        for r, source_row in zip(range(91, 98), range(28, 35)):
-            value_B = ws_total.cell(row=source_row, column=7).value
-            value_C = ws_total.cell(row=source_row, column=8).value
-            set_merged_cell_value(ws_modelo, f"B{r}", value_B)
-            set_merged_cell_value(ws_modelo, f"C{r}", value_C)
-            set_merged_cell_value(ws_modelo, f"D{r}", f"=B{r}+C{r}")
-
-        # Campos específicos FUNDAMENTAL
-        value_R20 = ws_total.cell(row=37, column=9).value  # I37
-        set_merged_cell_value(ws_modelo, "R20", value_R20)
-
+        set_merged_cell_value(ws_modelo, tcfg["modelo_manha_addr"], manha)
         set_merged_cell_value(ws_modelo, "R24", "-")
+        set_merged_cell_value(ws_modelo, tcfg["modelo_tarde_addr"], tarde)
 
-        value_R28 = ws_total.cell(row=39, column=9).value  # I39
-        set_merged_cell_value(ws_modelo, "R28", value_R28)
-
-        set_merged_cell_value(ws_modelo, "B37", ws_total.cell(row=6, column=7).value)   # G6
-        set_merged_cell_value(ws_modelo, "B38", ws_total.cell(row=7, column=7).value)   # G7
-        set_merged_cell_value(ws_modelo, "B39", ws_total.cell(row=8, column=7).value)   # G8
-        set_merged_cell_value(ws_modelo, "B40", ws_total.cell(row=9, column=7).value)   # G9
-        set_merged_cell_value(ws_modelo, "B41", ws_total.cell(row=10, column=7).value)  # G10
-        set_merged_cell_value(ws_modelo, "B42", ws_total.cell(row=11, column=7).value)  # G11
-
-        set_merged_cell_value(ws_modelo, "C37", ws_total.cell(row=6, column=8).value)   # H6
-        set_merged_cell_value(ws_modelo, "C38", ws_total.cell(row=7, column=8).value)   # H7
-        set_merged_cell_value(ws_modelo, "C39", ws_total.cell(row=8, column=8).value)   # H8
-        set_merged_cell_value(ws_modelo, "C40", ws_total.cell(row=9, column=8).value)   # H9
-        set_merged_cell_value(ws_modelo, "C41", ws_total.cell(row=10, column=8).value)  # H10
-        set_merged_cell_value(ws_modelo, "C42", ws_total.cell(row=11, column=8).value)  # H11
-
-        # ---- EJA (OPCIONAL: usa arquivo salvo em sessão, se existir) ----
-        eja_path = session.get('lista_eja')
-
+        # EJA: mantém comportamento atual
         def _preencher_eja_zerado():
-            # Define como 0 os campos do bloco EJA no modelo, para manter o arquivo consistente
             cells_zero = [
                 "L19", "L20", "L21", "L22",
                 "M19", "M20", "M21", "M22",
@@ -3000,64 +3117,70 @@ def quadro_atendimento_mensal():
             ]
             for addr in cells_zero:
                 set_merged_cell_value(ws_modelo, addr, 0)
-            # Mantém o R24 como "-" (já setado acima)
+            set_merged_cell_value(ws_modelo, "R24", "-")
 
-        if not eja_path or not os.path.exists(eja_path):
-            # Sem EJA: apenas zera o bloco EJA e segue normalmente
+        if not enable_eja:
             _preencher_eja_zerado()
+            debug_log.append("[EJA] desativada: bloco EJA zerado.")
         else:
-            try:
-                with open(eja_path, "rb") as f_eja:
-                    wb_eja = load_workbook(f_eja, data_only=True)
-            except Exception as e:
-                # EJA é opcional: se houver arquivo e falhar leitura, informa e gera sem EJA
-                flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}. Gerando sem EJA.", "warning")
+            eja_path = session.get('lista_eja')
+            if not eja_path or not os.path.exists(eja_path):
                 _preencher_eja_zerado()
+                debug_log.append("[EJA] habilitada, mas sem arquivo: bloco EJA zerado.")
             else:
-                sheet_name_eja = None
-                for name in wb_eja.sheetnames:
-                    if name.strip().lower() == "total de alunos":
-                        sheet_name_eja = name
-                        break
-
-                if not sheet_name_eja:
-                    flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA. Gerando sem EJA.", "warning")
+                try:
+                    wb_eja = load_workbook(eja_path, data_only=True, read_only=True)
+                except Exception as e:
+                    flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}. Gerando sem EJA.", "warning")
                     _preencher_eja_zerado()
+                    debug_log.append(f"[EJA] erro ao ler: {e}. Bloco EJA zerado.")
                 else:
-                    ws_total_eja = wb_eja[sheet_name_eja]
+                    sheet_name_eja = _find_sheet_case_insensitive(wb_eja, "Total de Alunos")
+                    if not sheet_name_eja:
+                        flash("A aba 'Total de Alunos' não foi encontrada na Lista Piloto EJA. Gerando sem EJA.", "warning")
+                        _preencher_eja_zerado()
+                        debug_log.append("[EJA] aba Total de Alunos não encontrada. Bloco EJA zerado.")
+                    else:
+                        ws_total_eja = wb_eja[sheet_name_eja]
+                        set_merged_cell_value(ws_modelo, "L19", ws_total_eja.cell(row=6, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L20", ws_total_eja.cell(row=7, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L21", ws_total_eja.cell(row=8, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L22", ws_total_eja.cell(row=9, column=5).value)
 
-                    set_merged_cell_value(ws_modelo, "L19", ws_total_eja.cell(row=6, column=5).value)  # E6
-                    set_merged_cell_value(ws_modelo, "L20", ws_total_eja.cell(row=7, column=5).value)  # E7
-                    set_merged_cell_value(ws_modelo, "L21", ws_total_eja.cell(row=8, column=5).value)  # E8
-                    set_merged_cell_value(ws_modelo, "L22", ws_total_eja.cell(row=9, column=5).value)  # E9
+                        set_merged_cell_value(ws_modelo, "M19", ws_total_eja.cell(row=6, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M20", ws_total_eja.cell(row=7, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M21", ws_total_eja.cell(row=8, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M22", ws_total_eja.cell(row=9, column=6).value)
 
-                    set_merged_cell_value(ws_modelo, "M19", ws_total_eja.cell(row=6, column=6).value)  # F6
-                    set_merged_cell_value(ws_modelo, "M20", ws_total_eja.cell(row=7, column=6).value)  # F7
-                    set_merged_cell_value(ws_modelo, "M21", ws_total_eja.cell(row=8, column=6).value)  # F8
-                    set_merged_cell_value(ws_modelo, "M22", ws_total_eja.cell(row=9, column=6).value)  # F9
+                        set_merged_cell_value(ws_modelo, "L27", ws_total_eja.cell(row=11, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L28", ws_total_eja.cell(row=12, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L29", ws_total_eja.cell(row=13, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L30", ws_total_eja.cell(row=14, column=5).value)
 
-                    set_merged_cell_value(ws_modelo, "L27", ws_total_eja.cell(row=11, column=5).value)  # E11
-                    set_merged_cell_value(ws_modelo, "L28", ws_total_eja.cell(row=12, column=5).value)  # E12
-                    set_merged_cell_value(ws_modelo, "L29", ws_total_eja.cell(row=13, column=5).value)  # E13
-                    set_merged_cell_value(ws_modelo, "L30", ws_total_eja.cell(row=14, column=5).value)  # E14
+                        set_merged_cell_value(ws_modelo, "M27", ws_total_eja.cell(row=11, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M28", ws_total_eja.cell(row=12, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M29", ws_total_eja.cell(row=13, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M30", ws_total_eja.cell(row=14, column=6).value)
 
-                    set_merged_cell_value(ws_modelo, "M27", ws_total_eja.cell(row=11, column=6).value)  # F11
-                    set_merged_cell_value(ws_modelo, "M28", ws_total_eja.cell(row=12, column=6).value)  # F12
-                    set_merged_cell_value(ws_modelo, "M29", ws_total_eja.cell(row=13, column=6).value)  # F13
-                    set_merged_cell_value(ws_modelo, "M30", ws_total_eja.cell(row=14, column=6).value)  # F14
+                        set_merged_cell_value(ws_modelo, "L35", ws_total_eja.cell(row=16, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L36", ws_total_eja.cell(row=17, column=5).value)
+                        set_merged_cell_value(ws_modelo, "L37", ws_total_eja.cell(row=18, column=5).value)
 
-                    set_merged_cell_value(ws_modelo, "L35", ws_total_eja.cell(row=16, column=5).value)  # E16
-                    set_merged_cell_value(ws_modelo, "L36", ws_total_eja.cell(row=17, column=5).value)  # E17
-                    set_merged_cell_value(ws_modelo, "L37", ws_total_eja.cell(row=18, column=5).value)  # E18
+                        set_merged_cell_value(ws_modelo, "M35", ws_total_eja.cell(row=16, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M36", ws_total_eja.cell(row=17, column=6).value)
+                        set_merged_cell_value(ws_modelo, "M37", ws_total_eja.cell(row=18, column=6).value)
 
-                    set_merged_cell_value(ws_modelo, "M35", ws_total_eja.cell(row=16, column=6).value)  # F16
-                    set_merged_cell_value(ws_modelo, "M36", ws_total_eja.cell(row=17, column=6).value)  # F17
-                    set_merged_cell_value(ws_modelo, "M37", ws_total_eja.cell(row=18, column=6).value)  # F18
+                        set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)
+                        set_merged_cell_value(ws_modelo, "R24", "-")
+                        debug_log.append("[EJA] preenchida com sucesso.")
 
-                    set_merged_cell_value(ws_modelo, "R32", ws_total_eja.cell(row=20, column=7).value)  # G20
-                    set_merged_cell_value(ws_modelo, "R24", "-")
+        if ATENDIMENTO_CONFIG["ENABLE_DEBUG_LOG"]:
+            try:
+                current_app.logger.info("=== DEBUG ATENDIMENTO MENSAL ===\n%s", "\n".join(debug_log))
+            except Exception:
+                print("=== DEBUG ATENDIMENTO MENSAL ===")
+                print("\n".join(debug_log))
 
-        # Gera arquivo em memória
         output = BytesIO()
         wb_modelo.save(output)
         output.seek(0)
@@ -3070,21 +3193,132 @@ def quadro_atendimento_mensal():
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-    # GET – renderiza a tela padronizada
-    return render_template('quadro_atendimento_mensal.html')
+    return render_template('quadro_atendimento_mensal.html', enable_eja=_is_eja_enabled())
 
 
 # ==========================================================
-#  QUADRO – TRANSFERÊNCIAS
+#  QUADRO – TRANSFERÊNCIAS (FIX H/I/J)
 # ==========================================================
+
+_RX_TE = re.compile(
+    r"(?i)(?<![A-Z0-9])TE\s*[-:\s–—]*\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?"
+)
+_RX_EJA = re.compile(
+    r"(?i)(?<![A-Z0-9])(TE|MC|MCC)\s*[-:\s–—]*\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?"
+)
+
+def _is_missing_text(v) -> bool:
+    s = _safe_str(v)
+    if not s:
+        return True
+    return s.lower() in {"0", "-", "nan", "none", "null"}
+
+def _parse_user_date(date_str: str) -> Optional[datetime]:
+    s = _safe_str(date_str)
+    if not s:
+        return None
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%y"):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            pass
+    return None
+
+def _parse_period_date(date_str: str, label: str) -> datetime:
+    """
+    Mantém compatibilidade com input type=date (YYYY-MM-DD) e aceita dd/mm/aa|aaaa.
+    """
+    s = _safe_str(date_str)
+    if not s:
+        raise ValueError(f"Informe {label}.")
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d/%m/%y"):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            pass
+    raise ValueError(f"Formato de {label} inválido: '{date_str}'.")
+
+def _extract_te_date_from_text(text: str, period_start: datetime, period_end: datetime):
+    """
+    Extrai TE - dd/mm[/aa|aaaa] de um texto (OBS).
+    Ano ausente: tenta encaixar no período; se não der, assume ano corrente.
+    Retorna (dt, match_txt, year_inferred).
+    """
+    s = _safe_str(text)
+    if not s:
+        return None, None, False
+
+    m = _RX_TE.search(s)
+    if not m:
+        return None, None, False
+
+    day = int(m.group(1))
+    month = int(m.group(2))
+    year_raw = m.group(3)
+
+    year_inferred = False
+    if year_raw:
+        y = int(year_raw)
+        if y < 100:
+            y += 2000
+        years_to_try = [y]
+    else:
+        year_inferred = True
+        years_to_try = [period_start.year]
+        if period_end.year != period_start.year:
+            years_to_try.append(period_end.year)
+
+    for y in years_to_try:
+        try:
+            dt = datetime(y, month, day)
+        except Exception:
+            continue
+        if period_start <= dt <= period_end:
+            return dt, m.group(0), year_inferred
+
+    if not year_raw:
+        y = datetime.now().year
+        try:
+            return datetime(y, month, day), m.group(0), year_inferred
+        except Exception:
+            return None, m.group(0), year_inferred
+
+    for y in years_to_try:
+        try:
+            return datetime(y, month, day), m.group(0), year_inferred
+        except Exception:
+            continue
+
+    return None, m.group(0), year_inferred
+
+def _label_set(ws, addr: str, label: str, value: str):
+    """
+    Mantém prefixo do template quando existir (ex.: 'Unidade Escolar: ...').
+    """
+    current = ws[addr].value
+    val = _safe_str(value)
+
+    if isinstance(current, str) and ":" in current:
+        left = current.split(":", 1)[0].strip()
+        if _norm_header_compact(left) == _norm_header_compact(label):
+            set_merged_cell_value(ws, addr, f"{left}: {val}")
+            return
+
+    set_merged_cell_value(ws, addr, val)
+
 
 @app.route("/quadros/transferencias", methods=["GET", "POST"])
 @login_required
 def quadro_transferencias():
     if request.method == "POST":
+        enable_eja = _is_eja_enabled()
+
         period_start_str = request.form.get("period_start")
         period_end_str = request.form.get("period_end")
+
         responsavel = request.form.get("responsavel")
+        diretor_nome = request.form.get("diretor_nome") or "Luciana Rocha Augustinho"
+        data_quadro_in = request.form.get("data_quadro")  # opcional
 
         fundamental_file = request.files.get("lista_fundamental")
         eja_file = request.files.get("lista_eja")
@@ -3093,12 +3327,13 @@ def quadro_transferencias():
             flash("Por favor, preencha todos os campos.", "error")
             return redirect(url_for("quadro_transferencias"))
 
-        # Salva/atualiza a Lista Piloto Fundamental, se enviada
+        # FUNDAMENTAL
         if fundamental_file and fundamental_file.filename != "":
             fundamental_filename = secure_filename(
                 f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
             )
-            fundamental_path = os.path.join(app.config["UPLOAD_FOLDER"], fundamental_filename)
+            upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
+            fundamental_path = os.path.join(upload_folder, fundamental_filename)
             fundamental_file.save(fundamental_path)
             session["lista_fundamental"] = fundamental_path
         else:
@@ -3107,195 +3342,204 @@ def quadro_transferencias():
                 flash("Lista Piloto Fundamental não encontrada.", "error")
                 return redirect(url_for("quadro_transferencias"))
 
-        # Salva/atualiza a Lista Piloto EJA, se enviada (opcional)
-        if eja_file and eja_file.filename != "":
+        # EJA opcional
+        eja_path = None
+        if enable_eja and eja_file and eja_file.filename != "":
             eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_" + eja_file.filename)
-            eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
+            upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
+            eja_path = os.path.join(upload_folder, eja_filename)
             eja_file.save(eja_path)
             session["lista_eja"] = eja_path
-        else:
+        elif enable_eja:
             eja_path = session.get("lista_eja")
-            # EJA é opcional
 
         try:
-            period_start = datetime.strptime(period_start_str, "%Y-%m-%d")
-            period_end = datetime.strptime(period_end_str, "%Y-%m-%d")
-        except Exception:
-            flash("Formato de data inválido.", "error")
+            period_start = _parse_period_date(period_start_str, "a data inicial")
+            period_end = _parse_period_date(period_end_str, "a data final")
+        except ValueError as e:
+            flash(str(e), "error")
             return redirect(url_for("quadro_transferencias"))
 
-        # ---- PARTE 1: FUNDAMENTAL ----
+        if period_end < period_start:
+            flash("A data final não pode ser menor que a data inicial.", "error")
+            return redirect(url_for("quadro_transferencias"))
+
+        data_quadro_dt = _parse_user_date(data_quadro_in) or datetime.now()
+
+        # Lê LISTA CORRIDA (Fundamental)
         try:
             df_fundamental = pd.read_excel(fundamental_path, sheet_name="LISTA CORRIDA")
         except Exception as e:
             flash(f"Erro ao ler a Lista Piloto Fundamental: {str(e)}", "error")
             return redirect(url_for("quadro_transferencias"))
 
-        motivo_map = {
-            "Dentro da Rede": "Dentro da rede",
-            "Rede Estadual": "Dentro da rede",
-            "Litoral": "Mudança de Municipio",
-            "Mudança de Municipio": "Mudança de Municipio",
-            "São Paulo": "Mudança de Municipio",
-            "ABCD": "Mudança de Municipio",
-            "Interior": "Mudança de Municipio",
-            "Outros Estados": "Mudança de estado",
-            "Particular": "Mudança para Escola Particular",
-            "País": "Mudança de País",
-        }
+        colmap = _build_colmap(df_fundamental)
+
+        col_serie = _pick_col(colmap, "SÉRIE", "SERIE")
+        col_nome = _pick_col(colmap, "NOME")
+        col_dn = _pick_col(colmap, "DATA NASC.", "DATA NASC", "DATANASC")
+        col_ra = _pick_col(colmap, "RA")
+        col_obs = _pick_col(colmap, "OBS", "OBSERVACAO", "OBSERVAÇÃO")
+        col_local_te = _pick_col(colmap, "LOCAL TE", "LOCALTE")
+
+        if not col_nome or not col_dn or not col_ra or not col_serie or not col_obs:
+            flash("A aba 'LISTA CORRIDA' não contém cabeçalhos essenciais (SÉRIE, NOME, DATA NASC., RA, OBS).", "error")
+            return redirect(url_for("quadro_transferencias"))
+
+        debug = []
+        debug.append("[quadro_transferencias] Aba lida: LISTA CORRIDA (Fundamental)")
+        debug.append(
+            f"[quadro_transferencias] Colunas detectadas: "
+            f"SÉRIE='{col_serie}', NOME='{col_nome}', DATA NASC.='{col_dn}', RA='{col_ra}', "
+            f"OBS='{col_obs}', LOCAL TE='{col_local_te}'"
+        )
 
         transfer_records = []
-        col_V_index = 21  # índice 0-based da coluna V
+        invalid_te_dates = 0
 
-        for _, row in df_fundamental.iterrows():
-            if len(row) < 9:
+        use_cols = [col_serie, col_nome, col_dn, col_ra, col_obs]
+        if col_local_te and col_local_te not in use_cols:
+            use_cols.append(col_local_te)
+
+        df_sub = df_fundamental[use_cols].copy()
+
+        for row in df_sub.itertuples(index=False, name=None):
+            row_dict = dict(zip(df_sub.columns, row))
+
+            te_dt, te_match_txt, _ = _extract_te_date_from_text(
+                row_dict.get(col_obs), period_start, period_end
+            )
+
+            if te_match_txt and not te_dt:
+                invalid_te_dates += 1
                 continue
 
-            obs_value = str(row.iloc[8]) if len(row) > 8 else ""
-            motivo_raw = ""
-            if len(row) > col_V_index:
-                motivo_raw = str(row.iloc[col_V_index]).strip()
-            else:
-                motivo_raw = ""
+            if not te_dt:
+                continue
 
-            motivo_w = ""
-            if len(row) > 22:
-                motivo_w = str(row.iloc[22]).strip()
+            if not (period_start <= te_dt <= period_end):
+                continue
 
-            match = re.search(r"(TE)\s*(\d{1,2}/\d{1,2})", obs_value)
-            if match:
-                te_date_str = match.group(2)  # dd/mm
-                te_date_full_str = f"{te_date_str}/{period_start.year}"
+            nome = _safe_str(row_dict.get(col_nome))
+
+            dn_val = row_dict.get(col_dn)
+            dn_str = ""
+            if pd.notna(dn_val):
                 try:
-                    te_date = datetime.strptime(te_date_full_str, "%d/%m/%Y")
+                    dn_dt = pd.to_datetime(dn_val, errors="coerce")
+                    dn_str = dn_dt.strftime("%d/%m/%Y") if pd.notna(dn_dt) else ""
                 except Exception:
-                    continue
-
-                if period_start <= te_date <= period_end:
-                    nome = str(row.iloc[3])
-                    dn_val = row.iloc[5]
                     dn_str = ""
-                    if pd.notna(dn_val):
-                        try:
-                            dn_dt = pd.to_datetime(dn_val, errors="coerce")
-                            if pd.notna(dn_dt):
-                                dn_str = dn_dt.strftime("%d/%m/%y")
-                            else:
-                                dn_str = ""
-                        except Exception:
-                            dn_str = ""
 
-                    ra = str(row.iloc[6])
-                    situacao = "Parcial"
-                    breda = "Não"
-                    nivel_classe = str(row.iloc[0])
-                    tipo_field = "TE"
+            ra = _safe_str(row_dict.get(col_ra))
+            nivel_classe = _safe_str(row_dict.get(col_serie))
 
-                    if motivo_raw in motivo_map:
-                        reason_final = motivo_map[motivo_raw]
-                    else:
-                        reason_final = motivo_raw
+            # FIX H/I/J:
+            local_te_raw = _safe_str(row_dict.get(col_local_te)) if col_local_te else ""
+            local_te = "-" if _is_missing_text(local_te_raw) else local_te_raw
 
-                    if motivo_w:
-                        reason_final = f"{reason_final} ({motivo_w})"
+            record = {
+                "nome": nome,
+                "dn": dn_str,
+                "ra": ra,
+                "situacao": "Parcial",
+                "breda": "Não",
+                "nivel_classe": nivel_classe,
+                "tipo": "TE",
+                "observacao": local_te,              # H
+                "remanejamento": "-",                # I
+                "data": te_dt.strftime("%d/%m/%Y"),  # J
+            }
+            transfer_records.append(record)
 
-                    remanejamento = "-"
-                    data_te = te_date.strftime("%d/%m/%Y")
+        debug.append(f"[quadro_transferencias] TE válidos no período: {len(transfer_records)}")
+        debug.append(f"[quadro_transferencias] Datas TE inválidas descartadas: {invalid_te_dates}")
 
-                    record = {
-                        "nome": nome,
-                        "dn": dn_str,
-                        "ra": ra,
-                        "situacao": situacao,
-                        "breda": breda,
-                        "nivel_classe": nivel_classe,
-                        "tipo": tipo_field,
-                        "observacao": reason_final,
-                        "remanejamento": remanejamento,
-                        "data": data_te,
-                    }
-                    transfer_records.append(record)
-
-        # ---- PARTE 2: EJA (TE / MC / MCC) – OPCIONAL ----
-        if eja_path and os.path.exists(eja_path):
+        # EJA opcional (mantido)
+        if enable_eja and eja_path and os.path.exists(eja_path):
             try:
                 df_eja = pd.read_excel(eja_path, sheet_name="LISTA CORRIDA")
             except Exception as e:
                 flash(f"Erro ao ler a Lista Piloto EJA: {str(e)}", "error")
                 return redirect(url_for("quadro_transferencias"))
 
-            for _, row in df_eja.iterrows():
-                if len(row) < 11:
-                    continue
+            colmap_eja = _build_colmap(df_eja)
+            eja_col_nome = _pick_col(colmap_eja, "NOME")
+            eja_col_dn = _pick_col(colmap_eja, "DATA NASC.", "DATA NASC")
+            eja_col_ra = _pick_col(colmap_eja, "RA")
+            eja_col_serie = _pick_col(colmap_eja, "SÉRIE", "SERIE")
+            eja_col_obs = _pick_col(colmap_eja, "OBS")
+            eja_col_local_te = _pick_col(colmap_eja, "LOCAL TE", "LOCALTE")
 
-                col_k_value = str(row.iloc[10]).strip() if len(row) > 10 else ""
-                if not col_k_value:
-                    continue
+            if eja_col_nome and eja_col_ra and eja_col_serie and eja_col_obs:
+                df_eja_sub = df_eja[
+                    [c for c in [eja_col_serie, eja_col_nome, eja_col_dn, eja_col_ra, eja_col_obs, eja_col_local_te] if c]
+                ].copy()
 
-                match_eja = re.search(
-                    r"(TE|MC|MCC)\s*(\d{1,2}/\d{1,2})", col_k_value, re.IGNORECASE
-                )
-                if match_eja:
-                    tipo_str = match_eja.group(1).upper()
-                    date_str = match_eja.group(2)
-                    eja_date_full = f"{date_str}/{period_start.year}"
+                for row in df_eja_sub.itertuples(index=False, name=None):
+                    row_dict = dict(zip(df_eja_sub.columns, row))
+                    txt = _safe_str(row_dict.get(eja_col_obs))
+
+                    m = _RX_EJA.search(txt)
+                    if not m:
+                        continue
+
+                    tipo_str = m.group(1).upper()
+                    day = int(m.group(2))
+                    month = int(m.group(3))
+                    year_raw = m.group(4)
+
+                    if year_raw:
+                        y = int(year_raw)
+                        if y < 100:
+                            y += 2000
+                    else:
+                        y = period_start.year
+
                     try:
-                        eja_date = datetime.strptime(eja_date_full, "%d/%m/%Y")
+                        dt = datetime(y, month, day)
                     except Exception:
                         continue
 
-                    if period_start <= eja_date <= period_end:
-                        nome = str(row.iloc[3])
-                        dn_val = row.iloc[6]
-                        dn_str = ""
+                    if not (period_start <= dt <= period_end):
+                        continue
+
+                    nome = _safe_str(row_dict.get(eja_col_nome))
+                    ra = _safe_str(row_dict.get(eja_col_ra))
+                    nivel_classe = _safe_str(row_dict.get(eja_col_serie))
+
+                    dn_str = ""
+                    if eja_col_dn:
+                        dn_val = row_dict.get(eja_col_dn)
                         if pd.notna(dn_val):
                             try:
                                 dn_dt = pd.to_datetime(dn_val, errors="coerce")
-                                if pd.notna(dn_dt):
-                                    dn_str = dn_dt.strftime("%d/%m/%Y")
+                                dn_str = dn_dt.strftime("%d/%m/%Y") if pd.notna(dn_dt) else ""
                             except Exception:
                                 dn_str = ""
 
-                        ra_val = row.iloc[7]
-                        if pd.isna(ra_val) or (
-                            isinstance(ra_val, (int, float)) and float(ra_val) == 0
-                        ):
-                            ra_val = row.iloc[8]
+                    local_te_raw = _safe_str(row_dict.get(eja_col_local_te)) if eja_col_local_te else ""
+                    local_te = "-" if _is_missing_text(local_te_raw) else local_te_raw
 
-                        situacao = "Parcial"
-                        breda = "Não"
-                        nivel_classe = str(row.iloc[0])
-                        tipo_field = tipo_str
-
-                        if tipo_field in ["MC", "MCC"]:
-                            obs_final = "Desistencia"
-                        else:
-                            part_z = str(row.iloc[25]).strip() if len(row) > 25 else ""
-                            part_aa = str(row.iloc[26]).strip() if len(row) > 26 else ""
-                            if part_aa:
-                                obs_final = f"{part_z} ({part_aa})".strip()
-                            else:
-                                obs_final = part_z
-
-                        remanejamento = "-"
-                        data_te = eja_date.strftime("%d/%m/%Y")
-
-                        record = {
-                            "nome": nome,
-                            "dn": dn_str,
-                            "ra": str(ra_val),
-                            "situacao": situacao,
-                            "breda": breda,
-                            "nivel_classe": nivel_classe,
-                            "tipo": tipo_field,
-                            "observacao": obs_final,
-                            "remanejamento": remanejamento,
-                            "data": data_te,
-                        }
-                        transfer_records.append(record)
+                    transfer_records.append({
+                        "nome": nome,
+                        "dn": dn_str,
+                        "ra": ra,
+                        "situacao": "Parcial",
+                        "breda": "Não",
+                        "nivel_classe": nivel_classe,
+                        "tipo": tipo_str,
+                        "observacao": local_te,           # H
+                        "remanejamento": "-",             # I
+                        "data": dt.strftime("%d/%m/%Y"),  # J
+                    })
 
         if not transfer_records:
             flash("Nenhum registro de TE/MC/MCC encontrado no período especificado.", "error")
+            try:
+                current_app.logger.info("\n".join(debug))
+            except Exception:
+                print("\n".join(debug))
             return redirect(url_for("quadro_transferencias"))
 
         model_path = os.path.join("modelos", "Quadro Informativo - Modelo.xlsx")
@@ -3312,12 +3556,14 @@ def quadro_transferencias():
 
         ws = wb.active
 
+        SCHOOL_NAME = "E.M José Padin Mouta"
+        _label_set(ws, "A7", "Unidade Escolar", SCHOOL_NAME)
+        _label_set(ws, "A8", "Diretor(a)", diretor_nome)
+
         set_merged_cell_value(ws, "B9", responsavel)
-        set_merged_cell_value(ws, "J9", datetime.now().strftime("%d/%m/%Y"))
+        set_merged_cell_value(ws, "J9", data_quadro_dt.strftime("%d/%m/%Y"))
 
-        start_row = 12
-        current_row = start_row
-
+        current_row = 12
         for record in transfer_records:
             set_merged_cell_value(ws, f"A{current_row}", record["nome"])
             set_merged_cell_value(ws, f"B{current_row}", record["dn"])
@@ -3326,19 +3572,25 @@ def quadro_transferencias():
             set_merged_cell_value(ws, f"E{current_row}", record["breda"])
             set_merged_cell_value(ws, f"F{current_row}", record["nivel_classe"])
             set_merged_cell_value(ws, f"G{current_row}", record["tipo"])
+
+            # FIX H/I/J
             set_merged_cell_value(ws, f"H{current_row}", record["observacao"])
-            set_merged_cell_value(ws, f"I{current_row}", record["remanejamento"])
+            set_merged_cell_value(ws, f"I{current_row}", "-")
             set_merged_cell_value(ws, f"J{current_row}", record["data"])
+
             current_row += 1
+
+        debug.append(f"[quadro_transferencias] Linhas preenchidas no modelo: {len(transfer_records)} (início A12)")
+        try:
+            current_app.logger.info("\n".join(debug))
+        except Exception:
+            print("\n".join(debug))
 
         output = BytesIO()
         wb.save(output)
         output.seek(0)
 
-        filename = (
-            f"Quadro_de_Transferencias_"
-            f"{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
-        )
+        filename = f"Quadro_de_Transferencias_{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
         return send_file(
             output,
             as_attachment=True,
@@ -3346,13 +3598,180 @@ def quadro_transferencias():
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    # GET – exibe o formulário estilizado
     return render_template("quadro_transferencias.html")
 
 
 # ==========================================================
 #  QUADRO – QUANTITATIVO MENSAL (Fundamental)
+#  (mantido: parse flexível do período + debug sheet oculta)
 # ==========================================================
+
+_RX_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_RX_BR_DATE = re.compile(r"^\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?\s*$")
+
+def parse_date_flexible(value: str, *, default_year: Optional[int] = None, field_label: str = "data") -> datetime:
+    """
+    Aceita:
+      - YYYY-MM-DD (input type=date)
+      - dd/mm/aaaa
+      - dd/mm/aa
+      - dd/mm (assume ano corrente, ou default_year se informado)
+    """
+    if value is None or str(value).strip() == "":
+        raise ValueError(f"Informe {field_label}.")
+
+    s = str(value).strip()
+
+    if _RX_ISO_DATE.match(s):
+        try:
+            return datetime.strptime(s, "%Y-%m-%d")
+        except Exception:
+            raise ValueError(f"{field_label.capitalize()} inválida: '{value}'.")
+
+    m = _RX_BR_DATE.match(s)
+    if not m:
+        raise ValueError(
+            f"{field_label.capitalize()} inválida: '{value}'. Use 16/01, 16/01/26, 16/01/2026 (ou selecione no calendário)."
+        )
+
+    day = int(m.group(1))
+    month = int(m.group(2))
+    y_str = m.group(3)
+
+    if not y_str:
+        year = int(default_year) if default_year is not None else datetime.now().year
+    else:
+        year = int(y_str)
+        if year < 100:
+            year += 2000
+
+    try:
+        return datetime(year, month, day)
+    except ValueError:
+        raise ValueError(f"{field_label.capitalize()} inválida: '{value}' (dia/mês não existe).")
+
+
+_RX_TE_DATE_FLEX = re.compile(
+    r"\bTE\b\s*[-:–—]?\s*(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?\b",
+    re.IGNORECASE,
+)
+
+def detect_te_date_from_obs_flexible(
+    obs_text,
+    *,
+    default_year: Optional[int] = None,
+) -> Tuple[Optional[datetime], Optional[str], Optional[str], bool]:
+    """
+    Procura TE + data em OBS.
+    Aceita: TE - 16/01, TE - 16/01/26, TE - 16/01/2026.
+    Se faltar ano, assume ano corrente (ou default_year se fornecido).
+    Retorna: (dt, regra, trecho_match, year_inferred)
+    """
+    if obs_text is None:
+        return None, None, None, False
+
+    text = str(obs_text).strip()
+    if text == "":
+        return None, None, None, False
+
+    m = _RX_TE_DATE_FLEX.search(text)
+    if not m:
+        return None, None, None, False
+
+    day = int(m.group(1))
+    month = int(m.group(2))
+    y_str = m.group(3)
+
+    year_inferred = False
+    if not y_str:
+        year = int(default_year) if default_year is not None else datetime.now().year
+        year_inferred = True
+    else:
+        year = int(y_str)
+        if year < 100:
+            year += 2000
+
+    try:
+        dt = datetime(year, month, day)
+    except ValueError:
+        return None, "OBS:TE_DATE", m.group(0), year_inferred
+
+    return dt, "OBS:TE_DATE", m.group(0), year_inferred
+
+
+def _serie_key_from_value(serie_val: str) -> Optional[str]:
+    """Extrai 2º/3º/4º/5º de valores como '4ºF', '5º D', etc."""
+    s = "" if serie_val is None else str(serie_val).strip()
+    m = re.search(r"(\d)\s*º", s)
+    if not m:
+        return None
+    n = m.group(1)
+    if n in {"2", "3", "4", "5"}:
+        return f"{n}º"
+    return None
+
+
+def _normalize_tipo_te(val) -> str:
+    """
+    Normaliza o TIPO TE para bater no mapping do modelo.
+    Fora disso vira 'Sem Informação' (sem inventar dado).
+    """
+    if _is_missing_value(val):
+        return "Sem Informação"
+
+    raw = str(val).strip()
+    norm = _norm_header_compact(raw)
+
+    if "DENTRO" in norm or "REDEMUNICIPAL" in norm or "MUNICIPAL" in norm:
+        return "Dentro da Rede"
+    if "ESTAD" in norm:
+        return "Rede Estadual"
+    if "LITORAL" in norm or "BAIXADA" in norm:
+        return "Litoral"
+    if "MUDANCA" in norm and "MUNICIP" in norm:
+        return "Mudança de Municipio"
+    if "SAOPAULO" in norm:
+        return "São Paulo"
+    if "ABCD" in norm:
+        return "ABCD"
+    if "INTERIOR" in norm:
+        return "Interior"
+    if "OUTROSESTADOS" in norm or ("OUTROS" in norm and "ESTAD" in norm):
+        return "Outros Estados"
+    if "PARTICULAR" in norm:
+        return "Particular"
+    if "PAIS" in norm:
+        return "País"
+    if "SEMINFORMA" in norm:
+        return "Sem Informação"
+
+    return raw
+
+
+def _recreate_debug_sheet_hidden(wb, title: str = "DEBUG_TE"):
+    """Cria/zera uma aba de debug (oculta) no workbook."""
+    if title in wb.sheetnames:
+        wb.remove(wb[title])
+    ws_dbg = wb.create_sheet(title)
+    ws_dbg.sheet_state = "hidden"
+    ws_dbg.append(
+        [
+            "LINHA_ARQUIVO",
+            "RM",
+            "NOME",
+            "SERIE",
+            "OBS_ORIGINAL",
+            "TE_DATA_EXTRAIDA",
+            "ANO_INFERIDO",
+            "TRECHO_MATCH",
+            "STATUS",
+            "MOTIVO",
+            "TIPO_TE_RAW",
+            "TIPO_TE_NORMALIZADO",
+        ]
+    )
+    return ws_dbg
+
 
 @app.route("/quadros/quantitativo_mensal", methods=["GET", "POST"])
 @login_required
@@ -3361,24 +3780,41 @@ def quadro_quantitativo_mensal():
         period_start_str = request.form.get("period_start")
         period_end_str = request.form.get("period_end")
         responsavel = request.form.get("responsavel")
+        mes_ano = request.form.get("mes_ano")
 
-        if not period_start_str or not period_end_str or not responsavel:
-            flash("Preencha todos os campos obrigatórios.", "error")
+        if not responsavel or not str(responsavel).strip():
+            flash("Preencha o campo Responsável.", "error")
             return redirect(url_for("quadro_quantitativo_mensal"))
+
+        default_year = datetime.now().year
 
         try:
-            period_start = datetime.strptime(period_start_str, "%Y-%m-%d")
-            period_end = datetime.strptime(period_end_str, "%Y-%m-%d")
-        except Exception:
-            flash("Formato de data inválido.", "error")
+            period_start = parse_date_flexible(period_start_str, default_year=default_year, field_label="a data inicial")
+            period_end = parse_date_flexible(period_end_str, default_year=default_year, field_label="a data final")
+        except ValueError as e:
+            flash(str(e), "error")
             return redirect(url_for("quadro_quantitativo_mensal"))
 
+        if period_end < period_start:
+            flash("A data final não pode ser menor que a data inicial.", "error")
+            return redirect(url_for("quadro_quantitativo_mensal"))
+
+        if not mes_ano or not str(mes_ano).strip():
+            meses = {
+                1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+                5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+                9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+            }
+            mes_ano = f"{meses[datetime.now().month]}/{datetime.now().year}"
+        mes_ano = str(mes_ano).strip()
+
         fundamental_file = request.files.get("lista_fundamental")
-        if fundamental_file and fundamental_file.filename != "":
+        if fundamental_file and fundamental_file.filename:
             fundamental_filename = secure_filename(
                 f"fundamental_{uuid.uuid4().hex}_" + fundamental_file.filename
             )
-            fundamental_path = os.path.join(app.config["UPLOAD_FOLDER"], fundamental_filename)
+            upload_folder = current_app.config.get("UPLOAD_FOLDER", "uploads")
+            fundamental_path = os.path.join(upload_folder, fundamental_filename)
             fundamental_file.save(fundamental_path)
             session["lista_fundamental"] = fundamental_path
         else:
@@ -3388,9 +3824,19 @@ def quadro_quantitativo_mensal():
                 return redirect(url_for("quadro_quantitativo_mensal"))
 
         try:
-            df_fundamental = pd.read_excel(fundamental_path, sheet_name="LISTA CORRIDA")
+            df = pd.read_excel(fundamental_path, sheet_name="LISTA CORRIDA")
         except Exception as e:
             flash(f"Erro ao ler a Lista Piloto Fundamental: {str(e)}", "error")
+            return redirect(url_for("quadro_quantitativo_mensal"))
+
+        col_rm = _find_df_col(df, ["RM"])
+        col_nome = _find_df_col(df, ["NOME"])
+        col_serie = _find_df_col(df, ["SÉRIE", "SERIE"])
+        col_obs = _find_df_col(df, ["OBS"])
+        col_tipo_te = _find_df_col(df, ["TIPO TE", "TIPO_TE", "TIPO  TE"])
+
+        if not col_serie or not col_obs:
+            flash("Não foi possível localizar as colunas essenciais (SÉRIE e/ou OBS) na LISTA CORRIDA.", "error")
             return redirect(url_for("quadro_quantitativo_mensal"))
 
         model_path = os.path.join("modelos", "Quadro Quantitativo Mensal - Modelo.xlsx")
@@ -3412,6 +3858,7 @@ def quadro_quantitativo_mensal():
                 "Dentro da Rede": "K14",
                 "Rede Estadual": "K15",
                 "Litoral": "K16",
+                "Mudança de Municipio": "K16",
                 "São Paulo": "K17",
                 "ABCD": "K18",
                 "Interior": "K19",
@@ -3424,6 +3871,7 @@ def quadro_quantitativo_mensal():
                 "Dentro da Rede": "L14",
                 "Rede Estadual": "L15",
                 "Litoral": "L16",
+                "Mudança de Municipio": "L16",
                 "São Paulo": "L17",
                 "ABCD": "L18",
                 "Interior": "L19",
@@ -3436,6 +3884,7 @@ def quadro_quantitativo_mensal():
                 "Dentro da Rede": "M14",
                 "Rede Estadual": "M15",
                 "Litoral": "M16",
+                "Mudança de Municipio": "M16",
                 "São Paulo": "M17",
                 "ABCD": "M18",
                 "Interior": "M19",
@@ -3448,6 +3897,7 @@ def quadro_quantitativo_mensal():
                 "Dentro da Rede": "N14",
                 "Rede Estadual": "N15",
                 "Litoral": "N16",
+                "Mudança de Municipio": "N16",
                 "São Paulo": "N17",
                 "ABCD": "N18",
                 "Interior": "N19",
@@ -3458,94 +3908,146 @@ def quadro_quantitativo_mensal():
             },
         }
 
-        # Inicializa contadores
-        for _, tipos in mapping.items():
+        # Zera determinísticamente todas as células-alvo
+        for tipos in mapping.values():
             for cell_addr in tipos.values():
-                current_val = ws[cell_addr].value
-                if current_val is None or not isinstance(current_val, (int, float)):
-                    set_merged_cell_value(ws, cell_addr, 0)
+                set_merged_cell_value(ws, cell_addr, 0)
 
-        for _, row in df_fundamental.iterrows():
-            if len(row) < 9:
+        ws_dbg = _recreate_debug_sheet_hidden(wb, "DEBUG_TE")
+
+        counted = 0
+        discarded = 0
+
+        for i, row in df.iterrows():
+            linha_arquivo = int(i) + 2
+
+            rm = row.get(col_rm) if col_rm else None
+            nome = row.get(col_nome) if col_nome else None
+            serie_val = row.get(col_serie, "")
+            obs_val = row.get(col_obs, "")
+
+            if _is_missing_value(obs_val):
                 continue
 
-            col_I_val = str(row.iloc[8]).strip() if pd.notna(row.iloc[8]) else ""
-            if "TE" not in col_I_val:
+            te_dt, rule, match_txt, year_inferred = detect_te_date_from_obs_flexible(
+                obs_val,
+                default_year=default_year,
+            )
+
+            if not match_txt:
                 continue
 
-            match = re.search(r"TE\s*([0-9]{1,2}/[0-9]{1,2})", col_I_val)
-            if not match:
+            if not te_dt:
+                discarded += 1
+                ws_dbg.append(
+                    [
+                        linha_arquivo,
+                        "" if rm is None else str(rm),
+                        "" if nome is None else str(nome),
+                        "" if serie_val is None else str(serie_val),
+                        str(obs_val).strip(),
+                        "",
+                        "SIM" if year_inferred else "NAO",
+                        match_txt,
+                        "SKIPPED",
+                        "Data TE inválida em OBS",
+                        "" if col_tipo_te is None else _safe_str(row.get(col_tipo_te)),
+                        "" if col_tipo_te is None else _normalize_tipo_te(row.get(col_tipo_te)),
+                    ]
+                )
                 continue
 
-            te_date_str = match.group(1)
-            te_date_full_str = f"{te_date_str}/{period_start.year}"
-            try:
-                te_date = datetime.strptime(te_date_full_str, "%d/%m/%Y")
-            except Exception:
+            if not (period_start <= te_dt <= period_end):
+                discarded += 1
+                ws_dbg.append(
+                    [
+                        linha_arquivo,
+                        "" if rm is None else str(rm),
+                        "" if nome is None else str(nome),
+                        "" if serie_val is None else str(serie_val),
+                        str(obs_val).strip(),
+                        te_dt.strftime("%d/%m/%Y"),
+                        "SIM" if year_inferred else "NAO",
+                        match_txt,
+                        "SKIPPED",
+                        "Fora do período informado",
+                        "" if col_tipo_te is None else _safe_str(row.get(col_tipo_te)),
+                        "" if col_tipo_te is None else _normalize_tipo_te(row.get(col_tipo_te)),
+                    ]
+                )
                 continue
 
-            if not (period_start <= te_date <= period_end):
+            serie_key = _serie_key_from_value(serie_val)
+            if not serie_key or serie_key not in mapping:
+                discarded += 1
+                ws_dbg.append(
+                    [
+                        linha_arquivo,
+                        "" if rm is None else str(rm),
+                        "" if nome is None else str(nome),
+                        "" if serie_val is None else str(serie_val),
+                        str(obs_val).strip(),
+                        te_dt.strftime("%d/%m/%Y"),
+                        "SIM" if year_inferred else "NAO",
+                        match_txt,
+                        "SKIPPED",
+                        "Série fora de 2º–5º ou ilegível",
+                        "" if col_tipo_te is None else _safe_str(row.get(col_tipo_te)),
+                        "" if col_tipo_te is None else _normalize_tipo_te(row.get(col_tipo_te)),
+                    ]
+                )
                 continue
 
-            serie_value = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
-            series_key = None
-            if "2º" in serie_value:
-                series_key = "2º"
-            elif "3º" in serie_value:
-                series_key = "3º"
-            elif "4º" in serie_value:
-                series_key = "4º"
-            elif "5º" in serie_value:
-                series_key = "5º"
-            else:
-                continue
-
-            tipo_te = ""
-            if len(row) > 21 and pd.notna(row.iloc[21]):
-                tipo_te = str(row.iloc[21]).strip()
-            if not tipo_te:
+            tipo_raw = row.get(col_tipo_te, None) if col_tipo_te else None
+            tipo_te = _normalize_tipo_te(tipo_raw)
+            if tipo_te not in mapping[serie_key]:
                 tipo_te = "Sem Informação"
 
-            if series_key in mapping and tipo_te in mapping[series_key]:
-                cell_addr = mapping[series_key][tipo_te]
-                current_count = ws[cell_addr].value
-                if not isinstance(current_count, (int, float)):
-                    current_count = 0
-                set_merged_cell_value(ws, cell_addr, current_count + 1)
+            cell_addr = mapping[serie_key][tipo_te]
+            current_val = ws[cell_addr].value
+            current_val = current_val if isinstance(current_val, (int, float)) else 0
+            set_merged_cell_value(ws, cell_addr, current_val + 1)
 
-        set_merged_cell_value(ws, "B3", responsavel)
-        set_merged_cell_value(
-            ws,
-            "D3",
-            f"{period_start.strftime('%d/%m/%Y')} a {period_end.strftime('%d/%m/%Y')}",
+            counted += 1
+            ws_dbg.append(
+                [
+                    linha_arquivo,
+                    "" if rm is None else str(rm),
+                    "" if nome is None else str(nome),
+                    "" if serie_val is None else str(serie_val),
+                    str(obs_val).strip(),
+                    te_dt.strftime("%d/%m/%Y"),
+                    "SIM" if year_inferred else "NAO",
+                    match_txt,
+                    "COUNTED",
+                    "",
+                    "" if tipo_raw is None else str(tipo_raw),
+                    tipo_te,
+                ]
+            )
+
+        set_merged_cell_value(ws, "B3", str(responsavel).strip())
+        set_merged_cell_value(ws, "D3", f"{period_start.strftime('%d/%m/%Y')} a {period_end.strftime('%d/%m/%Y')}")
+
+        with _temp_unprotect_sheet(ws):
+            set_merged_cell_value(ws, "A6", "E.M José Padin Mouta")
+            set_merged_cell_value(ws, "A8", mes_ano)
+            set_merged_cell_value(ws, "A10", "QUADRO GERAL DE TRANSFERENCIAS EXPEDIDAS - 2026")
+
+        current_app.logger.info(
+            "[QUADRO_QUANTITATIVO] periodo=%s..%s | counted=%s | discarded=%s | ano_padrao_sem_ano=%s",
+            period_start.strftime("%d/%m/%Y"),
+            period_end.strftime("%d/%m/%Y"),
+            counted,
+            discarded,
+            default_year,
         )
-
-        meses = {
-            1: "Janeiro",
-            2: "Fevereiro",
-            3: "Março",
-            4: "Abril",
-            5: "Maio",
-            6: "Junho",
-            7: "Julho",
-            8: "Agosto",
-            9: "Setembro",
-            10: "Outubro",
-            11: "Novembro",
-            12: "Dezembro",
-        }
-        current_month = meses[datetime.now().month]
-        current_year = datetime.now().year
-        set_merged_cell_value(ws, "A8", f"{current_month}/{current_year}")
 
         output = BytesIO()
         wb.save(output)
         output.seek(0)
 
-        filename = (
-            f"Quadro_Quantitativo_Fundamental_"
-            f"{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
-        )
+        filename = f"Quadro_Quantitativo_Fundamental_{period_start.strftime('%d%m')}_{period_end.strftime('%d%m')}.xlsx"
         return send_file(
             output,
             as_attachment=True,
@@ -3553,394 +4055,747 @@ def quadro_quantitativo_mensal():
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    # GET: exibe o formulário
-    return render_template("quadro_quantitativo_mensal.html")
-
+    meses = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+    }
+    default_mes_ano = f"{meses[datetime.now().month]}/{datetime.now().year}"
+    return render_template("quadro_quantitativo_mensal.html", default_mes_ano=default_mes_ano)
 
 # ==========================================================
-#  QUADRO QUANTITATIVO DE INCLUSÃO – REGULAR + EJA (EJA OPCIONAL)
+#  QUADRO QUANTITATIVO DE INCLUSÃO – REGULAR (EJA DESCONSIDERADA)
+#  - Contagem por turma via LISTA CORRIDA
+#  - Regras:
+#      * Turma: Coluna A
+#      * RM (identificador único): Coluna C (NÃO contabiliza vazio/0)
+#      * Inclusão: Coluna N == "Sim" (case/trim)
+#      * Plano de Ação: Coluna P com profissional válido (ignora vazio/0/-)
+#      * Profissionais: únicos por turma (dedupe case-insensitive e colapsando espaços)
+#  - Alerta: turmas com 2+ profissionais distintos (Plano de Ação)
+#  - Preenchimento por mapeamento automático do MODELO
 # ==========================================================
 
-SETORES = ["Financeiro", "Recursos Humanos", "Administrativo", "Marketing", "TI"]
+import os
+import re
+import json
+import base64
+import uuid
+from io import BytesIO
+from collections import defaultdict
+from datetime import datetime
+
+from flask import (
+    request,
+    flash,
+    redirect,
+    url_for,
+    send_file,
+    render_template,
+)
+from werkzeug.utils import secure_filename
+from openpyxl import load_workbook
+
+# OBS: este código assume que você já tem:
+# - app = Flask(__name__)
+# - app.config["UPLOAD_FOLDER"]
+# no seu arquivo principal.
+
+
+def _collapse_spaces(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "")).strip()
+
+
+def _normalize_rm(v) -> str:
+    """
+    Normaliza RM para string comparável e SEGURA para deduplicação.
+    Regras importantes:
+      - RM vazio/None => ""
+      - RM 0 / "0" / "0000" / "0.0" => "" (NÃO conta)
+      - Remove caracteres não numéricos e remove zeros à esquerda
+        (ex.: "00012" -> "12")
+      - Float não-inteiro (ex.: 12.5) => "" (inválido)
+    """
+    if v is None:
+        return ""
+
+    # int direto
+    if isinstance(v, int):
+        if v == 0:
+            return ""
+        return str(v).strip()
+
+    # float comum no Excel
+    if isinstance(v, float):
+        if not v.is_integer():
+            return ""  # RM com decimal é inválido
+        iv = int(v)
+        if iv == 0:
+            return ""
+        return str(iv).strip()
+
+    s = _collapse_spaces(str(v))
+    if not s:
+        return ""
+
+    # casos de "nan"/"none" etc
+    if s.casefold() in {"nan", "none"}:
+        return ""
+
+    # extrai somente dígitos (tolerante a RM com espaços/pontos)
+    digits = re.sub(r"\D+", "", s)
+    if not digits:
+        return ""
+
+    # remove zeros à esquerda
+    digits = digits.lstrip("0")
+    if not digits:
+        return ""  # era tudo zero
+
+    return digits
+
+
+def _normalize_turma(v) -> str:
+    """
+    Normaliza turma para padrão: '2ºA', '3ºC' etc.
+    Aceita entradas comuns: '2ºA', '2-A', '2 A', '2a', '2ªA' etc.
+    """
+    if v is None:
+        return ""
+    s = _collapse_spaces(str(v))
+    if not s:
+        return ""
+
+    s = s.replace("ª", "").replace("º", "").replace("°", "")
+    s = s.replace("-", "").replace("/", "").replace("\\", "")
+    s = s.replace(" ", "")
+    s = s.upper()
+
+    m = re.match(r"^(\d{1,2})([A-Z])$", s)
+    if not m:
+        return ""
+    num = int(m.group(1))
+    letra = m.group(2)
+    return f"{num}º{letra}"
+
+
+def _is_sim(v) -> bool:
+    """Coluna N: deve ser exatamente 'Sim' (tolerante a caixa/trim)."""
+    s = _collapse_spaces("" if v is None else str(v))
+    return s.casefold() == "sim"
+
+
+def _is_valid_prof(v) -> bool:
+    """Coluna P: profissional válido (ignora vazio, 0, -)."""
+    if v is None:
+        return False
+    s = _collapse_spaces(str(v))
+    if not s:
+        return False
+    if s in {"0", "-"}:
+        return False
+    if s.casefold() in {"nan", "none"}:
+        return False
+    return True
+
+
+def _prof_key(v: str) -> str:
+    """Chave de deduplicação: strip, colapsa espaços e compara case-insensitive."""
+    return _collapse_spaces(v).casefold()
+
+
+def _build_template_map(ws_model):
+    """
+    Mapeia automaticamente o MODELO:
+      - Encontra turmas nos rótulos (colunas B, F, J) como '2-A', '3-C', '5-F'...
+      - Para cada turma, calcula as células de quantidade:
+          Inclusão:        D/H/L na linha do rótulo
+          Plano de Ação:   D/H/L na linha do rótulo+1
+          Profissionais:   D/H/L na linha do rótulo+2
+    Retorna:
+      dict { '2ºA': {'inc_qtd': 'D13', 'plano_qtd': 'D14', 'prof_qtd': 'D15'}, ... }
+    """
+    label_to_qty = {2: 4, 6: 8, 10: 12}  # B->D, F->H, J->L
+    turma_cells = {}
+
+    max_row = ws_model.max_row
+    for label_col, qty_col in label_to_qty.items():
+        for r in range(1, max_row + 1):
+            v = ws_model.cell(r, label_col).value
+            if not isinstance(v, str):
+                continue
+            raw = _collapse_spaces(v)
+            if not re.match(r"^\d{1,2}\s*-\s*[A-Za-z]$", raw):
+                continue
+
+            turma_norm = _normalize_turma(raw)
+            if not turma_norm:
+                continue
+
+            inc_row = r
+            plano_row = r + 1
+            prof_row = r + 2
+
+            turma_cells[turma_norm] = {
+                "inc_qtd": ws_model.cell(inc_row, qty_col).coordinate,
+                "plano_qtd": ws_model.cell(plano_row, qty_col).coordinate,
+                "prof_qtd": ws_model.cell(prof_row, qty_col).coordinate,
+            }
+
+    return turma_cells
+
+
+def _collect_counts_from_lista_corrida(ws_lista, valid_turmas):
+    """
+    Lê LISTA CORRIDA e retorna:
+      - inc_counts[turma] = qtd alunos inclusão (N == 'Sim'), dedupe por RM
+      - plano_counts[turma] = qtd alunos com plano (P válido), dedupe por RM
+      - profs_by_turma[turma] = dict key-> {'display': str, 'alunos': [(rm, nome), ...]}
+    Colunas (0-index):
+      A turma = 0
+      C RM    = 2
+      D nome  = 3 (opcional p/ auditoria)
+      N incl  = 13
+      P prof  = 15
+    Observação crítica:
+      - RM vazio/0 NÃO é contabilizado (alunos não matriculados).
+    """
+    inc_rms = defaultdict(set)
+    plano_rms = defaultdict(set)
+    profs_by_turma = defaultdict(lambda: defaultdict(lambda: {"display": "", "alunos": []}))
+
+    for row in ws_lista.iter_rows(min_row=2, values_only=True):
+        if not row:
+            continue
+
+        turma = _normalize_turma(row[0] if len(row) > 0 else None)
+        if not turma or (valid_turmas and turma not in valid_turmas):
+            continue
+
+        rm = _normalize_rm(row[2] if len(row) > 2 else None)
+
+        # >>> CORREÇÃO PRINCIPAL: ignora RM inválido (vazio/0/etc)
+        if not rm:
+            continue
+
+        nome = _collapse_spaces(str(row[3])) if len(row) > 3 and row[3] is not None else ""
+
+        # Inclusão: coluna N (index 13) == "Sim"
+        incl_val = row[13] if len(row) > 13 else None
+        if _is_sim(incl_val):
+            inc_rms[turma].add(rm)
+
+        # Plano de Ação / Profissionais: coluna P (index 15)
+        prof_val = row[15] if len(row) > 15 else None
+        if _is_valid_prof(prof_val):
+            plano_rms[turma].add(rm)
+
+            display = _collapse_spaces(str(prof_val))
+            key = _prof_key(display)
+            bucket = profs_by_turma[turma][key]
+
+            if not bucket["display"]:
+                bucket["display"] = display
+
+            # auditoria leve
+            bucket["alunos"].append((rm, nome))
+
+    inc_counts = {t: len(rms) for t, rms in inc_rms.items()}
+    plano_counts = {t: len(rms) for t, rms in plano_rms.items()}
+
+    return inc_counts, plano_counts, profs_by_turma
 
 
 @app.route("/quantinclusao", methods=["GET", "POST"])
 def quantinclusao():
     if request.method == "POST":
-        reg_file = request.files.get("lista_regular")
-        eja_file = request.files.get("lista_eja")
+        # EJA foi desconsiderada conforme solicitado.
+        reg_file = (
+            request.files.get("lista_regular")
+            or request.files.get("lista_fundamental")
+            or request.files.get("lista")
+        )
         responsavel = request.form.get("responsavel")
 
         if not reg_file or reg_file.filename == "":
-            flash("Selecione o arquivo da Lista Piloto Regular.", "error")
+            flash("Selecione o arquivo da Lista Piloto (Regular/Fundamental).", "error")
             return redirect(url_for("quantinclusao"))
 
-        # EJA é OPCIONAL (pode não enviar)
         if not responsavel or responsavel.strip() == "":
             flash("Informe o Responsável pelo preenchimento.", "error")
             return redirect(url_for("quantinclusao"))
 
+        # Salva upload
         reg_filename = secure_filename(f"regular_{uuid.uuid4().hex}_{reg_file.filename}")
         reg_path = os.path.join(app.config["UPLOAD_FOLDER"], reg_filename)
         reg_file.save(reg_path)
 
-        # Se vier EJA, salva e guarda em sessão; se não vier, tenta reaproveitar o último da sessão (opcional)
-        eja_path = None
-        if eja_file and eja_file.filename != "":
-            eja_filename = secure_filename(f"eja_{uuid.uuid4().hex}_{eja_file.filename}")
-            eja_path = os.path.join(app.config["UPLOAD_FOLDER"], eja_filename)
-            eja_file.save(eja_path)
-            session["lista_eja"] = eja_path
-        else:
-            last_eja = session.get("lista_eja")
-            if last_eja and os.path.exists(last_eja):
-                eja_path = last_eja
-
-        # Regular – Total de Alunos + LISTA CORRIDA
+        # Abre LISTA CORRIDA (read_only p/ performance)
         try:
-            wb_reg = load_workbook(reg_path, data_only=True)
-            ws_total_reg = wb_reg["Total de Alunos"]
+            wb_reg = load_workbook(reg_path, data_only=True, read_only=True)
             ws_lista_reg = wb_reg["LISTA CORRIDA"]
         except Exception as e:
-            flash(f"Erro ao ler o arquivo Regular: {str(e)}", "error")
+            flash(f"Erro ao ler o arquivo: {str(e)}", "error")
             return redirect(url_for("quantinclusao"))
 
-        reg_map = {
-            "D13": ws_total_reg["O6"].value,
-            "D17": ws_total_reg["O7"].value,
-            "D21": ws_total_reg["O8"].value,
-            "D25": ws_total_reg["O9"].value,
-            "D29": ws_total_reg["O10"].value,
-            "D33": ws_total_reg["O11"].value,
-            "D41": ws_total_reg["O13"].value,
-            "D45": ws_total_reg["O14"].value,
-            "H13": ws_total_reg["O15"].value,
-            "H17": ws_total_reg["O16"].value,
-            "H21": ws_total_reg["O17"].value,
-            "H25": ws_total_reg["O18"].value,
-            "H29": ws_total_reg["O20"].value,
-            "H33": ws_total_reg["O21"].value,
-            "H37": ws_total_reg["O22"].value,
-            "H45": ws_total_reg["O24"].value,
-            "L13": ws_total_reg["O25"].value,
-            "L17": ws_total_reg["O26"].value,
-            "L21": ws_total_reg["O28"].value,
-            "L25": ws_total_reg["O29"].value,
-            "L29": ws_total_reg["O30"].value,
-            "L33": ws_total_reg["O31"].value,
-            "L37": ws_total_reg["O32"].value,
-            "L41": ws_total_reg["O33"].value,
-            "L45": ws_total_reg["O34"].value,
-        }
-
-        # Contadores para séries (Regular)
-        count_2A = count_2B = count_2C = count_2D = count_2E = count_2F = 0
-        count_3A = count_3B = count_3C = count_3D = count_3E = count_3F = 0
-        count_4A = count_4B = count_4C = count_4D = count_4E = count_4F = count_4G = 0
-        count_5A = count_5B = count_5C = count_5D = count_5E = count_5F = count_5G = 0
-
-        series_list = [
-            "2ºA", "2ºB", "2ºC", "2ºD", "2ºE", "2ºF", "2ºG",
-            "3ºA", "3ºB", "3ºC", "3ºD", "3ºE", "3ºF",
-            "4ºA", "4ºB", "4ºC", "4ºD", "4ºE", "4ºF", "4ºG",
-            "5ºA", "5ºB", "5ºC", "5ºD", "5ºE", "5ºF", "5ºG",
-        ]
-        unique_names = {serie: set() for serie in series_list}
-
-        for row in ws_lista_reg.iter_rows(min_row=2, values_only=True):
-            serie = str(row[0]).strip() if row[0] is not None else ""
-            plano = row[15] if len(row) > 15 else None
-
-            if serie in unique_names and is_valid_plano(plano):
-                unique_names[serie].add(str(plano).strip())
-
-            if serie == "2ºA" and is_valid_plano(plano):
-                count_2A += 1
-            elif serie == "2ºB" and is_valid_plano(plano):
-                count_2B += 1
-            elif serie == "2ºC" and is_valid_plano(plano):
-                count_2C += 1
-            elif serie == "2ºD" and is_valid_plano(plano):
-                count_2D += 1
-            elif serie == "2ºE" and is_valid_plano(plano):
-                count_2E += 1
-            elif serie == "2ºF" and is_valid_plano(plano):
-                count_2F += 1
-            elif serie == "3ºA" and is_valid_plano(plano):
-                count_3A += 1
-            elif serie == "3ºB" and is_valid_plano(plano):
-                count_3B += 1
-            elif serie == "3ºC" and is_valid_plano(plano):
-                count_3C += 1
-            elif serie == "3ºD" and is_valid_plano(plano):
-                count_3D += 1
-            elif serie == "3ºE" and is_valid_plano(plano):
-                count_3E += 1
-            elif serie == "3ºF" and is_valid_plano(plano):
-                count_3F += 1
-            elif serie == "4ºA" and is_valid_plano(plano):
-                count_4A += 1
-            elif serie == "4ºB" and is_valid_plano(plano):
-                count_4B += 1
-            elif serie == "4ºC" and is_valid_plano(plano):
-                count_4C += 1
-            elif serie == "4ºD" and is_valid_plano(plano):
-                count_4D += 1
-            elif serie == "4ºE" and is_valid_plano(plano):
-                count_4E += 1
-            elif serie == "4ºF" and is_valid_plano(plano):
-                count_4F += 1
-            elif serie == "4ºG" and is_valid_plano(plano):
-                count_4G += 1
-            elif serie == "5ºA" and is_valid_plano(plano):
-                count_5A += 1
-            elif serie == "5ºB" and is_valid_plano(plano):
-                count_5B += 1
-            elif serie == "5ºC" and is_valid_plano(plano):
-                count_5C += 1
-            elif serie == "5ºD" and is_valid_plano(plano):
-                count_5D += 1
-            elif serie == "5ºE" and is_valid_plano(plano):
-                count_5E += 1
-            elif serie == "5ºF" and is_valid_plano(plano):
-                count_5F += 1
-            elif serie == "5ºG" and is_valid_plano(plano):
-                count_5G += 1
-
-        # EJA – Total de Alunos (OPCIONAL)
-        eja_map = {
-            "D53": 0,
-            "D57": 0,
-            "D61": 0,
-            "H53": 0,
-            "H57": 0,
-            "H61": 0,
-            "L53": 0,
-        }
-
-        d54_count = 0
-        unique_d55 = set()
-        d58_count = 0
-        unique_d59 = set()
-        d62_count = 0
-        unique_d63 = set()
-        h54_count = 0
-        unique_h55 = set()
-        h58_count = 0
-        unique_h59 = set()
-        h62_count = 0
-        unique_h63 = set()
-        l54_count = 0
-        unique_l55 = set()
-
-        if eja_path and os.path.exists(eja_path):
-            try:
-                wb_eja = load_workbook(eja_path, data_only=True)
-                ws_total_eja = wb_eja["Total de Alunos"]
-            except Exception as e:
-                flash(f"Erro ao ler o arquivo EJA: {str(e)}. Gerando sem EJA.", "warning")
-            else:
-                eja_map = {
-                    "D53": ws_total_eja["M10"].value,
-                    "D57": (ws_total_eja["M11"].value or 0) + (ws_total_eja["M12"].value or 0),
-                    "D61": ws_total_eja["M13"].value,
-                    "H53": ws_total_eja["M14"].value,
-                    "H57": ws_total_eja["M16"].value,
-                    "H61": ws_total_eja["M17"].value,
-                    "L53": ws_total_eja["M18"].value,
-                }
-
-                try:
-                    ws_lista_eja = wb_eja["LISTA CORRIDA"]
-                except Exception as e:
-                    flash(f"Erro ao ler a aba LISTA CORRIDA no arquivo EJA: {str(e)}. Gerando sem EJA.", "warning")
-                else:
-                    series_ef_group1 = {"1ª SÉRIE E.F", "2ª SÉRIE E.F", "3ª SÉRIE E.F", "4ª SÉRIE E.F"}
-                    series_ef_group2 = {"5ª SÉRIE E.F", "6ª SÉRIE E.F"}
-                    series_ef_group3 = {"7ª SÉRIE E.F"}
-                    series_ef_group4 = {"8ª SÉRIE E.F"}
-                    series_em_group1 = {"1ª SÉRIE E.M"}
-                    series_em_group2 = {"2ª SÉRIE E.M"}
-                    series_em_group3 = {"3ª SÉRIE E.M"}
-
-                    for row in ws_lista_eja.iter_rows(min_row=2, values_only=True):
-                        serie = str(row[0]).strip() if row[0] is not None else ""
-                        nome = row[19] if len(row) > 19 else None
-
-                        if serie in series_ef_group1:
-                            if is_valid_plano(nome):
-                                d54_count += 1
-                                unique_d55.add(str(nome).strip())
-
-                        if serie in series_ef_group2:
-                            if is_valid_plano(nome):
-                                d58_count += 1
-                                unique_d59.add(str(nome).strip())
-
-                        if serie in series_ef_group3:
-                            if is_valid_plano(nome):
-                                d62_count += 1
-                                unique_d63.add(str(nome).strip())
-
-                        if serie in series_ef_group4:
-                            if is_valid_plano(nome):
-                                h54_count += 1
-                                unique_h55.add(str(nome).strip())
-
-                        if serie in series_em_group1:
-                            if is_valid_plano(nome):
-                                h58_count += 1
-                                unique_h59.add(str(nome).strip())
-
-                        if serie in series_em_group2:
-                            if is_valid_plano(nome):
-                                h62_count += 1
-                                unique_h63.add(str(nome).strip())
-
-                        if serie in series_em_group3:
-                            if is_valid_plano(nome):
-                                l54_count += 1
-                                unique_l55.add(str(nome).strip())
-
+        # Abre modelo e monta mapeamento automático
         model_path = os.path.join("modelos", "Quadro Quantitativo de Inclusão - Modelo.xlsx")
         try:
-            wb_model = load_workbook(model_path)
+            wb_model = load_workbook(model_path, data_only=False)
+            ws_model = wb_model.active
         except Exception as e:
             flash(f"Erro ao abrir o modelo de inclusão: {str(e)}", "error")
             return redirect(url_for("quantinclusao"))
 
-        ws_model = wb_model.active
+        template_map = _build_template_map(ws_model)
+        valid_turmas = set(template_map.keys())
 
-        # Regular fixo
-        for cell_addr, value in reg_map.items():
-            ws_model[cell_addr] = value
+        # Contagens por turma (somente turmas existentes no modelo)
+        inc_counts, plano_counts, profs_by_turma = _collect_counts_from_lista_corrida(
+            ws_lista_reg, valid_turmas
+        )
 
-        # EJA fixo (zera se não houver EJA)
-        for cell_addr, value in eja_map.items():
-            ws_model[cell_addr] = value if value is not None else 0
+        # Preenche as 3 linhas por turma: Inclusão / Plano / Profissionais
+        for turma, cells in template_map.items():
+            inc = inc_counts.get(turma, 0)
+            plano = plano_counts.get(turma, 0)
+            profs = len(profs_by_turma.get(turma, {}))
 
-        # Contagem simples Regular
-        ws_model["D14"] = count_2A
-        ws_model["D18"] = count_2B
-        ws_model["D22"] = count_2C
-        ws_model["D26"] = count_2D
-        ws_model["D30"] = count_2E
-        ws_model["D34"] = count_2F
+            ws_model[cells["inc_qtd"]] = inc
+            ws_model[cells["plano_qtd"]] = plano
+            ws_model[cells["prof_qtd"]] = profs
 
-        ws_model["D42"] = count_3A
-        ws_model["D46"] = count_3B
-
-        ws_model["H14"] = count_3C
-        ws_model["H18"] = count_3D
-        ws_model["H22"] = count_3E
-        ws_model["H26"] = count_3F
-
-        ws_model["H30"] = count_4A
-        ws_model["H34"] = count_4B
-        ws_model["H38"] = count_4C
-        ws_model["H42"] = count_4D
-        ws_model["H46"] = count_4E
-
-        ws_model["L14"] = count_4F
-        ws_model["L18"] = count_4G
-
-        ws_model["L22"] = count_5A
-        ws_model["L26"] = count_5B
-        ws_model["L30"] = count_5C
-        ws_model["L34"] = count_5D
-        ws_model["L38"] = count_5E
-        ws_model["L42"] = count_5F
-        ws_model["L46"] = count_5G
-
-        # Nomes únicos Regular
-        ws_model["D15"] = len(unique_names["2ºA"])
-        ws_model["D19"] = len(unique_names["2ºB"])
-        ws_model["D23"] = len(unique_names["2ºC"])
-        ws_model["D27"] = len(unique_names["2ºD"])
-        ws_model["D31"] = len(unique_names["2ºE"])
-        ws_model["D35"] = len(unique_names["2ºF"])
-        ws_model["D39"] = len(unique_names["2ºG"])
-
-        ws_model["D43"] = len(unique_names["3ºA"])
-        ws_model["D47"] = len(unique_names["3ºB"])
-
-        ws_model["H15"] = len(unique_names["3ºC"])
-        ws_model["H19"] = len(unique_names["3ºD"])
-        ws_model["H23"] = len(unique_names["3ºE"])
-        ws_model["H27"] = len(unique_names["3ºF"])
-
-        ws_model["H31"] = len(unique_names["4ºA"])
-        ws_model["H35"] = len(unique_names["4ºB"])
-        ws_model["H39"] = len(unique_names["4ºC"])
-        ws_model["H43"] = len(unique_names["4ºD"])
-        ws_model["H47"] = len(unique_names["4ºE"])
-
-        ws_model["L15"] = len(unique_names["4ºF"])
-        ws_model["L19"] = len(unique_names["4ºG"])
-
-        ws_model["L23"] = len(unique_names["5ºA"])
-        ws_model["L27"] = len(unique_names["5ºB"])
-        ws_model["L31"] = len(unique_names["5ºC"])
-        ws_model["L35"] = len(unique_names["5ºD"])
-        ws_model["L39"] = len(unique_names["5ºE"])
-        ws_model["L43"] = len(unique_names["5ºF"])
-        ws_model["L47"] = len(unique_names["5ºG"])
-
-        # Outros campos já existentes no seu modelo
-        ws_model["H41"] = ws_total_reg["O23"].value
-
-        # Dados do EJA (LISTA CORRIDA) – se não houver EJA, permanece 0
-        ws_model["D54"] = d54_count
-        ws_model["D55"] = len(unique_d55)
-        ws_model["D58"] = d58_count
-        ws_model["D59"] = len(unique_d59)
-        ws_model["D62"] = d62_count
-        ws_model["D63"] = len(unique_d63)
-
-        ws_model["H54"] = h54_count
-        ws_model["H55"] = len(unique_h55)
-        ws_model["H58"] = h58_count
-        ws_model["H59"] = len(unique_h59)
-        ws_model["H62"] = h62_count
-        ws_model["H63"] = len(unique_h63)
-
-        ws_model["L54"] = l54_count
-        ws_model["L55"] = len(unique_l55)
-
-        # Informações adicionais
+        # Cabeçalho
         meses = {
-            1: "JANEIRO",
-            2: "FEVEREIRO",
-            3: "MARÇO",
-            4: "ABRIL",
-            5: "MAIO",
-            6: "JUNHO",
-            7: "JULHO",
-            8: "AGOSTO",
-            9: "SETEMBRO",
-            10: "OUTUBRO",
-            11: "NOVEMBRO",
-            12: "DEZEMBRO",
+            1: "JANEIRO", 2: "FEVEREIRO", 3: "MARÇO", 4: "ABRIL",
+            5: "MAIO", 6: "JUNHO", 7: "JULHO", 8: "AGOSTO",
+            9: "SETEMBRO", 10: "OUTUBRO", 11: "NOVEMBRO", 12: "DEZEMBRO",
         }
-        current_date = datetime.now()
-        ws_model["B4"] = f"{meses[current_date.month]}/{current_date.year}"
-        ws_model["C8"] = responsavel.strip()
-        ws_model["K8"] = current_date.strftime("%d/%m/%Y")
+        now = datetime.now()
+        mes_ano = f"{meses[now.month]}/{now.year}"
 
+        # B4: troca apenas quando reconhece padrão; senão, anexa com cuidado
+        try:
+            b4 = ws_model["B4"].value or ""
+            b4s = str(b4)
+            if re.search(r"MÊS\s*/\s*\d{4}", b4s, flags=re.IGNORECASE):
+                ws_model["B4"] = re.sub(r"MÊS\s*/\s*\d{4}", mes_ano, b4s, flags=re.IGNORECASE)
+            else:
+                ws_model["B4"] = b4s if mes_ano in b4s else f"{b4s} - {mes_ano}".strip(" -")
+        except Exception:
+            pass
+
+        ws_model["C8"] = responsavel.strip()
+        ws_model["K8"] = now.strftime("%d/%m/%Y")
+
+        # Verificação extra: turmas com 2+ profissionais distintos
+        alerts = []
+        def _turma_sort_key(x: str):
+            # "2ºA" -> (2, "A")
+            try:
+                n = int(x.split("º")[0])
+                l = x.split("º")[1]
+                return (n, l)
+            except Exception:
+                return (999, x)
+
+        for turma in sorted(valid_turmas, key=_turma_sort_key):
+            prof_dict = profs_by_turma.get(turma, {})
+            if len(prof_dict) >= 2:
+                prof_names = sorted(
+                    [prof_dict[k]["display"] for k in prof_dict.keys()],
+                    key=lambda s: s.casefold(),
+                )
+
+                # auditoria opcional (leve): amostra por profissional
+                audit = []
+                for k in sorted(prof_dict.keys(), key=lambda s: prof_dict[s]["display"].casefold()):
+                    alunos = prof_dict[k]["alunos"][:10]  # limite p/ UI
+                    audit.append({
+                        "profissional": prof_dict[k]["display"],
+                        "amostra_alunos": [{"rm": rm, "nome": nome} for rm, nome in alunos],
+                    })
+
+                alerts.append({
+                    "turma": turma,
+                    "qtd_profissionais": len(prof_dict),
+                    "profissionais": prof_names,
+                    "auditoria": audit,
+                })
+
+        # Gera arquivo
         output = BytesIO()
         wb_model.save(output)
         output.seek(0)
-        filename = f"Quadro_Quantitativo_de_Inclusao_{datetime.now().strftime('%d%m%Y')}.xlsx"
-        return send_file(
+
+        filename = f"Quadro_Quantitativo_de_Inclusao_{now.strftime('%d%m%Y')}.xlsx"
+        resp = send_file(
             output,
             as_attachment=True,
             download_name=filename,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    # GET
+        # Envia alertas no header (ASCII-safe via base64)
+        if alerts:
+            payload = json.dumps(alerts, ensure_ascii=False)
+            b64 = base64.b64encode(payload.encode("utf-8")).decode("ascii")
+            if len(b64) > 7000:
+                b64 = b64[:7000]
+                resp.headers["X-QuantInclusao-Alerts-Truncated"] = "1"
+            resp.headers["X-QuantInclusao-Alerts"] = b64
+
+        return resp
+
     return render_template("quantinclusao.html")
 
+import os
+import json
+import calendar
+from dataclasses import dataclass
+from datetime import datetime, date, timedelta
+
+# ============================
+# ALERTAS DE PRAZO (SEM DB)
+# - usa feriados.json (dict: "YYYY-MM-DD": "Nome")
+# - calcula D0 ajustado para dia útil conforme regra:
+#   * Dia 20: próximo dia útil (posterior)
+#   * Último dia do mês: último dia útil do mês (anterior, se não útil)
+#   * Semanal: próximo dia útil (posterior) a partir do dia configurado
+# - EXIBE SOMENTE NAS JANELAS PEDIDAS:
+#   * Dia 20:        D-2, D-1, D0, D+1, D+2
+#   * Último do mês: D-2, D-1, D0, D+1, D+2
+#   * Semanal:       D-1, D0, D+1
+# ============================
+
+# Timezone (Render costuma rodar em UTC; aqui forçamos America/Sao_Paulo)
+try:
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    _TZ = None
+
+
+def _today_sp() -> date:
+    if _TZ:
+        return datetime.now(_TZ).date()
+    return date.today()
+
+
+# Caminho padrão do arquivo no projeto:
+# .../secretariapadin/modelos/feriados.json
+def _default_holidays_path() -> str:
+    return os.path.join(app.root_path, "modelos", "feriados.json")
+
+
+app.config.setdefault("HOLIDAYS_JSON_PATH", _default_holidays_path())
+
+# Configurável: qual dia fecha o "Informativo Semanal"
+# 0=Seg, 1=Ter, 2=Qua, 3=Qui, 4=Sex, 5=Sáb, 6=Dom
+app.config.setdefault("INFORMATIVO_WEEKDAY_DUE", 4)  # padrão: sexta-feira
+
+
+# ----------------------------
+# Cache de feriados (memória)
+# ----------------------------
+_HOLIDAYS_CACHE = {
+    "loaded": False,
+    "dates": set(),      # set(date)
+    "names": {},         # dict[date] = "Nome"
+    "error": None,
+    "path": None,
+}
+
+
+def _load_holidays_json_once() -> None:
+    """
+    Espera formato:
+      {
+        "2001-01-01": "Confraternização Universal",
+        "2001-02-27": "Carnaval",
+        ...
+      }
+    """
+    if _HOLIDAYS_CACHE["loaded"]:
+        return
+
+    path = app.config.get("HOLIDAYS_JSON_PATH") or _default_holidays_path()
+    _HOLIDAYS_CACHE["path"] = path
+
+    try:
+        if not os.path.exists(path):
+            _HOLIDAYS_CACHE["loaded"] = True
+            _HOLIDAYS_CACHE["error"] = f"feriados.json não encontrado em: {path}"
+            return
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            _HOLIDAYS_CACHE["loaded"] = True
+            _HOLIDAYS_CACHE["error"] = "feriados.json inválido: esperado um objeto JSON (dict)."
+            return
+
+        for k, v in data.items():
+            if not isinstance(k, str):
+                continue
+            # chave esperada: YYYY-MM-DD
+            try:
+                y = int(k[0:4]); m = int(k[5:7]); d = int(k[8:10])
+                dt = date(y, m, d)
+            except Exception:
+                continue
+
+            _HOLIDAYS_CACHE["dates"].add(dt)
+            name = str(v).strip() if v is not None else ""
+            if name:
+                _HOLIDAYS_CACHE["names"][dt] = name
+
+        _HOLIDAYS_CACHE["loaded"] = True
+        _HOLIDAYS_CACHE["error"] = None
+
+    except Exception as e:
+        _HOLIDAYS_CACHE["loaded"] = True
+        _HOLIDAYS_CACHE["error"] = str(e)
+
+
+def _holiday_name(d: date) -> str:
+    _load_holidays_json_once()
+    return _HOLIDAYS_CACHE["names"].get(d, "")
+
+
+def _is_business_day(d: date) -> bool:
+    _load_holidays_json_once()
+    if d.weekday() >= 5:  # 5=sábado, 6=domingo
+        return False
+    return d not in _HOLIDAYS_CACHE["dates"]
+
+
+def _next_business_day(d: date) -> date:
+    cur = d
+    while not _is_business_day(cur):
+        cur += timedelta(days=1)
+    return cur
+
+
+def _prev_business_day(d: date) -> date:
+    cur = d
+    while not _is_business_day(cur):
+        cur -= timedelta(days=1)
+    return cur
+
+
+def _last_day_of_month(y: int, m: int) -> date:
+    last = calendar.monthrange(y, m)[1]
+    return date(y, m, last)
+
+
+def _add_months(base: date, months: int) -> date:
+    y = base.year + (base.month - 1 + months) // 12
+    m = (base.month - 1 + months) % 12 + 1
+    day = min(base.day, calendar.monthrange(y, m)[1])
+    return date(y, m, day)
+
+
+def _fmt_br(d: date) -> str:
+    return d.strftime("%d/%m/%Y")
+
+
+def _window_hit(today: date, due: date, before: int, after: int) -> bool:
+    return (due - timedelta(days=before)) <= today <= (due + timedelta(days=after))
+
+
+def _days_delta(today: date, due: date) -> int:
+    return (due - today).days
+
+
+@dataclass
+class DeadlineAlert:
+    key: str
+    title: str
+    due_base: date
+    due_adjusted: date
+    window_before: int
+    window_after: int
+    message: str
+
+
+def _compute_due_day20(ref: date) -> tuple[date, date]:
+    """
+    D0 base: dia 20 do mês de referência.
+    D0 ajustado: próximo dia útil (posterior).
+    Se já passou da janela (D0 ajustado + 2), usa próximo mês.
+    """
+    base = date(ref.year, ref.month, 20)
+    adj = _next_business_day(base)
+
+    # janela: D-2..D+2
+    if ref > (adj + timedelta(days=2)):
+        base2 = _add_months(base, 1)
+        base2 = date(base2.year, base2.month, 20)
+        return base2, _next_business_day(base2)
+
+    return base, adj
+
+
+def _compute_due_month_end(ref: date) -> tuple[date, date]:
+    """
+    REGRA AJUSTADA CONFORME SEU ADENDO:
+
+    D0 base: último dia do mês.
+    D0 ajustado: ÚLTIMO DIA ÚTIL DO MÊS (se o último dia cair em não útil,
+                 volta para o dia útil anterior).
+
+    Se já passou da janela (D0 ajustado + 2), usa o mês seguinte.
+    """
+    base = _last_day_of_month(ref.year, ref.month)
+
+    # Se o último dia não for útil, usa o último dia útil do mês (anterior)
+    if _is_business_day(base):
+        adj = base
+    else:
+        adj = _prev_business_day(base)
+
+    # janela: D-2..D+2
+    if ref > (adj + timedelta(days=2)):
+        nextm = _add_months(date(ref.year, ref.month, 1), 1)
+        base2 = _last_day_of_month(nextm.year, nextm.month)
+        if _is_business_day(base2):
+            adj2 = base2
+        else:
+            adj2 = _prev_business_day(base2)
+        return base2, adj2
+
+    return base, adj
+
+
+def _compute_due_weekly(ref: date) -> tuple[date, date]:
+    """
+    D0 base: dia da semana configurado (default sexta) na semana de ref.
+    D0 ajustado: próximo dia útil (posterior) se cair em não útil/feriado.
+    Se já passou da janela (D0 ajustado + 1), usa próxima semana.
+    """
+    due_wd = int(app.config.get("INFORMATIVO_WEEKDAY_DUE", 4))
+    due_wd = max(0, min(6, due_wd))
+
+    # segunda-feira da semana atual
+    monday = ref - timedelta(days=ref.weekday())
+    base = monday + timedelta(days=due_wd)
+    adj = _next_business_day(base)
+
+    # janela semanal: D-1..D+1
+    if ref > (adj + timedelta(days=1)):
+        monday2 = monday + timedelta(days=7)
+        base2 = monday2 + timedelta(days=due_wd)
+        return base2, _next_business_day(base2)
+
+    return base, adj
+
+
+def build_deadline_alerts(today: date | None = None) -> list[dict]:
+    """
+    Retorna lista de dicts pronta para template.
+    Exibe somente quando estiver dentro da janela correta.
+    """
+    today = today or _today_sp()
+
+    # monta D0 base e ajustado por quadro
+    day20_base, day20_adj = _compute_due_day20(today)
+    mend_base, mend_adj = _compute_due_month_end(today)
+    wk_base, wk_adj = _compute_due_weekly(today)
+
+    alerts: list[DeadlineAlert] = []
+
+    # 1) Quantitativo de Inclusão (dia 20 ou próximo útil) -> D-2..D+2
+    if _window_hit(today, day20_adj, before=2, after=2):
+        extra = ""
+        if day20_adj != day20_base:
+            hn = _holiday_name(day20_base)
+            extra = f" (ajustado para próximo dia útil{': ' + hn if hn else ''})"
+        alerts.append(DeadlineAlert(
+            key="quant_inclusao",
+            title="Prazo: Quantitativo de Inclusão",
+            due_base=day20_base,
+            due_adjusted=day20_adj,
+            window_before=2,
+            window_after=2,
+            message=f"O Quadro Quantitativo de Inclusão deve ser enviado até {_fmt_br(day20_adj)}{extra}."
+        ))
+
+    # 2) Atendimento Mensal (último dia útil do mês) -> D-2..D+2
+    if _window_hit(today, mend_adj, before=2, after=2):
+        extra = ""
+        if mend_adj != mend_base:
+            hn = _holiday_name(mend_base)
+            extra = f" (ajustado para último dia útil do mês{': ' + hn if hn else ''})"
+        alerts.append(DeadlineAlert(
+            key="atendimento_mensal",
+            title="Prazo: Atendimento Mensal",
+            due_base=mend_base,
+            due_adjusted=mend_adj,
+            window_before=2,
+            window_after=2,
+            message=f"O Quadro de Atendimento Mensal deve ser enviado até {_fmt_br(mend_adj)}{extra}."
+        ))
+
+    # 3) Quantitativo Mensal de Transferências Expedidas (último dia útil do mês) -> D-2..D+2
+    if _window_hit(today, mend_adj, before=2, after=2):
+        extra = ""
+        if mend_adj != mend_base:
+            hn = _holiday_name(mend_base)
+            extra = f" (ajustado para último dia útil do mês{': ' + hn if hn else ''})"
+        alerts.append(DeadlineAlert(
+            key="quant_mensal_te",
+            title="Prazo: Quantitativo Mensal de Transferências Expedidas",
+            due_base=mend_base,
+            due_adjusted=mend_adj,
+            window_before=2,
+            window_after=2,
+            message=f"O Quadro Mensal de Transferências Expedidas deve ser enviado até {_fmt_br(mend_adj)}{extra}."
+        ))
+
+    # 4) Informativo Semanal -> D-1..D+1
+    if _window_hit(today, wk_adj, before=1, after=3):
+        extra = ""
+        if wk_adj != wk_base:
+            hn = _holiday_name(wk_base)
+            extra = f" (ajustado para próximo dia útil{': ' + hn if hn else ''})"
+        alerts.append(DeadlineAlert(
+            key="informativo_semanal",
+            title="Prazo: Informativo Semanal",
+            due_base=wk_base,
+            due_adjusted=wk_adj,
+            window_before=1,
+            window_after=1,
+            message=f"O Informativo Semanal deve ser enviado até {_fmt_br(wk_adj)}{extra}."
+        ))
+
+    # converte para dict simples + status por D- / D+
+    out: list[dict] = []
+    for a in alerts:
+        delta = _days_delta(today, a.due_adjusted)
+        if delta > 0:
+            when = f"Faltam {delta} dia(s)."
+        elif delta == 0:
+            when = "Vence hoje."
+        else:
+            when = f"Vencido há {abs(delta)} dia(s)."
+
+        out.append({
+            "key": a.key,
+            "title": a.title,
+            "message": a.message,
+            "due": _fmt_br(a.due_adjusted),
+            "status": when,
+        })
+
+    return out
+
+
+# Injeta automaticamente para TODOS os templates
+@app.context_processor
+def _inject_deadline_alerts():
+    return {"deadline_alerts": build_deadline_alerts()}
 
 # ==========================================================
 #  MAIN

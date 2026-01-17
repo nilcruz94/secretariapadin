@@ -24,12 +24,10 @@
   .quant-inc-header p {
     font-size: 0.9rem;
     color: #5d6c7a;
-    margin-bottom: 18px;
-  }
-
-  .flash-container {
     margin-bottom: 14px;
   }
+
+  .flash-container { margin-bottom: 14px; }
 
   .section-title {
     font-size: 0.9rem;
@@ -44,6 +42,84 @@
     margin-top: 4px;
   }
 
+  /* ------------------------------ */
+  /* ALERTA: múltiplos profissionais */
+  /* ------------------------------ */
+  .multi-prof-alert {
+    display: none;
+    border-radius: 14px;
+    border: 1px solid #f2d6a3;
+    background: linear-gradient(180deg, #fff8e6 0%, #fff2cc 100%);
+    padding: 14px 14px 12px;
+    margin-bottom: 14px;
+    color: #5a3c00;
+  }
+  .multi-prof-alert.show { display: block; }
+
+  .multi-prof-alert .title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .multi-prof-alert .title i {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f59e0b;
+    color: #fff;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .multi-prof-alert .desc {
+    font-size: 0.86rem;
+    color: #6b4a00;
+    margin: 0 0 10px;
+  }
+  .multi-prof-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.88rem;
+  }
+  .multi-prof-item { margin-bottom: 8px; }
+
+  .multi-prof-item strong { color: #4a3300; }
+  .multi-prof-profs { color: #5a3c00; }
+
+  details.audit {
+    margin-top: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.55);
+  }
+  details.audit summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #4a3300;
+  }
+  .audit-body {
+    margin-top: 8px;
+    padding-left: 8px;
+    font-size: 0.86rem;
+    color: #6b4a00;
+    line-height: 1.35;
+  }
+  .audit-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem;
+    background: rgba(0,0,0,0.06);
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+
+  /* ------------------------------ */
+  /* Dropzone */
+  /* ------------------------------ */
   .dropzone {
     position: relative;
     border-radius: 12px;
@@ -87,9 +163,7 @@
     font-size: 1.3rem;
   }
 
-  .dropzone-text-block {
-    flex: 1;
-  }
+  .dropzone-text-block { flex: 1; }
 
   .dropzone-title {
     margin: 0;
@@ -135,14 +209,10 @@
     align-items: center;
   }
 
-  .back-links a {
-    font-size: 0.85rem;
-  }
+  .back-links a { font-size: 0.85rem; }
 
   @media (max-width: 768px) {
-    .quant-inc-wrapper {
-      padding: 24px 18px 20px;
-    }
+    .quant-inc-wrapper { padding: 24px 18px 20px; }
   }
 {% endblock %}
 
@@ -151,11 +221,21 @@
     <div class="quant-inc-header">
       <h2>Quadro Quantitativo de Inclusão</h2>
       <p>
-        Gere o <strong>Quadro Quantitativo de Inclusão</strong> a partir das Listas Piloto
-        do Ensino Fundamental (Regular) e da EJA. O sistema utiliza as abas
-        <strong>"Total de Alunos"</strong> e <strong>"LISTA CORRIDA"</strong> para
-        calcular quantidades por série, nomes únicos e distribuição por segmento.
+        Gere o quadro a partir da <strong>Lista Piloto</strong> (aba <strong>LISTA CORRIDA</strong>).
+        Ao final, o Excel será baixado automaticamente.
       </p>
+    </div>
+
+    {# ALERTA MULTIPROFISSIONAIS (renderizado via JS após POST) #}
+    <div id="multi-prof-alert" class="multi-prof-alert" role="alert" aria-live="polite">
+      <div class="title">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>Atenção</div>
+      </div>
+      <p class="desc">
+        Turmas com <strong>2 ou mais</strong> profissionais diferentes no <strong>Plano de Ação</strong>.
+      </p>
+      <ul id="multi-prof-list" class="multi-prof-list"></ul>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -194,13 +274,8 @@
             <i class="fas fa-file-excel"></i>
           </div>
           <div class="dropzone-text-block">
-            <p class="dropzone-title">
-              Arraste o arquivo Regular aqui ou clique para selecionar
-            </p>
-            <p class="dropzone-subtitle">
-              Deve conter as abas <strong>Total de Alunos</strong> e <strong>LISTA CORRIDA</strong>.
-              Formatos aceitos: .xlsx, .xls, .xlsm
-            </p>
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
             <div class="dropzone-filename" id="regular-filename">
               Nenhum arquivo selecionado.
             </div>
@@ -215,35 +290,9 @@
         </div>
       </div>
 
-      <div class="form-group mt-3">
-        <div class="section-title">Lista Piloto – EJA</div>
-        <div id="drop-eja" class="dropzone">
-          <div class="dropzone-icon-circle">
-            <i class="fas fa-file-signature"></i>
-          </div>
-          <div class="dropzone-text-block">
-            <p class="dropzone-title">
-              Arraste o arquivo EJA aqui ou clique para selecionar
-            </p>
-            <p class="dropzone-subtitle">
-              Deve conter as abas <strong>Total de Alunos</strong> e <strong>LISTA CORRIDA</strong>.
-              Formatos aceitos: .xlsx, .xls, .xlsm
-            </p>
-            <div class="dropzone-filename" id="eja-filename">
-              Nenhum arquivo selecionado.
-            </div>
-          </div>
-          <input
-            type="file"
-            id="lista_eja"
-            name="lista_eja"
-            accept=".xlsx,.xls,.xlsm"
-            required
-          >
-        </div>
-      </div>
+      {# EJA removida / desconsiderada #}
 
-      <button type="submit" class="btn btn-primary btn-block btn-generate">
+      <button type="submit" class="btn btn-primary btn-block btn-generate" id="btn-gerar-quantinc">
         Gerar Quadro Quantitativo de Inclusão
       </button>
 
@@ -268,7 +317,6 @@
 
     if (!input || !drop || !label) return;
 
-    // Atualiza o texto ao escolher pelo diálogo
     input.addEventListener('change', function () {
       if (input.files && input.files.length > 0) {
         label.textContent = input.files[0].name;
@@ -277,7 +325,6 @@
       }
     });
 
-    // Efeito visual de arrastar
     ['dragenter', 'dragover'].forEach(evtName => {
       drop.addEventListener(evtName, function (e) {
         e.preventDefault();
@@ -294,13 +341,12 @@
       });
     });
 
-    // Drop do arquivo
     drop.addEventListener('drop', function (e) {
       const dt = e.dataTransfer;
       if (!dt || !dt.files || !dt.files.length) return;
 
       const file = dt.files[0];
-      const name = file.name.toLowerCase();
+      const name = (file.name || '').toLowerCase();
       const allowed = ['.xlsx', '.xls', '.xlsm'];
       const isValid = allowed.some(ext => name.endsWith(ext));
 
@@ -309,16 +355,16 @@
         return;
       }
 
-      input.files = dt.files;
+      // garante setar files (alguns browsers bloqueiam set direto)
+      const newDt = new DataTransfer();
+      newDt.items.add(file);
+      input.files = newDt.files;
+
       label.textContent = file.name;
     });
   }
 
-  let quantInclusaoDownloading = false;
-
   function showQuantInclusaoLoading() {
-    quantInclusaoDownloading = true;
-
     const existing = document.getElementById('loading-overlay');
     if (existing) existing.remove();
 
@@ -347,38 +393,129 @@
   }
 
   function hideQuantInclusaoLoading() {
-    quantInclusaoDownloading = false;
     const existing = document.getElementById('loading-overlay');
     if (existing) existing.remove();
   }
 
+  function b64ToUtf8(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array([...bin].map(ch => ch.charCodeAt(0)));
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function clearMultiProfAlert() {
+    const box = document.getElementById('multi-prof-alert');
+    const list = document.getElementById('multi-prof-list');
+    if (!box || !list) return;
+    list.innerHTML = '';
+    box.classList.remove('show');
+  }
+
+  function renderMultiProfAlert(alerts) {
+    const box = document.getElementById('multi-prof-alert');
+    const list = document.getElementById('multi-prof-list');
+    if (!box || !list) return;
+
+    if (!alerts || !alerts.length) {
+      clearMultiProfAlert();
+      return;
+    }
+
+    const escapeHtml = (s) => (s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    list.innerHTML = '';
+
+    alerts.forEach(a => {
+      const turma = escapeHtml(a.turma || '');
+      const qtd = Number(a.qtd_profissionais || 0);
+      const profs = (a.profissionais || []).map(escapeHtml).join(', ');
+
+      const li = document.createElement('li');
+      li.className = 'multi-prof-item';
+
+      li.innerHTML = `
+        <div>
+          <strong>${turma}</strong> — ${qtd} profissionais:
+          <span class="multi-prof-profs">${profs}</span>
+        </div>
+      `;
+
+      // Auditoria opcional (se o backend enviar)
+      if (Array.isArray(a.auditoria) && a.auditoria.length) {
+        const detailsWrap = document.createElement('div');
+        detailsWrap.innerHTML = a.auditoria.map(block => {
+          const prof = escapeHtml(block.profissional || '');
+          const alunos = Array.isArray(block.amostra_alunos) ? block.amostra_alunos : [];
+          const alunosLines = alunos.map(u => {
+            const rm = escapeHtml(u.rm || '');
+            const nome = escapeHtml(u.nome || '');
+            return `<div><code>${rm}</code>${nome ? ' — ' + nome : ''}</div>`;
+          }).join('') || '<div>(sem dados)</div>';
+
+          return `
+            <details class="audit">
+              <summary>${prof} (amostra)</summary>
+              <div class="audit-body">${alunosLines}</div>
+            </details>
+          `;
+        }).join('');
+
+        li.appendChild(detailsWrap);
+      }
+
+      list.appendChild(li);
+    });
+
+    box.classList.add('show');
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     setupDropzone('lista_regular', 'drop-regular', 'regular-filename');
-    setupDropzone('lista_eja', 'drop-eja', 'eja-filename');
 
     const form = document.getElementById('form-quantinclusao');
-    if (form) {
-      form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        showQuantInclusaoLoading();
+    if (!form) return;
 
-        const formData = new FormData(form);
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearMultiProfAlert();
+      showQuantInclusaoLoading();
 
-        try {
-          const response = await fetch(form.action || window.location.href, {
-            method: 'POST',
-            body: formData
-          });
+      const formData = new FormData(form);
 
-          const contentType = response.headers.get('Content-Type') || '';
+      try {
+        const response = await fetch(form.action || window.location.href, {
+          method: 'POST',
+          body: formData
+        });
 
-          if (!response.ok ||
-              !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-            hideQuantInclusaoLoading();
-            alert('Erro ao gerar o Quadro Quantitativo de Inclusão. Verifique os dados e tente novamente.');
-            return;
+        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+
+        if (!response.ok) {
+          // fallback: tenta exibir HTML com flash/erro
+          const text = await response.text();
+          document.open(); document.write(text); document.close();
+          return;
+        }
+
+        // Lê alertas (se existirem) antes de baixar
+        const h = response.headers.get('X-QuantInclusao-Alerts');
+        if (h) {
+          try {
+            const jsonText = b64ToUtf8(h);
+            const alerts = JSON.parse(jsonText);
+            renderMultiProfAlert(alerts);
+          } catch (err) {
+            console.error('Falha ao ler alertas:', err);
           }
+        }
 
+        // Se veio o Excel, baixa normalmente
+        if (contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
           const blob = await response.blob();
 
           let filename = 'Quadro_Quantitativo_de_Inclusao.xlsx';
@@ -398,14 +535,18 @@
           a.click();
           a.remove();
           window.URL.revokeObjectURL(url);
-        } catch (err) {
-          console.error(err);
-          alert('Erro de rede ao gerar o Quadro Quantitativo de Inclusão.');
-        } finally {
-          hideQuantInclusaoLoading();
+        } else {
+          // fallback (se backend retornar html)
+          const text = await response.text();
+          document.open(); document.write(text); document.close();
         }
-      });
-    }
+      } catch (err) {
+        console.error(err);
+        alert('Erro de rede ao gerar o Quadro Quantitativo de Inclusão.');
+      } finally {
+        hideQuantInclusaoLoading();
+      }
+    });
   });
 </script>
 {% endblock %}

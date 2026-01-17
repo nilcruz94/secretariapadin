@@ -11,7 +11,7 @@
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
     width: 100%;
-    max-width: 780px;
+    max-width: 820px;
     color: #283E51;
   }
 
@@ -36,6 +36,18 @@
     font-weight: 600;
     color: #374a5a;
     margin-bottom: 6px;
+  }
+
+  .badge-optional {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #5d6c7a;
+    background: #eef2f7;
+    border: 1px solid #d7dee8;
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-left: 8px;
   }
 
   .upload-group {
@@ -144,6 +156,19 @@
     font-size: 0.85rem;
   }
 
+  .info-box {
+    background: #f4f6fb;
+    border: 1px solid #e0e6ed;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: 10px;
+    margin-bottom: 14px;
+  }
+
+  .info-box strong {
+    color: #283E51;
+  }
+
   @media (max-width: 768px) {
     .transfer-wrapper {
       padding: 24px 18px 20px;
@@ -152,31 +177,73 @@
 {% endblock %}
 
 {% block content %}
+  {% set enable_eja = enable_eja|default(false) %}
+
   <div class="transfer-wrapper">
     <div class="transfer-header">
       <h2>Quadro de Transferências</h2>
       <p>
-        Gere o Quadro Informativo de transferências (TE, MC, MCC) a partir das
-        Listas Piloto do Ensino Fundamental e da EJA, dentro de um período
-        de datas escolhido. Informe o responsável pelos dados para preenchimento
-        automático do modelo.
+        Gere o Quadro Informativo (TE, MC, MCC) a partir da aba <strong>LISTA CORRIDA</strong>
+        da Lista Piloto, filtrando por período.
+        {% if enable_eja %}
+          A EJA está habilitada e pode ser enviada opcionalmente.
+        {% else %}
+          A EJA está desativada no sistema no momento.
+        {% endif %}
       </p>
+
+      <div class="info-box">
+        <strong>Dica:</strong> se você não selecionar a lista do Fundamental, o sistema tentará reutilizar a última
+        Lista Piloto FUNDAMENTAL salva em sessão (se existir).
+      </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-container">
+    <div id="flash-container" class="flash-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
           {% for category, message in messages %}
             {% set bs_class = 'danger' if category == 'error' else (category if category in ['success', 'info', 'warning', 'primary'] else 'info') %}
             <div class="alert alert-{{ bs_class }} mb-2" role="alert">
               {{ message }}
             </div>
           {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+        {% endif %}
+      {% endwith %}
+    </div>
 
     <form id="form-transferencias" method="POST" enctype="multipart/form-data">
+      <!-- Dados que vão para o MODELO (A7, A8, B9, J9) -->
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label for="diretor_nome">Diretor(a) / Nome padrão (A8)</label>
+          <input
+            type="text"
+            class="form-control"
+            name="diretor_nome"
+            id="diretor_nome"
+            value="Luciana Rocha Augustinho"
+            placeholder="Nome do diretor(a) / responsável padrão"
+          >
+          <small class="helper-text">
+            Este nome é inserido no cabeçalho do quadro (campo A8). Você pode editar antes de gerar.
+          </small>
+        </div>
+
+        <div class="form-group col-md-6">
+          <label for="data_quadro">Data do quadro (J9)</label>
+          <input
+            type="date"
+            class="form-control"
+            name="data_quadro"
+            id="data_quadro"
+          >
+          <small class="helper-text">
+            Se não informar, o sistema usa a data de hoje automaticamente.
+          </small>
+        </div>
+      </div>
+
+      <!-- Período de filtro -->
       <div class="form-row">
         <div class="form-group col-md-6">
           <label for="period_start">Data inicial do período</label>
@@ -188,7 +255,7 @@
             required
           >
           <small class="helper-text">
-            Dia em que começa a semana/período de análise.
+            Início do período de análise.
           </small>
         </div>
         <div class="form-group col-md-6">
@@ -201,13 +268,14 @@
             required
           >
           <small class="helper-text">
-            Dia em que termina a semana/período de análise.
+            Fim do período de análise.
           </small>
         </div>
       </div>
 
+      <!-- Rodapé/Responsável -->
       <div class="form-group">
-        <label for="responsavel">Responsável pelas informações</label>
+        <label for="responsavel">Responsável pelo preenchimento (B9)</label>
         <input
           type="text"
           class="form-control"
@@ -217,10 +285,11 @@
           required
         >
         <small class="helper-text">
-          Este nome será inserido automaticamente no rodapé do quadro.
+          Este nome será inserido automaticamente no modelo (B9).
         </small>
       </div>
 
+      <!-- Upload Fundamental -->
       <div class="upload-group">
         <div class="section-title">Lista Piloto – Ensino Fundamental</div>
         <div id="drop-fundamental" class="dropzone">
@@ -228,12 +297,8 @@
             <i class="fas fa-file-excel"></i>
           </div>
           <div class="dropzone-text-block">
-            <p class="dropzone-title">
-              Arraste o arquivo aqui ou clique para selecionar
-            </p>
-            <p class="dropzone-subtitle">
-              Formatos aceitos: .xlsx, .xls, .xlsm
-            </p>
+            <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+            <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
             <div class="dropzone-filename" id="fundamental-filename">
               Nenhum arquivo selecionado.
             </div>
@@ -246,41 +311,42 @@
           >
         </div>
         <div class="helper-text">
-          Se você não selecionar nada, o sistema tentará usar a última Lista Piloto
-          FUNDAMENTAL salva em sessão.
+          Se você não selecionar nada, o sistema tentará usar a última Lista Piloto FUNDAMENTAL salva em sessão.
         </div>
       </div>
 
-      <div class="upload-group">
-        <div class="section-title">Lista Piloto – EJA</div>
-        <div id="drop-eja" class="dropzone">
-          <div class="dropzone-icon-circle">
-            <i class="fas fa-file-excel"></i>
+      <!-- Upload EJA (opcional / pode estar desativada no backend) -->
+      {% if enable_eja %}
+        <div class="upload-group">
+          <div class="section-title">
+            Lista Piloto – EJA
+            <span class="badge-optional">Opcional</span>
           </div>
-          <div class="dropzone-text-block">
-            <p class="dropzone-title">
-              Arraste o arquivo aqui ou clique para selecionar
-            </p>
-            <p class="dropzone-subtitle">
-              Formatos aceitos: .xlsx, .xls, .xlsm
-            </p>
-            <div class="dropzone-filename" id="eja-filename">
-              Nenhum arquivo selecionado.
+          <div id="drop-eja" class="dropzone">
+            <div class="dropzone-icon-circle">
+              <i class="fas fa-file-excel"></i>
             </div>
+            <div class="dropzone-text-block">
+              <p class="dropzone-title">Arraste o arquivo aqui ou clique para selecionar</p>
+              <p class="dropzone-subtitle">Formatos aceitos: .xlsx, .xls, .xlsm</p>
+              <div class="dropzone-filename" id="eja-filename">
+                Nenhum arquivo selecionado.
+              </div>
+            </div>
+            <input
+              type="file"
+              id="lista_eja"
+              name="lista_eja"
+              accept=".xlsx,.xls,.xlsm"
+            >
           </div>
-          <input
-            type="file"
-            id="lista_eja"
-            name="lista_eja"
-            accept=".xlsx,.xls,.xlsm"
-          >
+          <div class="helper-text">
+            Opcional. Se não enviar, o quadro será gerado apenas com o Fundamental.
+          </div>
         </div>
-        <div class="helper-text">
-          O uso da EJA é opcional, mas recomendado para um quadro completo.
-          Se não houver arquivo em sessão e nada for enviado, apenas o Fundamental
-          será considerado.
-        </div>
-      </div>
+      {% else %}
+        {# EJA desativada: mantemos o formulário limpo #}
+      {% endif %}
 
       <button type="submit" class="btn btn-primary btn-block btn-generate">
         Gerar Quadro de Transferências
@@ -307,7 +373,6 @@
 
     if (!input || !drop || !label) return;
 
-    // Atualiza o nome ao escolher pelo diálogo
     input.addEventListener('change', function () {
       if (input.files && input.files.length > 0) {
         label.textContent = input.files[0].name;
@@ -316,7 +381,6 @@
       }
     });
 
-    // Efeito visual de arrastar
     ['dragenter', 'dragover'].forEach(evtName => {
       drop.addEventListener(evtName, function (e) {
         e.preventDefault();
@@ -338,7 +402,7 @@
       if (!dt || !dt.files || !dt.files.length) return;
 
       const file = dt.files[0];
-      const name = file.name.toLowerCase();
+      const name = (file.name || '').toLowerCase();
       const allowed = ['.xlsx', '.xls', '.xlsm'];
       const isValid = allowed.some(ext => name.endsWith(ext));
 
@@ -347,9 +411,46 @@
         return;
       }
 
-      input.files = dt.files;
+      const newDt = new DataTransfer();
+      newDt.items.add(file);
+      input.files = newDt.files;
+
       label.textContent = file.name;
     });
+  }
+
+  function renderFlashMessages(messages) {
+    const container = document.getElementById('flash-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    (messages || []).forEach(item => {
+      const div = document.createElement('div');
+      div.className = `alert alert-${item.bsClass} mb-2`;
+      div.setAttribute('role', 'alert');
+      div.textContent = item.text;
+      container.appendChild(div);
+    });
+  }
+
+  function extractAlertsFromHTML(htmlText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      const alerts = Array.from(doc.querySelectorAll('.alert'));
+      if (!alerts.length) return [];
+
+      return alerts.map(a => {
+        const classList = Array.from(a.classList);
+        const bs = (classList.find(c => c.startsWith('alert-')) || 'alert-info').replace('alert-', '');
+        return {
+          bsClass: bs,
+          text: (a.textContent || '').trim()
+        };
+      }).filter(x => x.text);
+    } catch (e) {
+      return [];
+    }
   }
 
   let transferenciasDownloading = false;
@@ -397,7 +498,9 @@
     const form = document.getElementById('form-transferencias');
     if (form) {
       form.addEventListener('submit', async function (e) {
-        e.preventDefault(); // impede submit padrão
+        e.preventDefault();
+
+        renderFlashMessages([]);
         showTransferenciasLoading();
 
         const formData = new FormData(form);
@@ -408,38 +511,50 @@
             body: formData
           });
 
-          const contentType = response.headers.get('Content-Type') || '';
+          const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
 
-          if (!response.ok ||
-              !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-            hideTransferenciasLoading();
-            alert('Erro ao gerar o Quadro de Transferências. Verifique os dados e tente novamente.');
+          // Sucesso: arquivo excel
+          if (response.ok && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+            const blob = await response.blob();
+
+            let filename = 'Quadro_de_Transferencias.xlsx';
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition) {
+              const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+              if (filenameMatch && filenameMatch[1]) {
+                filename = filenameMatch[1].replace(/['"]/g, '');
+              }
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
             return;
           }
 
-          const blob = await response.blob();
+          // Erro: geralmente vem HTML com flashes
+          const text = await response.text();
+          const extracted = extractAlertsFromHTML(text);
 
-          // Nome do arquivo vindo do header
-          let filename = 'Quadro_de_Transferencias.xlsx';
-          const disposition = response.headers.get('Content-Disposition');
-          if (disposition) {
-            const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-            if (filenameMatch && filenameMatch[1]) {
-              filename = filenameMatch[1].replace(/['"]/g, '');
-            }
+          if (extracted.length) {
+            renderFlashMessages(extracted);
+          } else {
+            renderFlashMessages([{
+              bsClass: 'warning',
+              text: 'Não foi possível gerar o Quadro de Transferências. Verifique os dados e tente novamente.'
+            }]);
           }
-
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
         } catch (err) {
           console.error(err);
-          alert('Erro de rede ao gerar o Quadro de Transferências.');
+          renderFlashMessages([{
+            bsClass: 'danger',
+            text: 'Erro de rede ao gerar o Quadro de Transferências.'
+          }]);
         } finally {
           hideTransferenciasLoading();
         }
