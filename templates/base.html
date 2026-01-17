@@ -2,7 +2,11 @@
 <html lang="pt-br">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Sistema da Secretaria Escolar{% endblock %}</title>
+
+    <!-- Favicon (coloque o arquivo em /static/favicon.ico) -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
 
     <!-- Fonte e Bootstrap -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
@@ -12,13 +16,11 @@
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    {# Bloco para CSS/links extras por página (ex: Select2, estilos específicos) #}
     {% block extra_css %}{% endblock %}
 
     <style>
-      :root {
-        --header-h: 76px;
-        --deadline-w: 400px;
-      }
+      :root { --header-h: 0px; }
 
       * { box-sizing: border-box; }
 
@@ -33,102 +35,253 @@
         color: #fff;
       }
 
-      /* HEADER NORMAL (SEM STICKY / SEM BLUR) */
+      /* ==========================================================
+         HEADER (APENAS QUANDO LOGADO)
+         - evita “quebra visual” do login
+         ========================================================== */
       header {
-        background: rgba(0, 0, 0, 0.22);
-        color: #fff;
-        padding: 18px 24px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        padding: 14px 24px;
         text-align: center;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-        z-index: 30;
-        position: relative;
+        color: #fff;
+        background: linear-gradient(135deg, rgba(40, 62, 81, 0.98), rgba(75, 121, 161, 0.98));
+        border-bottom: 1px solid rgba(255,255,255,0.10);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.28);
       }
 
       header h1 {
-        font-size: 1.6rem;
+        font-size: 1.55rem;
         margin: 0;
         font-weight: 600;
+        line-height: 1.1;
       }
 
       header span {
         display: block;
-        font-size: 1rem;
-        opacity: 0.9;
+        font-size: 0.98rem;
+        opacity: 0.92;
         margin-top: 4px;
       }
 
-      /* ==========================================================
-         ALERTAS DE PRAZO (FLUTUANTE, NÃO EMPURRA CONTEÚDO)
-         - Desktop: canto superior direito, abaixo do header
-         - Mobile: canto inferior
-         - Minimizar não é persistente (volta ao recarregar)
-         ========================================================== */
-      .deadline-float {
-        position: fixed;
-        top: calc(var(--header-h) + 14px);
-        right: 16px;
-        width: var(--deadline-w);
-        max-width: calc(100vw - 32px);
-        z-index: 60;
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Bolhas de fundo */
+      main::before,
+      main::after {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        opacity: 0.12;
+        filter: blur(2px);
         pointer-events: none;
       }
 
-      .deadline-shell { pointer-events: auto; width: 100%; }
+      main::before {
+        width: 320px;
+        height: 320px;
+        background: #4B79A1;
+        top: -60px;
+        left: -40px;
+      }
 
-      .deadline-shell.is-minimized .deadline-panel { display: none; }
-      .deadline-shell.is-minimized .deadline-fab { display: flex; }
+      main::after {
+        width: 260px;
+        height: 260px;
+        background: #283E51;
+        bottom: -80px;
+        right: -40px;
+      }
 
-      .deadline-fab {
-        display: none;
-        margin-left: auto;
-        width: 54px;
-        height: 54px;
-        border-radius: 16px;
-        background: linear-gradient(180deg, #fff7dd 0%, #fff0be 100%);
-        border: 1px solid rgba(255, 207, 90, 0.7);
-        box-shadow: 0 16px 35px rgba(0,0,0,0.25);
+      /* ==========================================================
+         LOGIN CARD (sofisticado, como no seu print)
+         - sem depender do header
+         ========================================================== */
+      .container-login {
+        position: relative;
+        z-index: 1;
+        background: rgba(255, 255, 255, 0.98);
+        padding: 34px 30px;
+        border-radius: 18px;
+        box-shadow:
+          0 18px 40px rgba(0, 0, 0, 0.35),
+          0 2px 0 rgba(255,255,255,0.35) inset;
+        width: 100%;
+        max-width: 420px;
+        color: #283E51;
+      }
+
+      .login-brand {
+        text-align: center;
+        margin-bottom: 18px;
+      }
+
+      .brand-circle {
+        width: 62px;
+        height: 62px;
+        border-radius: 999px;
+        margin: 0 auto 12px;
+        background: linear-gradient(135deg, #283E51, #4B79A1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 1.2rem;
+        letter-spacing: 0.02em;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+      }
+
+      .login-brand h2 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1.35rem;
+        color: #24384a;
+      }
+
+      .login-brand p {
+        margin: 6px 0 0;
+        font-size: 0.9rem;
+        color: #6b7a89;
+      }
+
+      label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #33485a;
+        margin-bottom: 8px;
+      }
+
+      .form-group { margin-bottom: 18px; }
+
+      /* Wrapper do campo + olho */
+      .password-wrapper { position: relative; }
+      .password-wrapper .form-control { padding-right: 44px; }
+
+      .form-control {
+        border-radius: 12px;
+        border: 1px solid #d0d7de;
+        height: 46px;
+        font-size: 0.95rem;
+      }
+
+      .form-control:focus {
+        border-color: #4B79A1;
+        box-shadow: 0 0 0 0.18rem rgba(75, 121, 161, 0.22);
+      }
+
+      .toggle-password {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        border: none;
+        background: transparent;
+        width: 34px;
+        height: 34px;
+        display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        position: relative;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        color: #4B79A1;
+        border-radius: 10px;
       }
 
-      .deadline-fab:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+      .toggle-password:hover {
+        background: rgba(75, 121, 161, 0.08);
       }
 
-      .deadline-fab i { color: #1f3344; font-size: 1.1rem; }
+      .toggle-password:focus { outline: none; }
 
-      .deadline-fab .badge-count {
-        position: absolute;
-        top: -7px;
-        right: -7px;
-        min-width: 22px;
-        height: 22px;
+      .btn-primary {
+        background: linear-gradient(135deg, #283E51, #4B79A1);
+        border: none;
         border-radius: 999px;
-        padding: 0 6px;
-        background: #ffcf5a;
-        border: 1px solid rgba(31, 51, 68, 0.18);
-        color: #1f3344;
-        font-weight: 700;
-        font-size: 0.75rem;
+        height: 46px;
+        font-weight: 600;
+        font-size: 0.98rem;
+        letter-spacing: 0.02em;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+        box-shadow: 0 14px 28px rgba(0,0,0,0.18);
       }
 
-      .deadline-panel {
-        width: 100%;
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #1f3040, #3d6384);
+      }
+
+      .btn-primary:focus {
+        box-shadow: 0 0 0 0.18rem rgba(75, 121, 161, 0.28);
+      }
+
+      .error {
+        color: #d93025;
+        margin-top: 10px;
+        font-size: 0.85rem;
+        text-align: center;
+      }
+
+      .helper-box {
+        background: #f4f6fb;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 0.82rem;
+        color: #4a5563;
+        margin-top: 18px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .helper-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 5px;
+        background: #4B79A1;
+        flex-shrink: 0;
+      }
+
+      footer {
+        background-color: rgba(0, 0, 0, 0.22);
+        color: #e5e5e5;
+        text-align: center;
+        padding: 10px 16px;
+        font-size: 0.8rem;
+      }
+
+      /* ==========================================================
+         ALERTAS DE PRAZO (FIXO NO CANTO DIREITO, NÃO EMPURRA CONTEÚDO)
+         - só aparece quando logado
+         - fechar NÃO persiste (volta a aparecer)
+         ========================================================== */
+      .deadline-wrap {
+        position: fixed;
+        top: calc(var(--header-h) + 14px);
+        right: 14px;
+        z-index: 60;
+        width: min(420px, calc(100% - 28px));
+        pointer-events: none;
+      }
+
+      .deadline-card {
+        pointer-events: auto;
         background: rgba(255, 255, 255, 0.97);
         color: #283E51;
         border-radius: 16px;
         overflow: hidden;
-        border: 1px solid rgba(255, 207, 90, 0.55);
         box-shadow: 0 18px 45px rgba(0,0,0,0.26);
+        border: 1px solid rgba(255, 207, 90, 0.55);
       }
 
       .deadline-topbar {
@@ -172,7 +325,7 @@
 
       .deadline-btn {
         border: 1px solid rgba(40, 62, 81, 0.15);
-        background: rgba(255,255,255,0.9);
+        background: rgba(255,255,255,0.92);
         color: #283E51;
         border-radius: 999px;
         height: 32px;
@@ -180,7 +333,6 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
         cursor: pointer;
         font-weight: 600;
         font-size: 0.82rem;
@@ -193,17 +345,12 @@
         border-color: rgba(75, 121, 161, 0.4);
       }
 
-      .deadline-btn:focus {
-        outline: none;
-        box-shadow: 0 0 0 0.15rem rgba(75, 121, 161, 0.22);
-      }
-
       .deadline-body {
-        padding: 12px 14px 10px;
+        padding: 12px 14px 12px;
         display: flex;
         flex-direction: column;
         gap: 10px;
-        max-height: 220px;
+        max-height: 240px;
         overflow: auto;
         background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(250,252,255,1) 100%);
       }
@@ -249,261 +396,111 @@
         line-height: 1.3;
       }
 
-      .deadline-panel.is-collapsed .deadline-body,
-      .deadline-panel.is-collapsed .deadline-footer { display: none; }
-
-      /* RODAPÉ INTERNO DO ALERTA (CTA) */
       .deadline-footer {
-        padding: 10px 12px;
-        background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        padding: 10px 14px 14px;
         border-top: 1px solid #e6edf5;
+        background: rgba(255,255,255,0.98);
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .deadline-footer-hint {
-        margin: 0;
-        font-size: 0.78rem;
-        color: #5d6c7a;
-        line-height: 1.2;
-      }
-
-      /* Remove estilo padrão de link em qualquer estado */
-      .deadline-cta,
-      .deadline-cta:link,
-      .deadline-cta:visited,
-      .deadline-cta:hover,
-      .deadline-cta:active {
-        text-decoration: none !important;
-        color: #ffffff !important;
+        justify-content: flex-end;
       }
 
       .deadline-cta {
+        text-decoration: none !important;
+        color: #ffffff !important;
+        background: linear-gradient(135deg, #283E51, #4B79A1);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-weight: 600;
+        font-size: 0.86rem;
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        font-weight: 700;
-        font-size: 0.82rem;
-        background: linear-gradient(135deg, #283E51, #4B79A1);
-        border: 1px solid rgba(40,62,81,0.2);
-        box-shadow: 0 10px 22px rgba(0,0,0,0.16);
-        transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
-        white-space: nowrap;
+        border: 1px solid rgba(40, 62, 81, 0.12);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+        transition: transform 0.12s ease, filter 0.12s ease;
       }
 
       .deadline-cta:hover {
         transform: translateY(-1px);
-        box-shadow: 0 14px 28px rgba(0,0,0,0.20);
-        filter: brightness(1.02);
+        filter: brightness(0.98);
+        color: #ffffff !important;
       }
 
-      .deadline-cta:focus {
-        outline: none;
-        box-shadow: 0 0 0 0.15rem rgba(75, 121, 161, 0.28), 0 14px 28px rgba(0,0,0,0.20);
+      .deadline-wrap.collapsed .deadline-body { display: none; }
+
+      @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(10px); }
+        to   { opacity: 1; transform: translateX(0); }
       }
-
-      @keyframes slideInSoft {
-        from { opacity: 0; transform: translateY(-8px); }
-        to   { opacity: 1; transform: translateY(0); }
-      }
-      .deadline-panel.animate-in { animation: slideInSoft 0.22s ease-out; }
-
-      main {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px 16px;
-        position: relative;
-        overflow: hidden;
-      }
-
-      main::before,
-      main::after {
-        content: "";
-        position: absolute;
-        border-radius: 50%;
-        opacity: 0.12;
-        filter: blur(2px);
-      }
-
-      main::before {
-        width: 320px;
-        height: 320px;
-        background: #4B79A1;
-        top: -60px;
-        left: -40px;
-      }
-
-      main::after {
-        width: 260px;
-        height: 260px;
-        background: #283E51;
-        bottom: -80px;
-        right: -40px;
-      }
-
-      .container-login {
-        position: relative;
-        z-index: 1;
-        background: rgba(255, 255, 255, 0.98);
-        padding: 32px 28px;
-        border-radius: 16px;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-        width: 100%;
-        max-width: 420px;
-        color: #283E51;
-      }
-
-      label {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #374a5a;
-        margin-bottom: 6px;
-      }
-
-      .form-group { margin-bottom: 18px; }
-
-      .password-wrapper { position: relative; }
-      .password-wrapper .form-control { padding-right: 44px; }
-
-      .form-control {
-        border-radius: 10px;
-        border: 1px solid #d0d7de;
-        height: 44px;
-        font-size: 0.95rem;
-      }
-
-      .form-control:focus {
-        border-color: #4B79A1;
-        box-shadow: 0 0 0 0.15rem rgba(75, 121, 161, 0.25);
-      }
-
-      .toggle-password {
-        position: absolute;
-        top: 50%;
-        right: 12px;
-        transform: translateY(-50%);
-        border: none;
-        background: transparent;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        color: #4B79A1;
-      }
-
-      .toggle-password:focus { outline: none; }
-      .toggle-password i { font-size: 1rem; pointer-events: none; }
-
-      .btn-primary {
-        background: linear-gradient(135deg, #283E51, #4B79A1);
-        border: none;
-        border-radius: 999px;
-        height: 44px;
-        font-weight: 600;
-        font-size: 0.95rem;
-        letter-spacing: 0.02em;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .btn-primary:hover { background: linear-gradient(135deg, #1f3040, #3d6384); }
-      .btn-primary:focus { box-shadow: 0 0 0 0.15rem rgba(75, 121, 161, 0.35); }
-
-      footer {
-        background-color: rgba(0, 0, 0, 0.22);
-        color: #e5e5e5;
-        text-align: center;
-        padding: 10px 16px;
-        font-size: 0.8rem;
-      }
-
-      @media (max-width: 768px) {
-        .deadline-float {
-          top: auto;
-          bottom: 14px;
-          right: 12px;
-          left: 12px;
-          width: auto;
-          max-width: none;
-        }
+      .deadline-card.animate-in {
+        animation: slideInRight 0.18s ease-out;
       }
 
       @media (max-width: 480px) {
-        header h1 { font-size: 1.4rem; }
+        header h1 { font-size: 1.35rem; }
         header span { font-size: 0.95rem; }
-        .container-login { padding: 24px 18px; border-radius: 14px; }
-        .deadline-topbar { padding: 10px 12px; }
-        .deadline-body { padding: 10px 12px 8px; max-height: 190px; }
-        .deadline-title { font-size: 0.92rem; }
-        .deadline-footer { flex-direction: column; align-items: stretch; }
-        .deadline-cta { justify-content: center; }
+
+        .container-login { padding: 26px 20px; border-radius: 16px; }
+
+        .deadline-wrap {
+          left: 12px;
+          right: 12px;
+          width: auto;
+          top: calc(var(--header-h) + 12px);
+        }
       }
 
+      {# CSS adicional específico de cada página (apenas declarações CSS, sem <style>) #}
       {% block extra_styles %}{% endblock %}
     </style>
   </head>
 
   <body>
-    <header id="app-header">
-      <h1>E.M. José Padin Mouta</h1>
-      <span>Sistema da Secretaria Escolar</span>
-    </header>
+    {# Header só quando logado (mantém login “limpo” como no seu print) #}
+    {% if session.get('logged_in') %}
+      <header id="app-header">
+        <h1>E.M. José Padin Mouta</h1>
+        <span>Sistema da Secretaria Escolar</span>
+      </header>
+    {% endif %}
 
+    {# ALERTA (FIXO, SÓ QUANDO LOGADO) #}
     {% if session.get('logged_in') and deadline_alerts and deadline_alerts|length %}
-      <div class="deadline-float" aria-label="Alertas de prazo">
-        <div id="deadlineShell" class="deadline-shell">
-          <button type="button" id="deadlineFab" class="deadline-fab" aria-label="Abrir alertas de prazo">
-            <i class="fas fa-bell"></i>
-            <span class="badge-count">{{ deadline_alerts|length }}</span>
-          </button>
+      <div id="deadline-wrap" class="deadline-wrap" aria-label="Alertas de prazo">
+        <div id="deadline-card" class="deadline-card">
+          <div class="deadline-topbar">
+            <p class="deadline-title">
+              <span class="bell"><i class="fas fa-bell"></i></span>
+              Prazos de envio
+            </p>
 
-          <div id="deadlinePanel" class="deadline-panel">
-            <div class="deadline-topbar">
-              <p class="deadline-title">
-                <span class="bell"><i class="fas fa-bell"></i></span>
-                Prazos de envio
-              </p>
-
-              <div class="deadline-actions">
-                <button type="button" class="deadline-btn" id="deadlineToggleBtn" aria-label="Recolher/Expandir">
-                  <i class="fas fa-chevron-up" id="deadlineToggleIcon"></i>
-                </button>
-                <button type="button" class="deadline-btn" id="deadlineMinBtn" aria-label="Minimizar">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
+            <div class="deadline-actions">
+              <button type="button" class="deadline-btn" id="deadlineToggleBtn" aria-label="Recolher/Expandir">
+                <i class="fas fa-chevron-up" id="deadlineToggleIcon"></i>
+              </button>
+              <button type="button" class="deadline-btn" id="deadlineCloseBtn" aria-label="Fechar">
+                <i class="fas fa-times"></i>
+              </button>
             </div>
+          </div>
 
-            <div class="deadline-body" id="deadlineBody">
-              {% for a in deadline_alerts %}
-                <div class="deadline-item">
-                  <div class="deadline-item-top">
-                    <p class="deadline-item-title">{{ a.title }}</p>
-                    <p class="deadline-pill">{{ a.status }}</p>
-                  </div>
-                  <p class="deadline-item-msg">{{ a.message }}</p>
+          <div class="deadline-body" id="deadlineBody">
+            {% for a in deadline_alerts %}
+              <div class="deadline-item">
+                <div class="deadline-item-top">
+                  <p class="deadline-item-title">{{ a.title }}</p>
+                  <p class="deadline-pill">{{ a.status }}</p>
                 </div>
-              {% endfor %}
-            </div>
+                <p class="deadline-item-msg">{{ a.message }}</p>
+              </div>
+            {% endfor %}
+          </div>
 
-            <div class="deadline-footer">
-              <p class="deadline-footer-hint">
-                Para gerar e enviar os arquivos, acesse a área de Quadros.
-              </p>
-              <a class="deadline-cta" href="{{ url_for('quadros') }}" role="button" aria-label="Acessar página de quadros">
-                <i class="fas fa-table"></i>
-                Acessar Quadros
-              </a>
-            </div>
+          <div class="deadline-footer">
+            <a class="deadline-cta" href="{{ url_for('quadros') }}">
+              <i class="fas fa-table"></i>
+              Acessar Quadros
+            </a>
           </div>
         </div>
       </div>
@@ -521,8 +518,8 @@
       (function () {
         function setHeaderHeightVar() {
           var header = document.getElementById('app-header');
-          if (!header) return;
-          var h = header.getBoundingClientRect().height || 76;
+          var h = 0;
+          if (header) h = header.getBoundingClientRect().height || 76;
           document.documentElement.style.setProperty('--header-h', h + 'px');
         }
 
@@ -530,34 +527,27 @@
           setHeaderHeightVar();
           window.addEventListener('resize', setHeaderHeightVar);
 
-          var shell = document.getElementById('deadlineShell');
-          var panel = document.getElementById('deadlinePanel');
-          var fab = document.getElementById('deadlineFab');
-          if (!shell || !panel || !fab) return;
+          var wrap = document.getElementById('deadline-wrap');
+          var card = document.getElementById('deadline-card');
+          if (!wrap || !card) return;
 
-          panel.classList.add('animate-in');
+          card.classList.add('animate-in');
 
-          var minBtn = document.getElementById('deadlineMinBtn');
+          var closeBtn = document.getElementById('deadlineCloseBtn');
           var toggleBtn = document.getElementById('deadlineToggleBtn');
           var toggleIcon = document.getElementById('deadlineToggleIcon');
 
-          if (minBtn) {
-            minBtn.addEventListener('click', function () {
-              shell.classList.add('is-minimized');
+          // Fechar: some apenas até recarregar/navegar (não persiste)
+          if (closeBtn) {
+            closeBtn.addEventListener('click', function () {
+              wrap.style.display = 'none';
             });
           }
 
-          fab.addEventListener('click', function () {
-            shell.classList.remove('is-minimized');
-
-            panel.classList.remove('animate-in');
-            void panel.offsetWidth;
-            panel.classList.add('animate-in');
-          });
-
+          // Recolher/expandir
           if (toggleBtn && toggleIcon) {
             toggleBtn.addEventListener('click', function () {
-              var collapsed = panel.classList.toggle('is-collapsed');
+              var collapsed = wrap.classList.toggle('collapsed');
               toggleIcon.classList.toggle('fa-chevron-up', !collapsed);
               toggleIcon.classList.toggle('fa-chevron-down', collapsed);
             });
@@ -566,7 +556,9 @@
       })();
     </script>
 
+    {# Scripts extras por página (modo antigo) #}
     {% block extra_scripts %}{% endblock %}
+    {# Scripts extras por página (novo, usado nas declarações) #}
     {% block extra_js %}{% endblock %}
   </body>
 </html>
