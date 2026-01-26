@@ -235,7 +235,7 @@ def is_valid_plano(val):
 #  CARTEIRINHAS – GERAÇÃO DE HTML
 # ==========================================================
 
-def gerar_html_carteirinhas(arquivo_excel):
+def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False):
     # Lê a planilha do Fundamental
     planilha = pd.read_excel(arquivo_excel, sheet_name="LISTA CORRIDA")
 
@@ -319,10 +319,16 @@ def gerar_html_carteirinhas(arquivo_excel):
             }
         )
 
+    # --- AQUI ENTRA O FILTRO ---
+    if somente_com_foto:
+        alunos_para_exibir = [a for a in alunos if a.get("foto_url")]
+    else:
+        alunos_para_exibir = alunos
+
     # Paginação: 6 carteirinhas por página
     pages = []
-    for i in range(0, len(alunos), 6):
-        pages.append(alunos[i: i + 6])
+    for i in range(0, len(alunos_para_exibir), 6):
+        pages.append(alunos_para_exibir[i: i + 6])
 
     total_sem_foto = len(alunos_sem_fotos_list)
 
@@ -331,7 +337,9 @@ def gerar_html_carteirinhas(arquivo_excel):
         pages=pages,
         alunos_sem_foto=alunos_sem_fotos_list,
         total_sem_foto=total_sem_foto,
+        somente_com_foto=somente_com_foto,  # opcional: p/ mostrar estado do filtro na tela
     )
+
 
 
 # ==========================================================
@@ -1872,6 +1880,10 @@ def carteirinhas():
     if request.method == "POST":
         file_path = None
 
+        # Checkbox no form (ex.: <input type="checkbox" name="somente_com_foto">)
+        somente_com_foto = request.form.get("somente_com_foto") in ("1", "on", "true", "True", "SIM", "sim")
+        session["carteirinhas_somente_com_foto"] = somente_com_foto
+
         if "excel_file" in request.files and request.files["excel_file"].filename != "":
             file = request.files["excel_file"]
             filename = secure_filename(file.filename)
@@ -1887,10 +1899,15 @@ def carteirinhas():
             return redirect(url_for("carteirinhas"))
 
         flash("Gerando carteirinhas. Aguarde...", "info")
-        html_result = gerar_html_carteirinhas(file_path)
+        html_result = gerar_html_carteirinhas(
+            file_path,
+            somente_com_foto=somente_com_foto,
+        )
         return html_result
 
-    return render_template("carteirinhas.html")
+    # GET: opcionalmente passa o estado atual do filtro para o template marcar o checkbox
+    somente_com_foto = session.get("carteirinhas_somente_com_foto", False)
+    return render_template("carteirinhas.html", somente_com_foto=somente_com_foto)
 
 
 #  DECLARAÇÕES – CONCLUSÃO 5º ANO (LOTE)
