@@ -281,41 +281,33 @@
 
     .no-print { }
 
-    /* ====== Impressão: MAIS ESPAÇO VERTICAL ENTRE AS LINHAS, SEM QUEBRAR 6 POR PÁGINA ======
-       Ajustes:
-       - Aumenta APENAS o espaçamento vertical do grid no print
-       - Remove margens "sobrando" da página no print (page e page-number)
-       - Mantém 2 colunas x 3 linhas (paginação do backend segue igual)
-    */
+    /* ====== Impressão: MAIS ESPAÇO VERTICAL ENTRE AS LINHAS, SEM QUEBRAR 6 POR PÁGINA ====== */
     @media print {
       .no-print { display: none !important; }
 
       body {
         margin: 0;
-        padding: 0.12cm; /* ligeiramente menor p/ ganhar área útil */
+        padding: 0.12cm;
         font-size: 16px;
         background-color: #ffffff !important;
       }
 
-      /* remove sobra que pode “comer” altura útil */
       .page { page-break-after: always; margin-bottom: 0 !important; }
 
       .page-number {
         font-size: 0.26cm;
-        margin-bottom: 0.08cm; /* menos para liberar altura */
+        margin-bottom: 0.08cm;
       }
 
-      /* MAIS distância ENTRE AS LINHAS (vertical), sem mexer tanto no horizontal */
       .cards-grid {
         gap: 0.92cm 0.75cm; /* vertical horizontal */
       }
 
-      /* pequenos ajustes para garantir que não estoure a página */
       .borda-pontilhada { padding: 0.16cm; }
 
       .carteirinha {
-        width: 10.35cm;     /* mantém o ajuste leve para caber o gap */
-        min-height: 7.65cm; /* um pouco menor para compensar o gap vertical maior */
+        width: 10.35cm;
+        min-height: 7.65cm;
       }
 
       .card-header-band {
@@ -398,7 +390,7 @@
     }
     .alunos-sem-fotos-btn:hover { background-color: #3a5d78; }
 
-    /* ====== Filtro "Somente com foto" (server-side) ====== */
+    /* ====== Filtros (server-side) ====== */
     .filtro-foto-form {
       display: inline-flex;
       align-items: center;
@@ -409,6 +401,7 @@
       padding: 0.18cm 0.28cm;
       border-radius: 999px;
       box-shadow: 0 0.05cm 0.15cm rgba(0,0,0,0.10);
+      flex-wrap: wrap;
     }
     .filtro-foto-form label {
       display: inline-flex;
@@ -610,12 +603,13 @@
     <div class="no-print" style="margin-bottom: 10px;">
       <button class="alunos-sem-fotos-btn" onclick="mostrarRelatorioAlunosSemFotos()">Alunos sem fotos</button>
 
-      <!-- Filtro "Somente com foto" -->
+      <!-- Filtros -->
       <form id="filtro-foto-form"
             class="filtro-foto-form"
             method="POST"
             action="{{ url_for('carteirinhas') }}"
             enctype="multipart/form-data">
+
         <label title="Quando marcado, serão exibidas apenas as carteirinhas que já possuem foto.">
           <input
             type="checkbox"
@@ -626,9 +620,24 @@
           >
           Somente com foto
         </label>
-        {% if (somente_com_foto|default(false)) %}
-          <span class="filtro-foto-pill">(ativo)</span>
+
+        <label title="Quando marcado, serão exibidas apenas as carteirinhas que ainda não foram registradas como impressas.">
+          <input
+            type="checkbox"
+            name="somente_nao_impressas"
+            value="1"
+            {% if (somente_nao_impressas|default(false)) %}checked{% endif %}
+            onchange="document.getElementById('filtro-foto-form').submit();"
+          >
+          Somente não impressas
+        </label>
+
+        {% if (somente_com_foto|default(false)) or (somente_nao_impressas|default(false)) %}
+          <span class="filtro-foto-pill">
+            (ativo{% if (somente_com_foto|default(false)) %} • foto{% endif %}{% if (somente_nao_impressas|default(false)) %} • não impressas{% endif %})
+          </span>
         {% endif %}
+
         <noscript>
           <button type="submit" style="border:none;background:#1976d2;color:#fff;border-radius:999px;padding:0.15cm 0.35cm;cursor:pointer;">
             Aplicar
@@ -705,7 +714,7 @@
                       <span class="icon">{{ aluno.status_icon|safe }}</span>
                       <span class="status-text">{{ aluno.status_texto }}</span>
                     </div>
-                    <div class="year-pill">2026</div>
+                    <div class="year-pill">{{ ano|default(2026) }}</div>
                   </div>
                 </div>
               </div>
@@ -716,8 +725,8 @@
     {% else %}
       <div class="no-print" style="margin-top: 0.6cm; color:#455a64; font-weight:700;">
         Nenhuma carteirinha para exibir.
-        {% if (somente_com_foto|default(false)) %}
-          (O filtro “Somente com foto” está ativo.)
+        {% if (somente_com_foto|default(false)) or (somente_nao_impressas|default(false)) %}
+          (Verifique os filtros ativos.)
         {% endif %}
       </div>
     {% endif %}
@@ -842,12 +851,67 @@ window.onload = function() {
     }
 };
 
+/* ==========================================================
+   NOVO: LOGAR IMPRESSÃO (somente para não reimprimir depois)
+   - Coleta os RMs visíveis
+   - POST /carteirinhas/marcar_impressas  {rms:[...], ano:YYYY}
+========================================================== */
+
+function coletarRMsVisiveis(scopeEl) {
+  var scope = scopeEl || document;
+  var cards = Array.prototype.slice.call(scope.querySelectorAll('.borda-pontilhada'));
+  var rms = [];
+  cards.forEach(function(card) {
+    if (card.style && card.style.display === 'none') return;
+    var rm = card.getAttribute('data-rm');
+    if (!rm) return;
+    var v = parseInt(rm, 10);
+    if (!isNaN(v) && v > 0) rms.push(v);
+  });
+  // unique preservando ordem
+  var seen = {};
+  var out = [];
+  rms.forEach(function(x){
+    if (!seen[x]) { seen[x] = true; out.push(x); }
+  });
+  return out;
+}
+
+function getCsrfTokenIfAny() {
+  var meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute('content') : null;
+}
+
+function marcarImpressas(rms) {
+  if (!rms || !rms.length) return Promise.resolve(null);
+
+  var ano = parseInt("{{ ano|default(2026) }}", 10);
+  var headers = { 'Content-Type': 'application/json' };
+
+  var csrf = getCsrfTokenIfAny();
+  if (csrf) headers['X-CSRFToken'] = csrf;
+
+  return fetch('/carteirinhas/marcar_impressas', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({ rms: rms, ano: ano })
+  })
+  .then(function(resp){ return resp.json(); })
+  .catch(function(){ return null; });
+}
+
+// expõe para a janela de impressão (window.open)
+window._marcarImpressas = marcarImpressas;
+
 function imprimirCarteirinhas() {
     var container = document.querySelector('.carteirinhas-container');
     if (!container) {
       window.print();
       return;
     }
+
+    // Coleta os RMs visíveis (respeita busca/filtros)
+    var rms = coletarRMsVisiveis(container);
 
     var styleTag = document.querySelector('style');
     var css = styleTag ? styleTag.innerHTML : '';
@@ -860,29 +924,44 @@ function imprimirCarteirinhas() {
       '<style>' + css + '</style>' +
       '</head><body>' +
       container.outerHTML +
+      '<script>' +
+        'window.onafterprint = function(){' +
+          'try{ if(window.opener && window.opener._marcarImpressas){ window.opener._marcarImpressas(' + JSON.stringify(rms) + '); } }catch(e){}' +
+        '};' +
+      '<\/script>' +
       '</body></html>'
     );
     printWindow.document.close();
     printWindow.focus();
     printWindow.onload = function() {
       printWindow.print();
-      printWindow.close();
+      // não fecha imediatamente para garantir afterprint em alguns navegadores
+      setTimeout(function(){ try{ printWindow.close(); }catch(e){} }, 700);
     };
 }
 
 function imprimirPagina(botao) {
     let pagina = botao.closest('.page');
     let todasPaginas = document.querySelectorAll('.page');
+
+    // Coleta RMs só da página atual
+    var rms = coletarRMsVisiveis(pagina);
+
     todasPaginas.forEach(p => {
       if (p !== pagina) {
         p.style.display = 'none';
       }
     });
+
     setTimeout(() => {
+      window.onafterprint = function() {
+        marcarImpressas(rms);
+        window.onafterprint = null;
+      };
+
       window.print();
-      todasPaginas.forEach(p => {
-        p.style.display = '';
-      });
+
+      todasPaginas.forEach(p => { p.style.display = ''; });
     }, 100);
 }
 
@@ -910,7 +989,7 @@ function verCarteirinha(rm) {
         card.classList.remove('card-highlight');
       }, 1500);
     } else {
-      alert('Essa carteirinha não está visível na tela (provavelmente porque o filtro "Somente com foto" está ativo). Desative o filtro e gere novamente para localizá-la.');
+      alert('Essa carteirinha não está visível na tela (pode estar oculta por filtros ou busca). Desative os filtros e gere novamente para localizá-la.');
     }
 }
 

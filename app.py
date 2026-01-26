@@ -231,11 +231,63 @@ def is_valid_plano(val):
     return s not in ["", "-", "0", "#REF"]
 
 
+import os
+import json
+from datetime import datetime
+import pandas as pd
+from flask import render_template, request, jsonify
+
+# ==========================================================
+#  CARTEIRINHAS – LOG DE IMPRESSÃO (JSON)
+# ==========================================================
+
+def _carteirinhas_printlog_path():
+    # usa a mesma pasta de uploads do sistema (ajuste se necessário)
+    base_dir = "uploads"
+    os.makedirs(base_dir, exist_ok=True)
+    return os.path.join(base_dir, "carteirinhas_print_log.json")
+
+
+def _load_print_log():
+    path = _carteirinhas_printlog_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        # se corromper por qualquer motivo, não trava o sistema
+        return {}
+
+
+def _save_print_log(data: dict):
+    path = _carteirinhas_printlog_path()
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+def _get_printed_set(ano: int) -> set:
+    log = _load_print_log()
+    bloco = log.get(str(ano), {})
+    printed = set()
+    for v in bloco.get("printed_rms", []):
+        try:
+            printed.add(int(v))
+        except Exception:
+            pass
+    return printed
+
+
 # ==========================================================
 #  CARTEIRINHAS – GERAÇÃO DE HTML
 # ==========================================================
 
-def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False):
+def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False, somente_nao_impressas=False, ano=None):
+    ano = int(ano or datetime.now().year)
+    printed_set = _get_printed_set(ano)
+
     # Lê a planilha do Fundamental
     planilha = pd.read_excel(arquivo_excel, sheet_name="LISTA CORRIDA")
 
@@ -256,6 +308,7 @@ def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False):
     allowed_exts = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
 
     for row in registros_validos:
+        rm_int = int(row["RM"])
         nome = row["NOME"]
         data_nasc = row["DATA NASC."]
         serie = row["SÉRIE"]
@@ -290,23 +343,26 @@ def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False):
         # Foto
         foto_url = None
         for ext in allowed_exts:
-            caminho_foto = f"static/fotos/{row['RM']}{ext}"
+            caminho_foto = f"static/fotos/{rm_int}{ext}"
             if os.path.exists(caminho_foto):
-                foto_url = f"/static/fotos/{row['RM']}{ext}"
+                foto_url = f"/static/fotos/{rm_int}{ext}"
                 break
 
         if not foto_url:
             alunos_sem_fotos_list.append(
                 {
-                    "rm": int(row["RM"]),
+                    "rm": rm_int,
                     "nome": nome,
                     "serie": serie,
                 }
             )
 
+        # flag de impressão (lógica nova)
+        impresso = (rm_int in printed_set)
+
         alunos.append(
             {
-                "rm": int(row["RM"]),
+                "rm": rm_int,
                 "nome": nome,
                 "data_nasc": data_nasc_str,
                 "ra": ra,
@@ -316,16 +372,22 @@ def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False):
                 "status_texto": status_texto,
                 "status_icon": status_icon,
                 "foto_url": foto_url,
+                "impresso": impresso,  # <<< NOVO
             }
         )
 
-    # --- AQUI ENTRA O FILTRO ---
-    if somente_com_foto:
-        alunos_para_exibir = [a for a in alunos if a.get("foto_url")]
-    else:
-        alunos_para_exibir = alunos
+    # --- FILTROS ---
+    alunos_para_exibir = alunos
 
-    # Paginação: 6 carteirinhas por página
+    # mantém seu filtro atual
+    if somente_com_foto:
+        alunos_para_exibir = [a for a in alunos_para_exibir if a.get("foto_url")]
+
+    # novo filtro: não impressas
+    if somente_nao_impressas:
+        alunos_para_exibir = [a for a in alunos_para_exibir if not a.get("impresso")]
+
+    # Paginação: 6 carteirinhas por página (mantém)
     pages = []
     for i in range(0, len(alunos_para_exibir), 6):
         pages.append(alunos_para_exibir[i: i + 6])
@@ -337,8 +399,96 @@ def gerar_html_carteirinhas(arquivo_excel, somente_com_foto=False):
         pages=pages,
         alunos_sem_foto=alunos_sem_fotos_list,
         total_sem_foto=total_sem_foto,
-        somente_com_foto=somente_com_foto,  # opcional: p/ mostrar estado do filtro na tela
+        somente_com_foto=somente_com_foto,
+        somente_nao_impressas=somente_nao_impressas,  # <<< NOVO (se quiser mostrar no template)
+        ano=ano,                                      # <<< NOVO (útil p/ log por ano)
     )
+
+
+# ==========================================================
+#  (NECESSÁRIO) CARTEIRINHAS – MARCAR COMO IMPRESSAS
+#  -> seu JS chama isso depois de imprimir (ou ao clicar em "Imprimir")
+# ==========================================================
+
+# OBS: se você já tem login_required, mantenha aqui também
+# @login_required
+def _normalize_rms(rms):
+    out = []
+    for x in (rms or []):
+        try:
+            v = int(str(x).strip())
+            if v > 0:
+                out.append(v)
+        except Exception:
+            pass
+    # unique preservando ordem
+    return list(dict.fromkeys(out))
+
+
+import os
+from datetime import datetime
+from flask import request, jsonify
+
+# Se você usa CSRFProtect (Flask-WTF), descomente a linha do csrf.exempt
+# from flask_wtf.csrf import CSRFProtect
+# csrf = CSRFProtect(app)
+
+ALLOWED_FOTO_EXTS = [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
+
+
+def _rm_tem_foto(rm: int) -> bool:
+    for ext in ALLOWED_FOTO_EXTS:
+        caminho = os.path.join("static", "fotos", f"{rm}{ext}")
+        if os.path.exists(caminho):
+            return True
+    return False
+
+
+@app.route("/carteirinhas/marcar_impressas", methods=["POST"])
+@login_required
+# @csrf.exempt  # use isto se CSRF estiver bloqueando POST JSON
+def marcar_carteirinhas_impressas():
+    payload = request.get_json(silent=True) or {}
+    rms = _normalize_rms(payload.get("rms", []))
+    ano = int(payload.get("ano") or datetime.now().year)
+
+    # REGRA-CHAVE: só marca como "impressa" se tiver foto de verdade
+    rms = [rm for rm in rms if _rm_tem_foto(rm)]
+
+    log = _load_print_log()
+    key = str(ano)
+
+    if key not in log:
+        log[key] = {"printed_rms": [], "printed_at": {}}
+
+    printed_set = set()
+    for v in log[key].get("printed_rms", []):
+        try:
+            printed_set.add(int(v))
+        except Exception:
+            pass
+
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    added = 0
+
+    for rm in rms:
+        if rm not in printed_set:
+            printed_set.add(rm)
+            added += 1
+        # você pode manter isso (atualiza o timestamp mesmo se já constava)
+        log[key].setdefault("printed_at", {})[str(rm)] = now_iso
+
+    log[key]["printed_rms"] = sorted(list(printed_set))
+    _save_print_log(log)
+
+    return jsonify({
+        "ok": True,
+        "ano": ano,
+        "received": len(_normalize_rms(payload.get("rms", []))),  # recebido bruto
+        "considered_with_photo": len(rms),                        # após filtro foto
+        "added": added,
+        "total_printed": len(printed_set),
+    })
 
 
 
@@ -1871,7 +2021,10 @@ def dashboard():
 
 
 # ==========================================================
-#  CARTEIRINHAS – ROTA PRINCIPAL
+#  CARTEIRINHAS – ROTA PRINCIPAL (AJUSTADA)
+#  - Mantém tudo que já existe
+#  - Adiciona suporte ao filtro "somente_nao_impressas"
+#  - Persiste ambos filtros em session p/ GET
 # ==========================================================
 
 @app.route("/carteirinhas", methods=["GET", "POST"])
@@ -1883,6 +2036,11 @@ def carteirinhas():
         # Checkbox no form (ex.: <input type="checkbox" name="somente_com_foto">)
         somente_com_foto = request.form.get("somente_com_foto") in ("1", "on", "true", "True", "SIM", "sim")
         session["carteirinhas_somente_com_foto"] = somente_com_foto
+
+        # NOVO: checkbox "somente_nao_impressas"
+        # (ex.: <input type="checkbox" name="somente_nao_impressas">)
+        somente_nao_impressas = request.form.get("somente_nao_impressas") in ("1", "on", "true", "True", "SIM", "sim")
+        session["carteirinhas_somente_nao_impressas"] = somente_nao_impressas
 
         if "excel_file" in request.files and request.files["excel_file"].filename != "":
             file = request.files["excel_file"]
@@ -1902,12 +2060,20 @@ def carteirinhas():
         html_result = gerar_html_carteirinhas(
             file_path,
             somente_com_foto=somente_com_foto,
+            somente_nao_impressas=somente_nao_impressas,  # NOVO
+            ano=datetime.now().year,                      # NOVO (para log por ano)
         )
         return html_result
 
-    # GET: opcionalmente passa o estado atual do filtro para o template marcar o checkbox
+    # GET: passa o estado atual dos filtros para o template marcar os checkbox
     somente_com_foto = session.get("carteirinhas_somente_com_foto", False)
-    return render_template("carteirinhas.html", somente_com_foto=somente_com_foto)
+    somente_nao_impressas = session.get("carteirinhas_somente_nao_impressas", False)
+
+    return render_template(
+        "carteirinhas.html",
+        somente_com_foto=somente_com_foto,
+        somente_nao_impressas=somente_nao_impressas,  # NOVO
+    )
 
 
 #  DECLARAÇÕES – CONCLUSÃO 5º ANO (LOTE)
